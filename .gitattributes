@@ -1,0 +1,14 @@
+# Line endings: LF in the repository and in every working copy.
+# Without this, a Windows checkout and a WSL checkout disagree on every line,
+# producing whole-file diffs that hide the real changes.
+* text=auto eol=lf
+
+# Binary files — never normalise
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.zip  binary
+*.pptx binary
+*.xlsx binary
