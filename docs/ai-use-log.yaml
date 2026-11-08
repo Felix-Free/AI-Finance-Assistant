@@ -1,1 +1,17 @@
 # AI Use Log
+
+# Log 1: Initial Skeleton Generation by Agent
+- date: "2026-11-06"
+  student: "D"
+  tool: "OpenCode (DeepSeek API)"
+  action: "Generated the initial project directory structure and baseline configuration files."
+  artifact_affected: "src/, test/, docs/, .gitignore, etc."
+  human_intervention: "None (Initial generation phase)."
+
+# Log 2: Human Review and Directory Rectification
+- date: "2026-11-08"
+  student: "A"
+  tool: "Human Review (Manual)"
+  action: "Reviewed PR #6. Identified that the AI agent missed critical governance directories (.github/workflows, .opencode, .agent). Manually added the missing directories and approved the merge."
+  artifact_affected: ".github/, .opencode/, .agent/, Report.md, etc."
+  human_intervention: "Rejected the incomplete AI-generated structure. Manually supplemented hidden directories to enforce architectural constraints and CI governance."
