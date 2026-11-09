@@ -30,7 +30,16 @@ SYSTEM_PROMPT = (
 
 
 class LlmTransportError(RuntimeError):
-    """Raised when the model call itself fails (network, auth, quota)."""
+    """Raised when the model call itself fails (network, auth, quota, protocol).
+
+    Optional ``status_code`` / ``body`` carry HTTP details so the caller can
+    log them without re-reading the response.
+    """
+
+    def __init__(self, message, status_code=None, body=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.body = body
 
 
 def _append_log(record: dict) -> None:
@@ -43,12 +52,73 @@ def _append_log(record: dict) -> None:
         raise LlmTransportError(f"cannot write call log: {exc}") from exc
 
 
-def extract(text: str) -> dict:
-    """Call the model once and return the parsed JSON object.
+def _post(payload: dict) -> str:
+    """Perform the HTTP call and return the model's raw response string.
 
-    Raises LlmTransportError on transport failure, and json.JSONDecodeError
-    when the model returns something that is not JSON (the caller decides
-    whether that becomes a rejection).
+    Module-level (not a closure) so a test can replace it with monkeypatch.
+
+    Raises LlmTransportError on any transport or protocol failure: network
+    error, non-200 status, or a response envelope that cannot be parsed into
+    {"choices": [{"message": {"content": <str>}}]}. Protocol failures must
+    never escape as KeyError / IndexError / ValueError.
+    """
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        raise LlmTransportError("transport: %s" % exc) from exc
+
+    if resp.status_code != 200:
+        raise LlmTransportError(
+            "http %s" % resp.status_code,
+            status_code=resp.status_code,
+            body=resp.text[:500],
+        )
+
+    try:
+        envelope = resp.json()
+    except ValueError as exc:
+        raise LlmTransportError(
+            "protocol: cannot parse response json: %s" % exc
+        ) from exc
+
+    try:
+        content = envelope["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmTransportError(
+            "protocol: malformed response envelope: %r" % (exc,)
+        ) from exc
+
+    if not isinstance(content, str):
+        raise LlmTransportError(
+            "protocol: content is not a string: %r" % (type(content).__name__,)
+        )
+    return content
+
+
+def extract(text: str) -> dict:
+    """Call the model once and return the UNVALIDATED parsed JSON object.
+
+    The returned dict is raw model output and is NOT trusted. The caller MUST
+    pass it to policy_core.validate_record() before anything may be stored; it
+    must never be persisted directly.
+
+    Exactly one line is appended to logs/llm_calls.jsonl on every path
+    (success, non-JSON content, HTTP non-200, transport failure): log first,
+    then raise or return. If the log cannot be written, the result is not
+    returned (fail-closed).
+
+    Raises LlmTransportError on transport / protocol failure, and
+    json.JSONDecodeError when the model returns something that is not JSON
+    (logged, then re-raised; the caller decides whether that becomes a
+    rejection).
     """
     if not BASE_URL or not API_KEY:
         raise LlmTransportError("LLM_BASE_URL / LLM_API_KEY missing (.env)")
@@ -64,25 +134,15 @@ def extract(text: str) -> dict:
     }
 
     try:
-        resp = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        _append_log({"input": text, "error": f"transport: {exc}"})
-        raise LlmTransportError(str(exc)) from exc
-
-    if resp.status_code != 200:
-        _append_log({"input": text, "error": f"http {resp.status_code}",
-                     "body": resp.text[:500]})
-        raise LlmTransportError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-
-    raw = resp.json()["choices"][0]["message"]["content"]
+        raw = _post(payload)
+    except LlmTransportError as exc:
+        log_record = {"input": text, "error": str(exc)}
+        status_code = getattr(exc, "status_code", None)
+        if status_code is not None:
+            log_record["error"] = "http %s" % status_code
+            log_record["body"] = getattr(exc, "body", "")
+        _append_log(log_record)
+        raise
 
     try:
         parsed = json.loads(raw)
