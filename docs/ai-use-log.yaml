@@ -1,1 +1,57 @@
 # AI Use Log
+#
+# One entry per working session. Append; do not rewrite earlier entries.
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 1
+  topic: security and governance specs
+  tool: opencode
+  files_created:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/permission-model.md
+    - .opencode/permissions.jsonc
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+  summary: >
+    Documented three business invariants (finite positive amount, closed category
+    whitelist, cumulative budget) using role-scoped ids C-INV-001..003 to avoid
+    colliding with the INV-002 already reserved in transcript 60915652, logging
+    integrity recorded as runtime policy RP-004, and a default-deny permission
+    model plus permissions.jsonc whitelist. Specs only; guards are D's, tests E's.
+  human_review:
+    - rejected replacing the budget invariant with a logging-integrity invariant
+    - required C-INV-### numbering instead of redefining global INV ids
+  validation:
+    jsonc_parse: pass (generic JSONC only)
+    pytest: no tests ran (empty suite; not evidence of passing)
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 2
+  topic: final validation of the C-Security artefacts
+  tool: opencode
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+    - .opencode/permissions.jsonc
+  summary: >
+    Re-validated the session-1 artefacts using the project virtual environment
+    ./.venv/bin/python. ai-use-log.yaml parsed (YAML OK). permissions.jsonc parsed
+    with generic JSONC parsing only; no OpenCode-specific permission validator exists
+    in this repository, so schema conformance is not verified. pytest reported no
+    tests ran. Corrected the session-1 transcript where it overstated the YAML and
+    pytest results, added session numbers, and added explicit read-whitelist entries
+    so permissions.jsonc matches permission-model.md; edit permissions remain denied.
+  human_review:
+    - required the OpenCode-validator limitation to be stated explicitly
+    - required the permission config read whitelist to match permission-model.md

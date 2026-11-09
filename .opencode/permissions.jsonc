@@ -1,0 +1,52 @@
+// Permission configuration for the AI coding agent (owner: role C).
+// Design: default deny + explicit whitelist. Deny always overrides allow.
+// See docs/architecture/permission-model.md for the rationale.
+// JSONC: comments are allowed; this is not strict JSON.
+{
+  // Default for every action and every path is deny.
+  "*": "deny",
+
+  // Read access: only the whitelisted subtrees. Secrets stay denied.
+  "read": {
+    "src/**": "allow",
+    "test/**": "allow",
+    "docs/**": "allow",
+    "logs/**": "allow",
+    ".opencode/**": "allow",
+    ".agent/**": "allow",
+    ".github/workflows/**": "allow",
+    "transcripts/**": "allow",
+    ".env": "deny"
+  },
+
+  // Edit access: application code, tests and task-asked architecture docs.
+  "edit": {
+    "src/**": "allow",
+    "test/**": "allow",
+
+    // Architecture/governance docs may be written only when a task asks.
+    "docs/architecture/**": "ask",
+    "docs/code-governance/**": "ask",
+
+    // Requirements, agent config, covenant, CI and transcripts are not ours to write.
+    "docs/req/**": "deny",
+    ".opencode/**": "deny",
+    ".agent/**": "deny",
+    ".github/**": "deny",
+    "transcripts/**": "deny",
+
+    // Runtime output and secrets: never writable by the agent.
+    "logs/**": "deny",
+    ".env": "deny"
+  },
+
+  // Shell access: no commits, pushes or deletions; everything else asks first.
+  "bash": {
+    "git push": "deny",
+    "git commit": "deny",
+    "git reset --hard": "deny",
+    "git clean": "deny",
+    "rm -rf": "deny",
+    "*": "ask"
+  }
+}
