@@ -47,6 +47,15 @@ def test_seam_transport_error_logs_once(captured_log, monkeypatch):
     assert captured_log[0]["input"] == "x"
 
 
+def test_config_error_logs_once(captured_log, monkeypatch):
+    monkeypatch.setattr(call_llm, "BASE_URL", "")
+    monkeypatch.setattr(call_llm, "API_KEY", "")
+    with pytest.raises(call_llm.LlmTransportError):
+        call_llm.extract("x")
+    assert len(captured_log) == 1
+    assert captured_log[0]["error"] == "config: missing base url or key"
+
+
 def test_post_raises_on_malformed_envelope(monkeypatch):
     class FakeResp:
         status_code = 200

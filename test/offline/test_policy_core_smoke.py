@@ -71,9 +71,16 @@ def test_validate_record_stops_at_first_failure():
     assert exc.value.code == "policy:amount"
 
 
+def test_validate_record_rejects_non_dict():
+    with pytest.raises(PolicyError) as exc:
+        validate_record([1, 2], 0.0, 1000.0)
+    assert exc.value.code == "policy:amount"
+    assert exc.value.review is False
+
+
 def test_validate_record_returns_normalised_record():
     record = validate_record({"amount": 350, "category": "food"}, 0.0, 1000.0)
-    assert record == {"amount": 350, "category": "food"}
+    assert record == {"amount": 350, "category": "food", "total": 350.0}
 
 
 def test_policy_core_has_no_io_imports():
