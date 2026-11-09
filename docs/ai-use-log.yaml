@@ -55,3 +55,39 @@
   human_review:
     - required the OpenCode-validator limitation to be stated explicitly
     - required the permission config read whitelist to match permission-model.md
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 3
+  topic: D3 coding-governance files (OpenCode rules, agent covenant, MCP tool manifest)
+  tool: opencode
+  files_created:
+    - .opencode/rules.md
+    - .agent/rules.md
+    - docs/code-governance/mcp-tool-manifest.md
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+  summary: >
+    Created the three D3 governance files. .opencode/rules.md is OpenCode-specific and
+    subordinate to AGENTS.md; .agent/rules.md is tool-agnostic and references AGENTS.md
+    instead of copying it; the MCP tool manifest states that no MCP server is configured
+    and separates application entry points (EP-001/EP-002) and test commands
+    (TC-001/TC-002) from MCP tools. permissions.jsonc was not modified; its broad docs/**
+    and test/** read rules are documented as intentional, not as a mismatch.
+  human_review:
+    - required the manifest not to treat functions or pytest as MCP tools
+    - required the "no MCP server configured" fact to be stated explicitly
+    - required permissions.jsonc to stay unmodified with the equivalence documented
+    - required a malformed change-protocol paragraph in the manifest to be cleaned up
+  validation:
+    yaml_parse: pass (YAML OK via ./.venv/bin/python)
+    git_diff_check: pass
+    pytest: no tests ran (empty suite; not evidence of passing)
+    opencode_mcp_schema: unavailable (no validator in repo)

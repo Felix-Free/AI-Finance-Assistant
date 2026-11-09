@@ -149,3 +149,79 @@ validation remains to be done by E if one is introduced.
 **Reflection.** A validation step is only evidence of what it actually exercised. Generic
 JSON parsing is not schema validation, and "no tests ran" is not "tests passed"; both
 must be written as what they are.
+
+---
+
+## Session 3
+
+**Date.** 2026-11-09 · D3 coding-governance files: OpenCode rules, agent covenant, MCP tool manifest
+
+**Context.** The course project requires three governance files that do not yet exist:
+`.opencode/rules.md`, `.agent/rules.md` and `docs/code-governance/mcp-tool-manifest.md`
+(D3 · owner C, reserved in `structural-constraints.md`). Writing them needs an approved
+exception because `.opencode/**` and `.agent/**` edits are denied and
+`docs/code-governance/**` is `ask`.
+
+**My instruction to the agent.**
+
+```
+Plan first, then create only .opencode/rules.md, .agent/rules.md and
+docs/code-governance/mcp-tool-manifest.md. Keep rules.md OpenCode-specific,
+.agent/rules.md tool-agnostic (reference AGENTS.md, do not copy it), and the
+manifest focused on tools/entry points/roles/approval. Do not treat
+call_llm.extract, enforce_*, or pytest as MCP tools. State that no MCP server is
+configured. Do not touch permissions.jsonc or existing C-Security files.
+```
+
+**Agent output (excerpt).**
+
+```
+I will create the three files with citations to AGENTS.md, permission-model.md,
+invariants.md and runtime-policy-catalog.md. I will keep the broad docs/** and
+test/** read rules of permissions.jsonc as intentional, not errors.
+```
+
+**What I caught.** My plan corrections were carried through, and one agent slip needed
+fixing: the first version of the manifest's change-protocol section ended with a malformed
+duplicate clause. I also held the agent to three design points from the revised plan:
+(1) the manifest must list **no MCP server** because none exists, and must separate
+application entry points (`call_llm.extract`, `policy_core.enforce_*`) and test commands
+(`pytest`) from MCP tools; (2) `.opencode/permissions.jsonc` must **not** be edited — the
+broad `docs/**` / `test/**` read rules are intentional and equivalent in effect to the
+granular paths in `permission-model.md`, so the relationship is documented, not "fixed";
+(3) `rules.md` stays OpenCode-specific while `.agent/rules.md` stays tool-agnostic.
+
+**My correction.**
+
+```
+Do not invent an MCP server. Say plainly that none is configured. Keep the
+manifest's three categories separate: MCP tools, application entry points, test
+commands. Do not edit permissions.jsonc — document the broad-vs-granular
+equivalence instead of demanding string equality. Clean up the malformed
+change-protocol paragraph.
+```
+
+**Result (files created this session).**
+
+- `.opencode/rules.md` — OpenCode-specific binding; precedence `AGENTS.md` first, then
+  permission enforcement, module boundaries, logging, style, OpenCode-specific
+  prohibitions, and a related-documents table.
+- `.agent/rules.md` — tool-agnostic covenant; references `AGENTS.md §3` instead of
+  copying it, defers boundaries to `permission-model.md §2`, lists prohibited actions.
+- `docs/code-governance/mcp-tool-manifest.md` — states **no MCP server is configured**,
+  then lists application entry points (EP-001/EP-002) and test commands (TC-001/TC-002)
+  separately, with a role matrix and a change protocol.
+- `.opencode/permissions.jsonc` was **not** modified. No `src/` or `test/` file changed.
+
+**Validation (what actually ran).** YAML log validation, `git diff --check` and
+`git status` are recorded below in the same session; `pytest test/offline -q` reported
+**no tests ran** (empty suite), reported as such, not as passing. No OpenCode or MCP
+schema validator exists in this repository.
+
+**Open handoffs.** E may add CI verification of these governance files; adding any real
+MCP server requires plan + approval and must update both the manifest and
+`permissions.jsonc` together.
+
+**Reflection.** The value of the manifest is the honest empty section: recording that
+there is no MCP server prevents a later reader from assuming one exists, and keeps
+"app entry point", "test command" and "MCP tool" from being conflated.
