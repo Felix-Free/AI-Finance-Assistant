@@ -71,6 +71,47 @@ proposes, code disposes" therefore belong in `AGENTS.md`, not in my head.
 
 ---
 
+## 2026-11-08 · Boundary decisions before coding (requirement and architecture inputs)
+
+> Requirements and architecture are owned by roles B and C. This entry records only the points
+> where implementation work forced a decision, and what I did with it: **propose, then escalate —
+> never decide unilaterally.**
+
+**Requirement boundary — the category vocabulary must be a closed set.**
+The model answered `category: "food"` for a Chinese sentence, and nothing in the system
+constrained the vocabulary: a second run could have returned `"Food"`, `"餐饮"` or `"meal"`.
+I treated this as a requirement-level question ("what may the record contain?"), not as a code
+detail, and proposed that the vocabulary be a closed set enforced by code — which became
+`INV-002`. Role C owns the specification; my contribution was the trigger and the evidence that
+the free-text answer was unstable.
+
+**Architecture boundary — where validation lives.**
+Three candidate placements for validating model output:
+
+| Candidate | Verdict |
+|---|---|
+| (a) inside `call_llm.extract()` | rejected — mixes transport with policy, and a guard inside a transport call cannot be tested in isolation |
+| (b) a separate `policy_core` module | **chosen** — one module decides, so it can be tested without network |
+| (c) the storage layer | rejected — a single writer can bypass it, and then "the model proposes, code disposes" is only a slogan |
+
+I proposed (b) plus the rule "nothing may write before validation", and wrote the rule into
+`docs/code-governance/structural-constraints.md` §2. Role B owns the architecture blueprint;
+this was an input to it, not a replacement for it.
+
+**Specification boundary — evidence for a rejection.**
+While checking the implementation against `invariants.md` I found that its Evidence column and
+RP-004 ("exactly one line per call") could not both hold. I did not choose a resolution: I put
+three options to the specification owner and implemented the one she selected (see the entry of
+2026-11-09).
+
+**Reflection.** An implementer sees requirement and architecture gaps that their owners cannot
+see, because the gaps only appear once the code is written. The useful behaviour is neither to
+fill them silently nor to stay quiet about them, but to surface them with evidence and hand the
+decision back to the owner. Two of the three decisions above came back changed after the owner
+looked at them, which is exactly why they had to go to the owner.
+
+---
+
 ## 2026-11-09 · policy_core and the transport seam, written by OpenCode (Phase 1)
 
 **Context.** Role C had finished the three invariant specifications
