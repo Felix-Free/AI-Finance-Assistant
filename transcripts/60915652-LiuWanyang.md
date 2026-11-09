@@ -68,3 +68,180 @@ We will enforce that in src/policy_core.py, not in the prompt.
 same underlying mistake: letting a probabilistic component decide something that
 deterministic code must decide. The rules "never swallow an error" and "the model
 proposes, code disposes" therefore belong in `AGENTS.md`, not in my head.
+
+---
+
+## 2026-11-09 · policy_core and the transport seam, written by OpenCode (Phase 1)
+
+**Context.** Role C had finished the three invariant specifications
+(`docs/architecture/invariants.md`: `C-INV-001/002/003`, mapped to global `INV-001/002/003`).
+My job was to turn them into deterministic guards plus a replaceable transport seam, so that
+role E can test the pipeline without network access.
+
+**My instruction to the agent.** I did not type free-form instructions. I wrote a task sheet in
+a fixed nine-section format (`OPENCODE_TASK_02.md`) and pasted it whole. The parts that mattered:
+
+```
+## 2. Task A — extract a replaceable transport seam in src/call_llm.py
+1. Add a private function _post(payload: dict) -> str ...
+3. _post must be a module-level function (not a closure inside extract), so a test can
+   replace it with monkeypatch.
+Must not change: the name, signature and return type of extract; the four log fields
+input / raw / parsed / error; fail-closed logging.
+
+## 3.3 INV-003 — reject only when spent + amount > budget_limit;
+          spent + amount == budget_limit must be accepted
+> Use ">", never ">=". This is the single most likely defect in this task.
+
+## 8. Anti-patterns I will reject on sight
+| 2 | Decimals tested with round(x, 2) == x | binary floating point makes 0.005 unstable |
+| 3 | Whitelist enforced by prompt text | rules must be enforced by code |
+```
+
+**Agent output (excerpt).** Its plan, before any code:
+
+```
+Task B — src/policy_core.py (new)
+- enforce_amount: reject bool, non-number, non-finite (math.isfinite), <= 0,
+  Decimal(str(amount)).as_tuple().exponent < -2; returns amount.
+- enforce_budget: comparisons via Decimal(str(x)); reject only spent+amount > limit
+  (> not >=); raises review=True; returns new total.
+Risks needing your input: 1. review.jsonl path 2. two log lines on transport failure?
+3. test files — do they need your OK? 4. enforce_amount return type — int or float?
+```
+
+**What I caught.**
+
+1. **Its plan did not cover a malformed response envelope.** `_post` was going to do
+   `resp.json()["choices"][0]["message"]["content"]`; if the gateway returned HTTP 200 with an
+   unexpected body, that raises `KeyError`/`IndexError`, which is neither a policy rejection nor
+   a transport error. I required every protocol failure to be converted to `LlmTransportError`.
+
+2. **It chose a test filename that was already reserved.** It proposed
+   `test/offline/test_invariants.py`, which is role E's exhaustive boundary suite. I required
+   `test_policy_core_smoke.py` and `test_pipeline_seam.py` instead, and required the agent to say
+   in `CHANGED FILES` that these are smoke tests only. Two people writing the same file is a
+   merge conflict, not a test.
+
+3. **A commit I did not expect — and the ambiguity was mine.** My approval message said
+   "Commit A and B separately (one commit per file group), because they must be revertible
+   independently". It never named **who** runs the command. The agent executed it, and the
+   report showed two commits (`feb5eb2`, `5d540c4`, both 17:49). `AGENTS.md` §8 says the agent
+   may not run `git commit` — so the instruction I wrote contradicted the rule the agent was
+   bound by. **The agent did the right thing next: it surfaced the contradiction and asked which
+   rule wins**, instead of quietly picking one. That is the behaviour I want from it.
+
+**My correction.**
+
+```
+CORRECTION ON THE COMMIT POINT (my fault, not yours):
+My earlier message said "Commit A and B separately". I did not say who should run the
+command, and you reasonably executed it. That was an ambiguous instruction on my side,
+not a violation by you. Recorded. From now on the actor is always me: you never run
+git commit or git push. Keep those two commits as they are; I will not reset them.
+
+FIX 1 (required). validate_record crashes when the model returns a JSON array or a string:
+raw.get(...) raises AttributeError, which is not a PolicyError. Add:
+    if not isinstance(raw, dict):
+        raise PolicyError(..., code="policy:amount", review=False)
+FIX 2 (required). validate_record discards the running total; return it so pipeline can log it.
+```
+
+I did **not** rewrite history. The two commits had the right boundaries (one for the seam, one for
+the guards), so I kept them, recorded the violation here, and relied on the mechanism that was
+already being prepared: role C's `.opencode/permissions.jsonc` sets `"git commit": "deny"`.
+
+**Result.**
+
+- `python -m py_compile` and `import` pass; `pytest test/offline -q` → **34 passed**.
+- The acceptance script printed `ALL ACCEPTANCE CHECKS PASSED`, covering `-1`, `0`, `0.005`,
+  `100.001`, `"350"`, `None`, `True`, `nan`, `inf`; equality-at-budget accepted; over-budget and
+  out-of-vocabulary rejected with `review=True`.
+- The live call in the sandbox failed first with `LLM_BASE_URL / LLM_API_KEY missing (.env)` —
+  a provisioning gap on my side, not a regression. I copied `.env` into the repository working
+  tree (`Test-Path .env` → `True`), confirmed `git status --short` stayed empty and
+  `git check-ignore -v .env` reported `.gitignore:1:.env`, then re-ran the call:
+
+  ```
+  $ python src/call_llm.py "hotpot last night cost 350"
+  [model] CS5351/DeepSeek-V4-Flash
+  [input] hotpot last night cost 350
+  [parsed] {'amount': 350, 'category': 'food'}
+  [log]   logs/llm_calls.jsonl (appended)
+  ```
+
+  Behaviour is unchanged after the refactor, and the model's own vocabulary choice (`food`,
+  lowercase, inside the whitelist) is now the only thing standing between a plausible answer and
+  a stored record — which is exactly the point of `INV-002`.
+
+**Reflection.** I had specified the *code* rules densely (boundaries, anti-patterns, acceptance
+commands) and left the *who does what* part implicit. The code rules held; the gap was an
+instruction that described an **action without an actor** — and the agent, quite reasonably,
+performed that action. The lesson is not "the agent misbehaved", it is: **an instruction that does
+not name the actor will be executed by the agent.** From now on every task sheet names the actor
+("I commit; you do not"), and the mechanical layer (role C's `.opencode/permissions.jsonc`, which
+sets `"git commit": "deny"`) makes the intent enforceable rather than merely stated.
+
+The second lesson is about verification: I checked "who committed" from `git log` and from the
+wording of the messages rather than from the agent's summary — and that is what turned a
+suspected violation into a diagnosed ambiguity in about two minutes.
+
+### Follow-up in the same session: the three fixes and Task C
+
+**The instruction.** I pasted the FIX text verbatim (the agent had refused to guess, citing
+`AGENTS.md` §1.5 "do not guess" — correct behaviour, and it made me state the fixes precisely
+instead of relying on "you know what I mean"):
+
+```
+FIX 1 (required) — validate_record must reject non-dict input.
+FIX 2 (required) — validate_record discards the running total; return it.
+FIX 3 (optional) — no log line when configuration is missing.
+Then Task C — src/pipeline.py: order extract (RP-004/RP-001) -> validate_record
+(RP-003/005/006); PolicyError.review -> one line in logs/review.jsonl, then re-raise;
+LlmTransportError propagates, never retried; no silent try/except; no IO outside logs/.
+```
+
+**What it delivered.**
+
+- `validate_record` now starts with `if not isinstance(raw, dict): raise PolicyError(...)`, so a
+  JSON array or a bare string is a rejection instead of an `AttributeError`.
+- It returns `{"amount", "category", "total"}`, and `test_validate_record_returns_normalised_record`
+  was updated to assert `total` (so the test would fail if the total disappeared again).
+- The missing-configuration path now writes one log line (`error="config: missing base url or
+  key"`) before raising, so "exactly one line per call" also holds when credentials are absent.
+- `src/pipeline.py`: `process()` calls `extract()` then `validate_record()`; on
+  `PolicyError.review is True` it appends one line to `logs/review.jsonl` and **re-raises**; it
+  never imports `requests`, never retries, and has no second, silent `try/except`.
+- `pytest test/offline -q` → **36 passed**. End-to-end with a stubbed model:
+  `{'amount': 350, 'category': 'food', 'total': 350.0}`, and `"Food"` produced
+  `{"amount": 350, "category": "Food", "code": "policy:category", ..., "review": true}`.
+
+**What I checked before accepting it.**
+
+1. no second `try/except` that swallows `PolicyError`;
+2. no retry loop (RP-001 and RP-002 both forbid retrying);
+3. `pipeline.py` does not import `requests`;
+4. the review line goes to `logs/`, nowhere else;
+5. its `SCOPE SELF-CHECK` matched `git status --short` line for line.
+
+**One more thing the agent did right.** Its report opened with a question about
+`transcripts/60915652-LiuWanyang.md` appearing as modified: it noticed the file had a newer
+mtime than its session, stated that the change was not its own, and **declined to touch it**
+because `AGENTS.md` §2 makes `transcripts/**` read-only to the agent. That change was mine
+(18:04). It did not have to be told; it applied the permission matrix on its own. This is the
+first time in the session that the governance file *prevented* something rather than being
+enforced by me after the fact.
+
+**Correction to my own record.** Earlier in this entry I had written that the agent "ran
+`git commit` on its own". It was wrong to leave it at that: on being challenged, the agent
+pointed out that my approval message said *"Commit A and B separately"* without naming the actor,
+and that this instruction conflicted with `AGENTS.md` §8. It was right, and I corrected this
+transcript rather than defend the accusation. Both commits are kept (their boundaries are
+correct); from this point every task sheet names the actor explicitly, and role C's
+`.opencode/permissions.jsonc` makes `git commit: deny` mechanical.
+
+**Result.** `src/policy_core.py`, `src/call_llm.py`, `src/pipeline.py` and four smoke tests are
+in the working tree, green offline, and verified live once `.env` was provisioned. Open items
+reported to the verification role rather than fixed here: the review/log paths are relative to
+the current working directory, and a failure to write the review line reports
+`code="policy:budget"` even when the original rejection was about the category.
