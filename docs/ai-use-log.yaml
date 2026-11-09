@@ -1,1 +1,124 @@
 # AI Use Log
+#
+# One entry per working session. Append; do not rewrite earlier entries.
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 1
+  topic: security and governance specs
+  tool: opencode
+  files_created:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/permission-model.md
+    - .opencode/permissions.jsonc
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+  summary: >
+    Documented three business invariants (finite positive amount, closed category
+    whitelist, cumulative budget) using role-scoped ids C-INV-001..003 to avoid
+    colliding with the INV-002 already reserved in transcript 60915652, logging
+    integrity recorded as runtime policy RP-004, and a default-deny permission
+    model plus permissions.jsonc whitelist. Specs only; guards are D's, tests E's.
+  human_review:
+    - rejected replacing the budget invariant with a logging-integrity invariant
+    - required C-INV-### numbering instead of redefining global INV ids
+  validation:
+    jsonc_parse: pass (generic JSONC only)
+    pytest: no tests ran (empty suite; not evidence of passing)
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 2
+  topic: final validation of the C-Security artefacts
+  tool: opencode
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+    - .opencode/permissions.jsonc
+  summary: >
+    Re-validated the session-1 artefacts using the project virtual environment
+    ./.venv/bin/python. ai-use-log.yaml parsed (YAML OK). permissions.jsonc parsed
+    with generic JSONC parsing only; no OpenCode-specific permission validator exists
+    in this repository, so schema conformance is not verified. pytest reported no
+    tests ran. Corrected the session-1 transcript where it overstated the YAML and
+    pytest results, added session numbers, and added explicit read-whitelist entries
+    so permissions.jsonc matches permission-model.md; edit permissions remain denied.
+  human_review:
+    - required the OpenCode-validator limitation to be stated explicitly
+    - required the permission config read whitelist to match permission-model.md
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 3
+  topic: D3 coding-governance files (OpenCode rules, agent covenant, MCP tool manifest)
+  tool: opencode
+  files_created:
+    - .opencode/rules.md
+    - .agent/rules.md
+    - docs/code-governance/mcp-tool-manifest.md
+  files_modified:
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+  summary: >
+    Created the three D3 governance files. .opencode/rules.md is OpenCode-specific and
+    subordinate to AGENTS.md; .agent/rules.md is tool-agnostic and references AGENTS.md
+    instead of copying it; the MCP tool manifest states that no MCP server is configured
+    and separates application entry points (EP-001/EP-002) and test commands
+    (TC-001/TC-002) from MCP tools. permissions.jsonc was not modified; its broad docs/**
+    and test/** read rules are documented as intentional, not as a mismatch.
+  human_review:
+    - required the manifest not to treat functions or pytest as MCP tools
+    - required the "no MCP server configured" fact to be stated explicitly
+    - required permissions.jsonc to stay unmodified with the equivalence documented
+    - required a malformed change-protocol paragraph in the manifest to be cleaned up
+  validation:
+    yaml_parse: pass (YAML OK via ./.venv/bin/python)
+    git_diff_check: pass
+    pytest: no tests ran (empty suite; not evidence of passing)
+    opencode_mcp_schema: unavailable (no validator in repo)
+
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 4
+  topic: required policy-review evidence edits
+  tool: codex
+  files_created: []
+  files_modified:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .DS_Store
+    - docs/c-role-handoff.md
+    - src/**
+    - test/**
+  summary: >
+    Applied the first three required C document edits: invariant policy rejections now
+    use logs/review.jsonl with the specified review flags, the rejection-evidence note
+    was added at the start of invariants.md §2, and only RP-003/RP-005/RP-006 received
+    review-log evidence paths. RP-001/RP-002/RP-004 were left unchanged.
+  human_review:
+    - confirmed the three invariant Evidence lines and review flags
+    - confirmed RP-001/RP-002/RP-004 were not changed
+    - confirmed the unrelated .DS_Store was excluded
+  validation:
+    git_diff_check: pass
+    yaml_parse: pass
