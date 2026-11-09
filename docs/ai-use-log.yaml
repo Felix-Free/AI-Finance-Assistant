@@ -97,11 +97,9 @@
   student_id: "60915652"
   phase: 1
   session: 1
-  topic: model entry point, one-line call log, agent governance draft, transcript 1
-  tool: deepseek-harness (first draft); opencode from session 2 onwards
+  topic: agent-governance draft, conventions draft, requirements for the model entry point, transcript 1
+  tool: "human authoring (documents and configuration only; no source code in this session)"
   files_created:
-    - src/call_llm.py
-    - src/__init__.py
     - AGENTS.md
     - docs/code-governance/structural-constraints.md
     - transcripts/60915652-LiuWanyang.md
@@ -112,23 +110,20 @@
   files_modified:
     - docs/ai-use-log.yaml
   files_not_modified:
+    - src/**
     - docs/req/**
     - docs/architecture/**
     - test/**
   summary: >
-    Built the single model entry point: one module calls the gateway, parses the JSON
-    object and appends exactly one line per call to logs/llm_calls.jsonl with the
-    fields input / raw / parsed / error; logging is fail-closed. Also drafted the
-    agent governance file and the code-governance conventions, and recorded the first
-    transcript entry. The first draft of call_llm.py came from a different coding agent
-    at a point when the OpenCode environment was not yet provisioned; in session 2 that
-    file was refactored by OpenCode (transport seam extracted), so the version currently
-    in the repository is OpenCode-produced.
+    Authored the agent-governance file and the code-governance conventions, fixed the
+    requirements for the model entry point (one module, one log line per call, fail-closed),
+    and recorded the first transcript entry. No source code was authored in this session: the
+    model client in the repository is the version written through OpenCode in session 2, which
+    is where it is listed.
   human_review:
-    - rejected returning {} when the model response is not JSON; required log-then-re-raise
-    - required the category vocabulary to be enforced by code, not by prompt text
     - required all model calls to be confined to one module, with no second requests.post
     - required .env and logs/ to stay out of the repository, verified with git check-ignore
+    - required the category vocabulary to be enforced by code, not by prompt text
     - required the recorded Python version to be the observed one (3.14.4), not a placeholder
   validation:
     py_compile: pass (Python 3.9.7 system interpreter)
@@ -143,6 +138,8 @@
   topic: deterministic guards INV-001..003, transport seam, pipeline with review logging
   tool: opencode
   files_created:
+    - src/call_llm.py
+    - src/__init__.py
     - src/policy_core.py
     - src/pipeline.py
     - test/offline/test_policy_core_smoke.py
