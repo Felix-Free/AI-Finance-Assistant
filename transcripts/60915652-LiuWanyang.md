@@ -245,3 +245,78 @@ in the working tree, green offline, and verified live once `.env` was provisione
 reported to the verification role rather than fixed here: the review/log paths are relative to
 the current working directory, and a failure to write the review line reports
 `code="policy:budget"` even when the original rejection was about the category.
+
+---
+
+## 2026-11-09 · Conformance check against role C's specification, and the evidence fix
+
+**Context.** Before asking for review I re-read `docs/architecture/invariants.md` and compared the
+implementation against it **field by field** — Condition, Threshold, Exception, On failure,
+Boundary, Evidence — instead of trusting that 36 green tests meant conformance. They do not mean
+the same thing.
+
+**What the check produced.**
+
+| Field | INV-001 | INV-002 | INV-003 |
+|---|---|---|---|
+| Condition | conforms | conforms | conforms |
+| Threshold | conforms (two decimals via Decimal) | conforms (exact, case-sensitive) | conforms (`>` not `>=`) |
+| Exception | conforms (`PolicyError`) | conforms (+ review) | conforms (+ review) |
+| Boundary | `-0.01` not tested separately | conforms | conforms |
+| **Evidence** | **nothing written at all** | written to the wrong file, wrong field name | same |
+
+So 36 passing tests, and the Evidence column was still not implemented. The tests proved
+behaviour; only the spec comparison proved conformance.
+
+**Root cause.** The call line in `logs/llm_calls.jsonl` is written inside `call_llm.extract()`
+**before** validation runs, so it cannot carry `error="policy:amount"`. And two of C's own
+documents disagree: the Evidence column says the rejection is logged in `llm_calls.jsonl`, while
+RP-004 says every call writes **exactly one** line there.
+
+**What I deliberately did not do.** I did not fix it myself, and I did not edit her document:
+
+1. code must be produced through the agent ("no non-agentic modification");
+2. the conflict is between two documents owned by role C, so the choice of resolution is hers,
+   not mine. Deciding it silently would have been exactly the mistake I had criticised the agent
+   for earlier.
+
+**Decision.** I put three options to her: **A** append an extra line to `llm_calls.jsonl` (breaks
+RP-004 literally), **B** record every rejection in `logs/review.jsonl` and rename the field
+`code` → `error` (keeps RP-004), **C** restructure so the call line is written after validation
+(largest change). She chose **B**. The decision and who owns the document edit are recorded in
+`OPENCODE_TASK_03.md`.
+
+**My instruction to the agent.** The sheet, then the approval:
+
+```
+APPROVED for Option B, with these confirmations.
+1. logs/review.jsonl now carries all policy rejections, including INV-001 (review=false). Confirmed.
+2. keep the guarded total computation; for INV-001 the raw amount may be non-numeric, so total
+   may be null.
+3. use the existing test file; assert one line, error == policy:*, review == false/true/true,
+   and that pipeline does not write to logs/llm_calls.jsonl.
+4. no `if exc.review:` gate; raise after writing; no requests import; report only, no git.
+```
+
+**Agent output (excerpt).** It removed the `if exc.review:` gate, changed the record to
+`{"error": exc.code, "amount", "category", "spent", "total", "review": exc.review}`, updated the
+docstring to state that `llm_calls.jsonl` is untouched, and added a parametrised test over the
+three invariants.
+
+**What I checked before accepting.** No `if exc.review:` left; field renamed rather than
+duplicated; `review` taken from `exc.review` instead of hard-coded `True`; `policy_core.py`
+untouched; `raise` still there; `pytest` → 39 passed.
+
+**Two weaknesses I recorded instead of fixing.** (1) The new assertion
+`captured_log == []` proves little, because `call_llm.extract` was stubbed in that test and could
+not have written a line anyway — a stronger test stubs `_post` and lets the real `extract` write.
+(2) `_append_review` and `logs/review.jsonl` now carry every rejection, not only the review ones;
+the names are debt, deferred so the change stays reviewable. Both are written down for the
+verification role rather than quietly patched.
+
+**Reflection.** The Evidence field is the first column to rot, because it does not affect
+behaviour: every test passes, the demo looks right, and the audit trail is still missing. Twenty
+minutes of field-by-field comparison found a defect that 36 green tests could not, and the fix
+required a decision from the specification owner, not from me and not from the agent. The division
+of labour that finally worked was: **I read the spec and found the gap; the owner chose the
+resolution; the agent wrote the code; I verified the diff.**

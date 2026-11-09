@@ -180,3 +180,49 @@
     live_call: pass after provisioning .env (parsed amount=350, category=food)
     guard_boundaries: pass (-1, 0, 0.005, 100.001, "350", None, True, nan, inf rejected; equality at the budget accepted; over-budget and out-of-vocabulary rejected with review=true)
     review_log: pass (one line written to logs/review.jsonl for an out-of-vocabulary category)
+
+- date: 2026-11-09
+  role: D
+  student_id: "60915652"
+  phase: 1
+  session: 3
+  topic: conformance check against invariants.md, and the rejection-evidence fix (option B)
+  tool: opencode
+  files_modified:
+    - src/pipeline.py
+    - test/offline/test_pipeline_seam.py
+    - transcripts/60915652-LiuWanyang.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/policy_core.py
+    - src/call_llm.py
+    - docs/**
+    - AGENTS.md
+    - requirements.txt
+  summary: >
+    Compared the implementation against every field of role C's guard specification (Condition,
+    Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and
+    Boundary conformed for all three invariants; Evidence did not. The call line in
+    logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry
+    a policy outcome, and RP-004 forbids a second line there. The specification owner chose
+    option B: every policy rejection now appends exactly one line to logs/review.jsonl with
+    error = policy:amount / policy:category / policy:budget and review = false / true / true,
+    while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no
+    trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields)
+    and runtime-policy-catalog.md (RP-003/005/006 point at the file).
+  human_review:
+    - found the Evidence gap by comparing field by field, not by trusting 36 passing tests
+    - refused to resolve the conflict myself because it is between two documents owned by role C; put options A/B/C to the owner instead
+    - refused to edit invariants.md, because the specification is C's artefact
+    - required the field rename code to error rather than adding a second field
+    - required review to be taken from exc.review instead of hard-coded true
+    - required the llm_calls.jsonl behaviour to stay untouched (RP-004)
+    - recorded two test weaknesses instead of hiding them: a near-vacuous captured_log assertion, and the now-misleading _append_review / review.jsonl names
+  validation:
+    py_compile: pass
+    pytest_offline: 39 passed (36 existing + 3 new parametrised cases, one per invariant)
+    rejection_evidence: pass (exactly one line per rejection; field set error/amount/category/spent/total/review; review false/true/true)
+    requests_in_pipeline: absent
+    llm_calls_untouched_by_pipeline: pass (RP-004 preserved)
+    spec_conformance: Evidence now conforms to option B; role C's document edit still pending
+
