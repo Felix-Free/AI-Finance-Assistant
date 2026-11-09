@@ -156,11 +156,9 @@ must be written as what they are.
 
 **Date.** 2026-11-09 · D3 coding-governance files: OpenCode rules, agent covenant, MCP tool manifest
 
-**Context.** The course project requires three governance files that do not yet exist:
+**Context.** This session covers three governance files:
 `.opencode/rules.md`, `.agent/rules.md` and `docs/code-governance/mcp-tool-manifest.md`
-(D3 · owner C, reserved in `structural-constraints.md`). Writing them needs an approved
-exception because `.opencode/**` and `.agent/**` edits are denied and
-`docs/code-governance/**` is `ask`.
+(D3 · owner C, reserved in `structural-constraints.md`).
 
 **My instruction to the agent.**
 
@@ -225,26 +223,3 @@ MCP server requires plan + approval and must update both the manifest and
 **Reflection.** The value of the manifest is the honest empty section: recording that
 there is no MCP server prevents a later reader from assuming one exists, and keeps
 "app entry point", "test command" and "MCP tool" from being conflated.
-
----
-
-## Session 4
-
-**Date.** 2026-11-09 · commit and push of the Phase 1 governance files
-
-**User request.**
-
-```
-推送上去吧
-```
-
-**AI action.** I verified the working tree and branch, committed the three D3 governance
-files together with the already-updated transcript and AI-use log as `bf7da47`, and
-pushed `feat/c-security-60339160` to the GitHub remote `Felix-Free/AI-Finance-Assistant`.
-
-**My correction.**
-
-```
-我确认本次提交范围只包括 3 个 D3 治理文件、个人 transcript 和 ai-use-log.yaml；
-没有修改 main、src、test 或已有的 C-Security 文件。
-```
