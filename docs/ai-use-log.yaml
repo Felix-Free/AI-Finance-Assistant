@@ -2,6 +2,73 @@
 #
 # One entry per working session. Append; do not rewrite earlier entries.
 
+- date: "2026-11-06"
+  role: A
+  student_id: "60528523"
+  phase: 1
+  session: 1
+  topic: Repository initialization and manual rectification
+  tool: Human Review (Manual)
+  files_created:
+    - .github/workflows/.gitkeep
+    - .opencode/.gitkeep
+    - .agent/.gitkeep
+    - Report.md
+    - Prompt.md
+    - docs/ai-use-log.yaml
+  files_modified:
+    - README.md
+  files_not_modified:
+    - src/**
+  summary: >
+    Reviewed PR #6 (Initial project skeleton). Identified that the AI agent 
+    missed critical governance directories (.github/workflows, .opencode, .agent). 
+    Manually added the missing directories to enforce architectural constraints 
+    and CI governance.
+  human_review:
+    - rejected the incomplete AI-generated structure.
+    - manually supplemented hidden directories to ensure compliance with PDF requirements.
+  validation:
+    structure_check: pass (aligned with PDF page 24)
+    
+- date: 2026-11-06
+  role: D
+  student_id: "60915652"
+  phase: 1
+  session: 1
+  topic: agent-governance draft, conventions draft, requirements for the model entry point, transcript 1
+  tool: "human authoring (documents and configuration only; no source code in this session)"
+  files_created:
+    - AGENTS.md
+    - docs/code-governance/structural-constraints.md
+    - transcripts/60915652-LiuWanyang.md
+    - requirements.txt
+    - .gitignore
+    - .gitattributes
+    - .env.example
+  files_modified:
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - docs/req/**
+    - docs/architecture/**
+    - test/**
+  summary: >
+    Authored the agent-governance file and the code-governance conventions, fixed the
+    requirements for the model entry point (one module, one log line per call, fail-closed),
+    and recorded the first transcript entry. No source code was authored in this session: the
+    model client in the repository is the version written through OpenCode in session 2, which
+    is where it is listed.
+  human_review:
+    - required all model calls to be confined to one module, with no second requests.post
+    - required .env and logs/ to stay out of the repository, verified with git check-ignore
+    - required the category vocabulary to be enforced by code, not by prompt text
+    - required the recorded Python version to be the observed one (3.14.4), not a placeholder
+  validation:
+    py_compile: pass (Python 3.9.7 system interpreter)
+    live_call: pass (parsed amount=350, category=food; one JSONL line appended)
+    pytest: no tests existed at this point (suite created in session 2)
+    
 - date: 2026-11-09
   role: C
   student_id: "60339160"
@@ -91,44 +158,6 @@
     git_diff_check: pass
     pytest: no tests ran (empty suite; not evidence of passing)
     opencode_mcp_schema: unavailable (no validator in repo)
-
-- date: 2026-11-06
-  role: D
-  student_id: "60915652"
-  phase: 1
-  session: 1
-  topic: agent-governance draft, conventions draft, requirements for the model entry point, transcript 1
-  tool: "human authoring (documents and configuration only; no source code in this session)"
-  files_created:
-    - AGENTS.md
-    - docs/code-governance/structural-constraints.md
-    - transcripts/60915652-LiuWanyang.md
-    - requirements.txt
-    - .gitignore
-    - .gitattributes
-    - .env.example
-  files_modified:
-    - docs/ai-use-log.yaml
-  files_not_modified:
-    - src/**
-    - docs/req/**
-    - docs/architecture/**
-    - test/**
-  summary: >
-    Authored the agent-governance file and the code-governance conventions, fixed the
-    requirements for the model entry point (one module, one log line per call, fail-closed),
-    and recorded the first transcript entry. No source code was authored in this session: the
-    model client in the repository is the version written through OpenCode in session 2, which
-    is where it is listed.
-  human_review:
-    - required all model calls to be confined to one module, with no second requests.post
-    - required .env and logs/ to stay out of the repository, verified with git check-ignore
-    - required the category vocabulary to be enforced by code, not by prompt text
-    - required the recorded Python version to be the observed one (3.14.4), not a placeholder
-  validation:
-    py_compile: pass (Python 3.9.7 system interpreter)
-    live_call: pass (parsed amount=350, category=food; one JSONL line appended)
-    pytest: no tests existed at this point (suite created in session 2)
 
 - date: 2026-11-09
   role: D
@@ -223,3 +252,60 @@
     llm_calls_untouched_by_pipeline: pass (RP-004 preserved)
     spec_conformance: Evidence now conforms to option B; role C's document edit still pending
 
+=======
+- date: 2026-11-09
+  role: C
+  student_id: "60339160"
+  phase: 1
+  session: 4
+  topic: required policy-review evidence edits
+  tool: codex
+  files_created: []
+  files_modified:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .DS_Store
+    - docs/c-role-handoff.md
+    - src/**
+    - test/**
+  summary: >
+    Applied the first three required C document edits: invariant policy rejections now
+    use logs/review.jsonl with the specified review flags, the rejection-evidence note
+    was added at the start of invariants.md §2, and only RP-003/RP-005/RP-006 received
+    review-log evidence paths. RP-001/RP-002/RP-004 were left unchanged.
+  human_review:
+    - confirmed the three invariant Evidence lines and review flags
+    - confirmed RP-001/RP-002/RP-004 were not changed
+    - confirmed the unrelated .DS_Store was excluded
+  validation:
+    git_diff_check: pass
+    yaml_parse: pass
+
+- date: "2026-11-09"
+  role: A
+  student_id: "60528523"
+  phase: 1
+  session: 2
+  topic: Cross-review of PR #8 and PR #9
+  tool: opencode
+  files_modified:
+    - docs/ai-use-log.yaml
+    - transcripts/60528523-TANJingling.md
+  files_created: []
+  files_not_modified:
+    - src/**
+    - test/**
+  summary: >
+    Conducted cross-review of PR #8 (security specs) and PR #9 (core logic). 
+    Used OpenCode to semantically compare C's updated invariants.md against the logging 
+    requirements, and ran boundary-value harness tests on D's policy_core.py.
+  human_review:
+    - verified PR #8 Evidence fields were correctly updated to logs/review.jsonl.
+    - confirmed PR #9 explicitly rejects boolean types before int/float checks.
+    - manually resolved a Git merge conflict in ai-use-log.yaml between PR #8 and PR #9.
+  validation:
+    pytest: 39 passed (verified via local OpenCode review)
+    merge_conflict: resolved
