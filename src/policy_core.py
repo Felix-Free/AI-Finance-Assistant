@@ -94,7 +94,10 @@ def validate_record(raw: dict, spent: float, budget_limit: float) -> dict:
     Return the normalised record only if all three pass. Stops at the first
     failure by letting PolicyError propagate.
     """
+    if not isinstance(raw, dict):
+        raise PolicyError("record must be a JSON object, got %r" % type(raw).__name__,
+                          code="policy:amount", review=False)
     amount = enforce_amount(raw.get("amount"))
     category = enforce_category(raw.get("category"))
-    enforce_budget(spent, amount, budget_limit)
-    return {"amount": amount, "category": category}
+    total = enforce_budget(spent, amount, budget_limit)
+    return {"amount": amount, "category": category, "total": total}

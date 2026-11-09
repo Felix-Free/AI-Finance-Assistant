@@ -121,6 +121,7 @@ def extract(text: str) -> dict:
     rejection).
     """
     if not BASE_URL or not API_KEY:
+        _append_log({"input": text, "error": "config: missing base url or key"})
         raise LlmTransportError("LLM_BASE_URL / LLM_API_KEY missing (.env)")
 
     payload = {
