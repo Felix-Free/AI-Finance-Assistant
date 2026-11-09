@@ -49,7 +49,7 @@ write (`structural-constraints.md §4`).
 - **Action:** `reject`; raise `PolicyError`.
 - **Degradation:** stored data and running totals stay unchanged; the record is not
   applied. `C-INV-002` and `C-INV-003` additionally flag `REVIEW`.
-- **Evidence:** log `error="policy:<subject>"` with the offending field and value.
+- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`.
 
 ### RP-004 — Logging integrity (fail-closed)
 
@@ -71,14 +71,14 @@ write (`structural-constraints.md §4`).
 - **Trigger:** accepted total + new amount > `budget_limit`.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** previous total is authoritative; the new record is never applied.
-- **Evidence:** log `error="policy:budget"` with amount and running total.
+- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`.
 
 ### RP-006 — Category out of vocabulary (guard for C-INV-002)
 
 - **Trigger:** category not in the closed whitelist.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** never coerce, never fuzzy-match, never ask the model to fix it.
-- **Evidence:** log `error="policy:category"` with the rejected value.
+- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`.
 
 ---
 

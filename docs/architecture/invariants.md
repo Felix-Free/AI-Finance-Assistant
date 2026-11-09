@@ -39,6 +39,13 @@ owns the specification. Consequences:
 
 ## 2. Guard specification blocks (handoff format, `structural-constraints.md §2.2`)
 
+> **Rejection evidence (decision 2026-11-09, option B).** Every policy rejection — for all three
+> invariants, including `C-INV-001` — appends exactly one line to `logs/review.jsonl` with the
+> fields `error`, `amount`, `category`, `spent`, `total`, `review`. `logs/llm_calls.jsonl` keeps
+> exactly one line per model call (`runtime-policy-catalog.md` RP-004), so a policy outcome never
+> adds a second line there. The rejection line does **not** carry the input text or a call id, so it
+> cannot yet be joined to its call line; this is recorded as debt for Phase 2.
+
 ### C-INV-001 — amount must be a finite positive number
 
 ```
@@ -48,7 +55,7 @@ Threshold   : amount > 0; more than 2 decimal places is rejected (money is cents
 Exception   : PolicyError
 On failure  : reject  (record discarded; no persistence; one log line)
 Boundary    : -0.01, 0, 0.01, 0.005  (and non-numeric: "350", null, NaN, Inf, 100.001)
-Evidence    : logs/llm_calls.jsonl line with error="policy:amount"
+Evidence    : logs/review.jsonl line with error="policy:amount" and review=false
 ```
 
 ### C-INV-002 — category must be in the closed whitelist
@@ -60,7 +67,7 @@ Threshold   : case-sensitive exact match against the whitelist defined in code
 Exception   : PolicyError
 On failure  : reject, flag REVIEW  (record discarded; no persistence)
 Boundary    : "Food", "餐饮", "meal", ""  (all rejected) vs each whitelisted value (accepted)
-Evidence    : logs/llm_calls.jsonl line with error="policy:category"
+Evidence    : logs/review.jsonl line with error="policy:category" and review=true
 ```
 
 > The whitelist itself is defined in code (`src/policy_core.py`), never in a prompt, and
@@ -77,7 +84,8 @@ Exception   : PolicyError
 On failure  : reject  (new record discarded; the existing total is unchanged); flag REVIEW
 Boundary    : budget-0.01 (accepted), budget (accepted), budget+0.01 (rejected)
               — proves the check is cumulative, not per-record, and has no off-by-one
-Evidence    : logs/llm_calls.jsonl line with error="policy:budget" plus amount and running total
+Evidence    : logs/review.jsonl line with error="policy:budget", amount and running total,
+              review=true
 ```
 
 > Rationale: the budget limit is the core safety property of a personal finance

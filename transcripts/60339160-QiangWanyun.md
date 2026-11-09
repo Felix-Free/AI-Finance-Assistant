@@ -223,3 +223,30 @@ MCP server requires plan + approval and must update both the manifest and
 **Reflection.** The value of the manifest is the honest empty section: recording that
 there is no MCP server prevents a later reader from assuming one exists, and keeps
 "app entry point", "test command" and "MCP tool" from being conflated.
+
+---
+
+## Session 4
+
+**Date.** 2026-11-09 · required C document edits for policy-review evidence
+
+**My instruction to the agent.**
+
+```
+Apply the first three required edits: move invariant rejection evidence to
+logs/review.jsonl with the specified review flags, add the rejection-evidence
+note at the start of §2, and update only RP-003/RP-005/RP-006 evidence paths.
+Do not change RP-001/RP-002/RP-004.
+```
+
+**Result.** The two C documents contain only the requested evidence-path changes. The
+three invariant Evidence lines now use `logs/review.jsonl`; the review flags are
+`false`, `true`, and `true` respectively; and the §2 note records the two-log decision.
+RP-001, RP-002 and RP-004 remain unchanged.
+
+**My correction.**
+
+```
+Before committing, I checked that the diff contains only the requested three edits and
+that the unrelated .DS_Store file is excluded.
+```
