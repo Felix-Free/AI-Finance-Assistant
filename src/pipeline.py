@@ -37,28 +37,30 @@ def process(text: str, spent: float, budget_limit: float) -> dict:
     ``call_llm.extract`` returns an UNVALIDATED parse. It is passed straight to
     ``policy_core.validate_record``; nothing here trusts the model output.
 
-    On a rejection that requires human review (``PolicyError.review is True``)
-    exactly one line is appended to logs/review.jsonl before the error is
-    re-raised. ``LlmTransportError`` propagates unchanged and is never retried.
+    Every policy rejection (INV-001, INV-002, INV-003) appends exactly one line
+    to logs/review.jsonl carrying ``error`` = the rejection code, then re-raises.
+    The ``review`` field keeps the distinction: False for amount, True for
+    category/budget. logs/llm_calls.jsonl is untouched (RP-004 preserved:
+    exactly one line per model call, written by call_llm.extract).
+    ``LlmTransportError`` propagates unchanged and is never retried.
     """
     raw = call_llm.extract(text)
 
     try:
         return policy_core.validate_record(raw, spent, budget_limit)
     except policy_core.PolicyError as exc:
-        if exc.review:
-            amount = raw.get("amount") if isinstance(raw, dict) else None
-            category = raw.get("category") if isinstance(raw, dict) else None
-            try:
-                total = spent + amount
-            except TypeError:
-                total = None
-            _append_review({
-                "amount": amount,
-                "category": category,
-                "code": exc.code,
-                "spent": spent,
-                "total": total,
-                "review": True,
-            })
+        amount = raw.get("amount") if isinstance(raw, dict) else None
+        category = raw.get("category") if isinstance(raw, dict) else None
+        try:
+            total = spent + amount
+        except TypeError:
+            total = None
+        _append_review({
+            "error": exc.code,
+            "amount": amount,
+            "category": category,
+            "spent": spent,
+            "total": total,
+            "review": exc.review,
+        })
         raise

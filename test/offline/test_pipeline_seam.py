@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from src import call_llm
+from src import call_llm, pipeline, policy_core
 
 
 @pytest.fixture
@@ -68,3 +68,34 @@ def test_post_raises_on_malformed_envelope(monkeypatch):
     monkeypatch.setattr(call_llm, "API_KEY", "k")
     with pytest.raises(call_llm.LlmTransportError):
         call_llm._post({})
+
+
+@pytest.mark.parametrize(
+    "raw,spent,budget,expected_error,expected_review",
+    [
+        ({"amount": -1, "category": "food"}, 0.0, 1000.0, "policy:amount", False),
+        ({"amount": 350, "category": "Food"}, 0.0, 1000.0, "policy:category", True),
+        ({"amount": 20, "category": "food"}, 990.0, 1000.0, "policy:budget", True),
+    ],
+    ids=["inv001-amount", "inv002-category", "inv003-budget"],
+)
+def test_policy_rejection_writes_one_review_line(
+    captured_log, monkeypatch, tmp_path,
+    raw, spent, budget, expected_error, expected_review,
+):
+    review_path = tmp_path / "review.jsonl"
+    monkeypatch.setattr(pipeline, "REVIEW_PATH", review_path)
+    monkeypatch.setattr(call_llm, "extract", lambda text: raw)
+
+    with pytest.raises(policy_core.PolicyError) as exc:
+        pipeline.process("x", spent, budget)
+    assert exc.value.code == expected_error
+
+    lines = review_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert set(record) == {"error", "amount", "category", "spent", "total", "review"}
+    assert record["error"] == expected_error
+    assert record["review"] is expected_review
+    assert captured_log == []
+
