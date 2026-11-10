@@ -474,3 +474,34 @@
   validation:
     pytest_offline: 41 passed locally against main at 0dda36b.
     github_ci_followup: PR #11 passed with 2 tests selected by the marker filter; 39 unmarked tests were deselected locally.
+
+- date: "2026-11-10"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 15
+  topic: CI check dependencies
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - requirements.txt
+  summary: Added jsonschema and Ruff for the new CI checks.
+  human_review:
+    - Approved the dependency changes and selected versions verified to support Python 3.9.
+
+- date: "2026-11-10"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 16
+  topic: Phase 1 CI review follow-up
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+  summary: Ran the full offline suite and added Ruff, requirements schema and AI-use log checks.
+  human_review:
+    - Approved the workflow scope. Review caught invalid YAML indentation, a repeated dependency install and overly broad log parsing.
+  validation:
+    offline_tests: 41 passed locally with network connections disabled.
+    lint: Selected Ruff rules passed.
+    ai_use_log: A new session passed. An unchanged, malformed or duplicate log failed.
+    schema: B's PR files passed. Missing files and a missing required field failed.
