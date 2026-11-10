@@ -161,6 +161,61 @@ to block the merge rather than accept inline tables as a substitute.
 
 ---
 
+## Session 3 — 2026-11-10 · Review of PR #11 (E CI/CD Pipeline)
+
+**Context.** Role E submitted the CI/CD pipeline (`.github/workflows/ci.yml`) and offline tests. The project mandates exactly 6 blocking gates. Because CI is the enforcement mechanism for our entire safety boundary, any omission here means unvalidated code could reach `main`. I asked the agent to act as a strict QA auditor.
+
+**My instruction to the agent.**
+
+```
+You are the Lead QA Auditor. Please review the current branch (PR #11).
+This PR contains the CI/CD pipeline configuration and offline tests created by Role E.
+Our project strictly requires 6 blocking gates (especially the Schema Gate for requirements.yaml, and the Regression Gate for all tests). Please perform the following checks:
+
+Read .github/workflows/ci.yml. Does it trigger on pull_request events?
+
+Does the pipeline include a step to validate docs/req/requirements.yaml against docs/req/req-schema.json (Schema Gate)?
+
+Does the pipeline run the offline tests (pytest test/offline)?
+
+Are there any logical flaws in the CI YAML? For example, if a test fails, will the workflow correctly fail and block the PR merge?
+
+Read any files in test/offline/. Do they correctly test the security invariants?
+Output a structured review report. Say LGTM only if compliant.
+```
+
+**Agent output (excerpt).**
+
+```
+Not LGTM.
+
+Schema Gate: ❌ MISSING. No step validates requirements.yaml. docs/req/ only has .gitkeep.
+
+Logical flaws: ⚠️ Several. 1) Only ONE of the 6 required gates exists. 2) -m offline could silently skip unmarked tests (run still exits 0). 3) jsonschema not in requirements.txt.
+
+Offline tests: ✅ Yes. They run and test security invariants strongly (e.g., rejecting -0.01, bad categories).
+Verdict: ❌ CHANGES REQUESTED. The CI pipeline is missing the Schema Gate and 4 of the 6 required gates.
+```
+
+
+**What I caught.** Three critical issues, plus a coordination problem.
+
+1. **Missing gates and dependencies.** The agent caught that the pipeline only implemented 1 of the 6 required blocking gates and lacked `jsonschema` in `requirements.txt`. 
+2. **The silent test-skip vulnerability.** The agent noted that using `-m offline` might exit with 0 even if tests are skipped because of missing markers. This is a subtle CI logic flaw that human review often misses.
+3. **Cross-role coordination.** I realized the missing Schema Gate wasn't just E's fault; E's CI was trying to check `requirements.yaml`, but Role B's PR #10 was still pending and not yet merged into `main`.
+
+**My decision.** I rejected PR #11 and issued a detailed change request to Role E (including fixing the `-m offline` skip risk and adding `jsonschema`). Simultaneously, I intervened in the group chat to coordinate the cross-role dependency, asking Role B to fix and merge PR #10 first so Role E could complete the Schema Gate.
+
+**Result.**
+
+- PR #11 rejected; change request issued to role E.
+- Role B notified in chat to prioritize merging their requirements file to unblock the CI.
+- The CI compliance remains a tracked blocking issue.
+
+**Reflection.** The agent was incredibly effective at parsing the CI YAML logic and spotting the `-m offline` silent-skip edge case. As a human, I would have likely just focused on whether the pipeline triggered and tests passed, missing the nuance of skipped markers. However, the agent does not understand cross-role dependencies (that it didn't see `requirements.yaml` because of a pending PR). My role was to connect the agent's code-level findings with the team's workflow, orchestrating the merge order to fix the CI.
+
+---
+
 ## Overall Reflection — Role A (Leader)
 
 Across both sessions the same pattern held: the agent's usefulness was proportional to how
