@@ -16,8 +16,7 @@
 #   - docs/architecture/permission-model.md
 #   - AGENTS.md
 #   - docs/code-governance/structural-constraints.md §3 (naming)
-#   - src/call_llm.py (main)
-#   - src/policy_core.py, src/pipeline.py (branch feat/D-policy-core, not yet merged)
+#   - src/call_llm.py, src/policy_core.py, src/pipeline.py (main; feat/D-policy-core merged through PR #9, commit 0dda36b)
 # =============================================================================
 
 project_metadata:
@@ -593,8 +592,8 @@ pending_decisions:
     question: "When will src/policy_core.py and src/pipeline.py be merged into main?"
     status: pending_confirmation
     owner: A
-    verification: "main contains src/policy_core.py and src/pipeline.py and CI passes."
-    notes: "NEEDS CONFIRMATION (owner: A / D)."
+    verification: "Factually satisfied: main (0dda36b, PR #9) contains src/call_llm.py, src/policy_core.py and src/pipeline.py; offline tests exist at test/offline/test_policy_core_smoke.py and test/offline/test_pipeline_seam.py and pass. CI is NOT yet on main (a separate, unmerged deliverable on feat/e-ci-skeleton)."
+    notes: "The merge condition is factually satisfied. Historical branch feat/D-policy-core was merged into main via PR #9 (commit 0dda36b); the three core modules and their offline tests are on main. The 'CI passes' sub-clause is still unmet because CI has not been merged. Administrative closure confirmation by owner A remains pending."
   - id: PD-006
     topic: "Python version baseline"
     question: "Is the baseline Python 3.9.7 (as documented) or the 3.14.4 observed in the venv?"
