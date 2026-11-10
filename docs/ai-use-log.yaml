@@ -252,7 +252,6 @@
     llm_calls_untouched_by_pipeline: pass (RP-004 preserved)
     spec_conformance: Evidence now conforms to option B; role C's document edit still pending
 
-=======
 - date: 2026-11-09
   role: C
   student_id: "60339160"
@@ -309,3 +308,208 @@
   validation:
     pytest: 39 passed (verified via local OpenCode review)
     merge_conflict: resolved
+
+# Role E entries to append to docs/ai-use-log.yaml
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 1
+  topic: repository startup and working directory
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    OpenCode could not read the repository from the directory it had selected. The
+    next attempt used an explicit project path.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 2
+  topic: initial PR CI workflow
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+
+  files_created:
+    - .github/workflows/ci.yml
+  summary: >
+    Planned and wrote the first PR workflow, with repository checkout, Python 3.9 and
+    the offline pytest command.
+  human_review:
+    - Approved the single-file CI plan and write exception.
+  validation:
+    local_pytest: 0 tests collected; exit 5 before any offline test existed
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 3
+  topic: offline and live pytest markers
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+
+  files_created:
+    - pytest.ini
+  summary: >
+    Added offline and live markers in pytest.ini. The write was approved; the agent
+    left the exception label out of its completion summary.
+  human_review:
+    - Approved only adding pytest.ini and its write exception.
+  validation:
+    markers: Both markers recognized locally
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 4
+  topic: CI workflow and marker review
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Reviewed the existing workflow and markers. Local pytest returned exit 5 for an
+    empty test directory.
+  human_review:
+    - Requested a shorter, conversational prompt for the rerun.
+  validation:
+    local_pytest: 0 tests collected; exit 5
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 5
+  topic: amount boundary test planning
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Outlined possible amount-boundary cases before the guard interface was available.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 6
+  topic: initial amount test scope
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Reduced the first test set to a negative amount and a valid control. Left
+    function details to D.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 7
+  topic: Phase 1 QA handoff draft
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Drafted a short handoff. The reviewed note distinguishes a missing test file from
+    an empty file and separates local checks from GitHub results.
+  human_review:
+    - Requested a more natural handoff with inaccurate wording removed.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 8
+  topic: CI workflow rerun plan
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    The first redo plan saw the existing workflow and suggested broadening test
+    collection. The later plan kept test/offline and -m offline.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 9
+  topic: pytest configuration rerun plan
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Reviewed the existing marker configuration during the first redo attempt. A later
+    session recreated the file after the original was backed up.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 10
+  topic: CI workflow recreation
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+
+  files_created:
+    - .github/workflows/ci.yml
+  summary: >
+    Recreated the CI workflow in a new conversation after archiving the first
+    version. The PR trigger and commands matched the previous implementation.
+  human_review:
+    - Approved the new plan and the single-file write exception.
+  validation:
+    ci_config: Checked locally; no GitHub Actions result yet
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 11
+  topic: pytest configuration recreation
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+
+  files_created:
+    - pytest.ini
+  summary: >
+    Recreated pytest.ini in a new conversation, keeping only the offline and live
+    markers.
+  human_review:
+    - Approved the new plan and the single-file write exception.
+  validation:
+    markers: Both markers recognized locally
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 12
+  topic: initial test plan against D's interface
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    The first interface-based request ended before producing a plan. No test file was
+    written in this conversation.
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 13
+  topic: INV-001 offline tests
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+
+  files_created:
+    - test/offline/test_invariants.py
+  summary: >
+    Added two offline tests for INV-001. The first write needed an explicit import
+    path, and the subsequent review required test names to contain the rule ID.
+  human_review:
+    - Approved writing the two planned amount tests in test/offline/test_invariants.py.
+  validation:
+    pr9_reference: 9d2717f762908d1b5fae1bd3a7c52a0a160ba0f3
+    pytest_offline: 41 passed in the combined D and E offline directory
+    pytest_offline_marker_filter: 2 passed, 39 deselected because the D tests have no offline marker
+    negative_guard_check: 1 failed, 1 passed when a temporary copy allowed negative amounts
+    github_ci: Pending PR run
+
+- date: 2026-11-09
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 14
+  topic: CI offline test selection review
+  tool: opencode (DeepSeek V4 Flash); Codex assistance
+  summary: >
+    Asked OpenCode to plan a one-line CI change after the local joint test found that
+    the marker filter omitted D's 39 offline tests. This session only produced a
+    plan.
+  validation:
+    local_offline_directory: 41 passed
+    current_ci_command: 2 passed, 39 deselected
+    workflow_change: Pending explicit approval
