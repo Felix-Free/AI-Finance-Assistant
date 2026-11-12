@@ -145,17 +145,35 @@ If an invariant cannot be written this way, it is not an invariant yet.
 ## 5. Logging contract
 
 **File:** `logs/llm_calls.jsonl` — one JSON object per line, append-only.
+**Every line carries exactly these ten keys** — identical key set on success and on failure;
+an inapplicable value is `null`, never an omitted key (so any consumer can read every row).
 
 | Field | Required | Meaning |
 |---|---|---|
 | `input` | yes | the exact text sent by the user |
-| `raw` | on success | the model's raw string response |
-| `parsed` | on success | the parsed object, or `null` if parsing failed |
-| `error` | on failure | short code: `not_json`, `http 401`, `transport: ...` |
+| `raw` | yes | the model's raw string response, or `null` when there is none |
+| `parsed` | yes | the parsed object, or `null` if parsing failed |
+| `error` | yes | short code: `not_json`, `http 401: …`, `transport: …`, `config: missing base url or key` |
+| `call_id` | yes | one actual LLM API call — `uuid4().hex` (32 chars) |
+| `tokens` | yes | `{"input": int\|null, "output": int\|null, "total": int\|null}`, mapped from the gateway `usage` object |
+| `session_id` | yes | one application/script run; every call in that run shares it |
+| `request_id` | yes | one user request; it may trigger several `call_id`s |
+| `usage_source` | yes | **only** `gateway` \| `partial` \| `missing` |
+| `request_made` | yes | `true` if and only if an HTTP request was actually sent |
 
+**Rules** (role C approved the four appended fields on 2026-11-12, with the conditions below):
+
+- The four Phase 1 fields keep their names and meaning; new fields are **appended**, never
+  renamed, and a `policy:*` code is never written here (those belong to `logs/review.jsonl`).
+- `usage_source`: three ints → `gateway`; some but not all → `partial`; none → `missing`.
+  Missing values stay `null` — **never 0, never estimated**.
+- `request_made` is `false` for configuration errors, parameter errors and any local pre-check;
+  it is `true` only when a request went out.
+- Any future local failure path must set `request_made=false` and must be covered by an offline
+  negative test (owner: role E); a test asserting **the exact ten-key set on every path** is also
+  required, so a forgotten field fails CI instead of silently producing a ragged log.
 - Secrets must never be logged.
 - A call whose result cannot be logged must not be used (fail-closed).
-- Extra fields are allowed but must not rename the four above.
 
 ---
 
