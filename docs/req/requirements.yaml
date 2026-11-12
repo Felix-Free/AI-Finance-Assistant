@@ -286,9 +286,9 @@ nonfunctional_requirements:
 
   - id: NFR-007
     name: Testability
-    metric: "fraction of invariants with an offline, network-free negative test"
-    threshold: "100% pass rate for all negative tests in CI"
-    verification: "map each C-INV to at least one test that fails without the guard; run pytest test/offline."
+    metric: "fraction of approved invariants with at least one offline, network-free negative test that fails when the corresponding guard is removed"
+    threshold: 1.0
+    verification: "map every approved C-INV to at least one corresponding guard-removal negative test; run the complete offline invariant test suite using pytest test/offline; verify that all tests pass with guards enabled and that each corresponding test fails when its guard is removed."
     priority: high
     status: pending_confirmation
     owner: E
