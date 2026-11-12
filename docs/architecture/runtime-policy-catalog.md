@@ -7,9 +7,9 @@
 >
 > Status: **Phase 1 · C-Security (transcript 60339160); extended in Phase 2 (§5).**
 > Specs only. Role C defines the trigger, action and degradation; role D implements; role
-> E verifies. Phase 1 policies RP-001..RP-006 keep their ids and meaning; the Phase 2
-> addendum adds the `call_id`, token, storage-failure and NFR-006 evidence contracts
-> without renaming or renumbering any existing policy.
+> E verifies. Phase 1 policies RP-001..RP-006 keep their ids and meaning; Phase 2 adds
+> **RP-007 (storage write failure)** plus the `call_id`, token, storage-failure and NFR-006
+> evidence contracts, without renaming or renumbering any existing policy.
 
 ---
 
@@ -52,7 +52,7 @@ write (`structural-constraints.md §4`).
 - **Action:** `reject`; raise `PolicyError`.
 - **Degradation:** stored data and running totals stay unchanged; the record is not
   applied. `C-INV-002` and `C-INV-003` additionally flag `REVIEW`.
-- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`.
+- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
 
 ### RP-004 — Logging integrity (fail-closed)
 
@@ -74,14 +74,34 @@ write (`structural-constraints.md §4`).
 - **Trigger:** accepted total + new amount > `budget_limit`.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** previous total is authoritative; the new record is never applied.
-- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`.
+- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
 
 ### RP-006 — Category out of vocabulary (guard for C-INV-002)
 
 - **Trigger:** category not in the closed whitelist.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** never coerce, never fuzzy-match, never ask the model to fix it.
-- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`.
+- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
+
+### RP-007 — Storage write failure
+
+- **Trigger:** a validated record cannot be written to storage (I/O error, unwritable path,
+  persistence error).
+- **Action:** raise an **independent `StorageError`**. It is an infrastructure failure, not
+  a rule decision.
+- **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
+  rejection (RP-003/005/006). A storage failure **must not** be rewritten as `policy:*`.
+- **No partial state:** no partial state change is allowed; the previous stored state
+  remains authoritative (the write either completes or the prior state stands).
+- **Not a policy rejection:** a storage failure is **not** a normal policy rejection and
+  **must not** create a policy review line (`logs/review.jsonl`).
+- **Evidence:** the failure surfaces as `StorageError` to the caller.
+
+> **Pending clarification.** The exact storage-failure evidence detail (whether it is
+> logged at all and, if so, in what record and format) is **not** defined elsewhere in this
+> repository. RP-007 requires only `StorageError` and the absence of a `policy` review line;
+> it does not invent a new log format. The precise evidence record is pending clarification
+> until the pipeline/spec fixes it.
 
 ---
 
@@ -91,6 +111,9 @@ write (`structural-constraints.md §4`).
 2. **Transport (RP-002)** before parse — a failed call has no output to judge.
 3. **Parse (RP-001)** before business rules.
 4. **Invariants (RP-003/005/006)** last, before any state change.
+5. **Storage write (RP-007)** runs where the state change would happen. If it fails, raise
+   `StorageError` and leave the previous state authoritative — never convert it into a
+   `policy:*` rejection.
 
 Later stages never run when an earlier stage rejects.
 
@@ -188,6 +211,8 @@ Preserved requirements (unchanged by these fields):
 > clarification until the pipeline/spec fixes it.
 
 ### 5.3 C4 — storage failure is not a policy rejection
+
+> This section is the contract rationale; the formal policy entry is **RP-007** (§2).
 
 - **Trigger.** A write to storage fails (I/O error, unwritable path, persistence error).
 - **Action:** raise an **independent `StorageError`**. It is a transport/infrastructure

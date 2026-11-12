@@ -338,3 +338,50 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: 2026-11-12
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 10
+  topic: align C2 rejection evidence and add RP-007
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/permission-model.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/code-governance/**
+    - logs/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only correction. Fixed the C2 evidence inconsistency: the invariants.md
+    rejection-evidence note now lists call_id and requires the review.jsonl line to carry the
+    same call_id as its llm_calls record; the stale "no call_id, cannot be joined" sentence
+    was removed while keeping the statement that the rejection line does not duplicate the
+    input text. RP-003/RP-005/RP-006 Evidence now state the review line includes the relevant
+    call_id, with policy:amount / policy:category / policy:budget unchanged. Added a formal
+    RP-007 Storage write failure entry (independent StorageError, policy:* reserved, never
+    rewritten as policy:*, no partial state, no policy review line) and a precedence step;
+    the storage-failure evidence record is marked pending rather than invented. The four
+    newly approved metadata fields, the C2 generation/carriage contract and the pending
+    NFR-006 three-location mapping were not changed. No source, test or measurement was run.
+  human_review:
+    - required the stale "review line has no call_id" statement to be removed, not kept
+    - required the rejection line to share call_id with its llm_calls record
+    - required the no-duplicated-input statement to stay
+    - required RP-007 as a formal numbered policy with a precedence position
+    - required storage-failure evidence detail to be marked pending, not invented
+    - required the four new metadata fields and NFR-006 mapping to stay unchanged
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed

@@ -648,3 +648,87 @@ consistency checks, recording real results and confirming no fabricated or zeroe
 id from the request and session ids, and keeping `request_made` a real boolean instead of a
 guess from message text, is what makes the logbook's counts trustworthy rather than
 plausible.
+
+---
+
+## Session 10
+
+**Date.** 2026-11-12 · Phase 2 C: align C2 rejection evidence and add RP-007
+
+**Context.** Two gaps in the Phase 2 C documentation. First, `invariants.md` still said the
+`review.jsonl` rejection line carries **no** `call_id` and therefore cannot be joined — a
+direct contradiction of the C2 contract, which requires the rejection evidence to share the
+`call_id` of its `llm_calls` record. Second, the C4 storage-failure rule existed only as
+prose in §5.3 and had no formal numbered policy, so the catalog's RP sequence and
+precedence did not represent it. This session fixes both. It does not change the four new
+metadata fields, the C2 generation/carriage contract, or the pending NFR-006 mapping.
+
+**My instruction to the agent.**
+
+```
+Close the C2 documentation inconsistency: the review.jsonl rejection line must carry the
+same call_id as its llm_calls record, and the stale "no call_id, cannot be joined" sentence
+must go. Update RP-003/RP-005/RP-006 Evidence to say the review line includes the call_id,
+keeping policy:amount, policy:category, policy:budget unchanged. Add a formal RP-007 storage
+write failure entry (independent StorageError, policy:* reserved, no rewrite as policy:*,
+no partial state, no policy review line) with any undefined evidence detail marked pending.
+Do not touch the four new metadata fields or the NFR-006 location mapping.
+```
+
+**Agent output (excerpt).**
+
+```
+I will rewrite the invariants.md rejection-evidence note so the line carries call_id and
+keeps the "does not duplicate the input text" statement, update RP-003/RP-005/RP-006
+Evidence to include the call_id, add RP-007 under §2, extend the precedence list, and mark
+the storage-failure evidence record pending rather than inventing a format.
+```
+
+**What I caught.** Three things.
+
+1. **The stale sentence was a direct contradiction, not a stale nuance.** Session 1 recorded
+   the no-`call_id` limitation as "debt for Phase 2"; Phase 2 C2 paid that debt by requiring
+   the shared `call_id`. Leaving the old sentence would tell D/E the opposite of the
+   contract. I required it removed and replaced with the join requirement.
+
+2. **The rejection line still must not duplicate input text.** Fixing the `call_id` should
+   not turn the review line into a copy of the call line. I kept "does not duplicate the full
+   input text" and pointed the reader at the joined `llm_calls` record for the input.
+
+3. **RP-007 had to be a real policy, marked pending where unknown.** The C4 rule was only in
+   §5.3 prose; the catalog needs it numbered with a precedence position. I required the entry
+   and the precedence update, but marked the storage-failure *evidence record* pending rather
+   than inventing a log format. The policy error codes and RP-001..RP-006 stay unchanged.
+
+**My correction.**
+
+```
+State the join: rejection evidence carries the same call_id as its llm_calls record; drop
+the "no call_id / cannot be joined" sentence; keep the no-duplicated-input statement. Keep
+policy:amount / policy:category / policy:budget exactly. Add RP-007 as a formal entry with
+no partial state and no policy review line, evidence detail pending. Do not change the four
+metadata fields, the C2 contract, or the NFR-006 mapping.
+```
+
+**Result.**
+
+- `docs/architecture/invariants.md` — rejection-evidence note now lists `call_id`, requires
+  it to match the related `llm_calls` record, and keeps the no-duplicated-input statement;
+  the stale "no call_id, cannot be joined" sentence is removed. Invariant conditions,
+  thresholds, rejection codes and review flags are unchanged.
+- `docs/architecture/runtime-policy-catalog.md` — RP-003/RP-005/RP-006 Evidence now state
+  the `review.jsonl` line includes the relevant `call_id`; added **RP-007 — Storage write
+  failure**; precedence gained a storage-write step; status line and §5.3 cross-reference
+  updated. RP-001..RP-006 meanings and the `policy:*` codes are unchanged.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `git diff --check` clean.
+- No source code, tests or measurements were changed or run; the four new metadata fields
+  and the pending NFR-006 three-location mapping are untouched.
+
+**Open handoffs.** D implements the `call_id` on the `review.jsonl` line so RP-003/005/006
+join, and implements RP-007 (`StorageError`, no partial state, no policy review line). E
+tests both and fixes the storage-failure evidence record once its format is clarified.
+
+**Reflection.** Debt that is "recorded for Phase 2" does not clear itself when Phase 2
+arrives; the old sentence had to be deleted, not left beside the new rule. And a rule that
+matters deserves a number — RP-007 makes the storage failure a first-class policy instead of
+a paragraph someone can miss.

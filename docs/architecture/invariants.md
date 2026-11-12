@@ -39,12 +39,14 @@ owns the specification. Consequences:
 
 ## 2. Guard specification blocks (handoff format, `structural-constraints.md §2.2`)
 
-> **Rejection evidence (decision 2026-11-09, option B).** Every policy rejection — for all three
-> invariants, including `C-INV-001` — appends exactly one line to `logs/review.jsonl` with the
-> fields `error`, `amount`, `category`, `spent`, `total`, `review`. `logs/llm_calls.jsonl` keeps
-> exactly one line per model call (`runtime-policy-catalog.md` RP-004), so a policy outcome never
-> adds a second line there. The rejection line does **not** carry the input text or a call id, so it
-> cannot yet be joined to its call line; this is recorded as debt for Phase 2.
+> **Rejection evidence (decision 2026-11-09, option B; aligned in Phase 2 C2).** Every policy
+> rejection — for all three invariants, including `C-INV-001` — appends exactly one line to
+> `logs/review.jsonl` with the fields `error`, `amount`, `category`, `spent`, `total`, `review`,
+> and `call_id`. `logs/llm_calls.jsonl` keeps exactly one line per model call
+> (`runtime-policy-catalog.md` RP-004), so a policy outcome never adds a second line there. The
+> rejection line must carry the **same `call_id`** as the related `llm_calls` record, so a
+> rejection can be joined to its call. The rejection line does **not** duplicate the full input
+> text; the input remains on the `llm_calls` line that shares the `call_id`.
 
 ### C-INV-001 — amount must be a finite positive number
 
