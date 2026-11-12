@@ -27,7 +27,7 @@ project_metadata:
   repository: "https://github.com/Felix-Free/AI-Finance-Assistant"
   default_branch: main
   model:
-    id: "CS5351/DeepSeek-V4-Flash"
+    id: "DeepSeek-V4-Flash"
     configured_via: env
     env_var: LLM_MODEL
     # NEEDS CONFIRMATION (owner: D) -> PD-004
@@ -287,7 +287,7 @@ nonfunctional_requirements:
   - id: NFR-007
     name: Testability
     metric: "fraction of invariants with an offline, network-free negative test"
-    threshold: null
+    threshold: "100% pass rate for all negative tests in CI"
     verification: "map each C-INV to at least one test that fails without the guard; run pytest test/offline."
     priority: high
     status: pending_confirmation
