@@ -294,8 +294,9 @@ No `src/` or `test/` file changed. No file was written under `data/`.
 - `docs/ai-use-log.yaml` parsed under `./.venv/bin/python` (`YAML OK`).
 - `git diff --check` clean; `git status` shows only the three intended files plus the
   pre-existing untracked `.DS_Store` and `docs/.DS_Store`.
-- `pytest test/offline -q` still reports **no tests ran** (empty suite); reported as such,
-  not claimed as passing.
+- `pytest test/offline -q` — **corrected in Session 6.** Session 5 recorded "no tests ran"
+  without establishing that the command could run; the project venv has no pytest, so the
+  suite was not actually executed here. See Session 6 for the re-run.
 
 **Open handoffs.** The measurement scripts themselves, the `data/` inputs and the
 `docs/measurements/` reports are subsequent Phase 2 steps. The `python scripts/*`
@@ -304,3 +305,68 @@ allow is deliberately scoped to the repo's own scripts directory.
 **Reflection.** A permission change is the one edit where "it works" is not the goal:
 every added line is a new capability for the agent, so the session records both what was
 granted and what was explicitly left denied.
+
+---
+
+## Session 6
+
+**Date.** 2026-11-12 · Phase 2 C1 follow-up: synchronize permission model, correct pytest evidence
+
+**Context.** Two gaps in the C1 commit `88aab30`. First, `.opencode/permissions.jsonc` was
+widened but `docs/architecture/permission-model.md` still described only the Phase 1
+boundaries, so document and config disagreed — the very thing §"Status" of that file warns
+against. Second, Session 5 recorded the pytest result as "no tests ran (empty suite)"
+without establishing that the command could run; the project venv has no pytest installed,
+so that claim was not honest. This session fixes both; it does not change the C1 permission
+entries themselves.
+
+**Why the permission model was synchronized.** `permission-model.md` is the authoritative
+statement and `.opencode/permissions.jsonc` is its machine-readable form; the file's own
+preamble says they must never disagree. Adding §3.1 and three rows to the §2 table records
+the C1 expansion (data, scripts, measurements as read+edit `allow`; pytest, py_compile and
+`python scripts/*` as bash `allow`), states that runtime files under `data/` must not be
+committed, and restates that default-deny, deny-overrides-allow, `.env` protection and the
+protected paths are unchanged.
+
+**Corrected pytest result (what actually ran in this environment).**
+
+```
+$ pytest test/offline -q
+zsh: command not found: pytest              # exit 127 — pytest CLI not on PATH
+
+$ ./.venv/bin/python -m pytest test/offline -q
+.../​.venv/bin/python: No module named pytest   # exit 1 — venv has no pytest
+
+$ python3 -m pytest test/offline -q          # system Python 3.9.6, pytest 8.4.2
+no tests ran in 0.00s                        # exit 5 — collected nothing
+```
+
+So the honest record is: **tests were not exercised in the project venv** (no pytest there);
+the only interpreter with pytest collected zero tests and exited 5. This is **not** a pass,
+and it is not evidence that the suite is empty in the sense of "green" — no test ran.
+
+**Files changed in this follow-up.**
+
+- `docs/architecture/permission-model.md` — §2 rows and new §3.1 for the C1 expansion.
+- `transcripts/60339160-QiangWanyun.md` — Session 5 pytest claim corrected; this entry.
+- `docs/ai-use-log.yaml` — matching Session 6 entry.
+
+`.opencode/permissions.jsonc` was not modified; its C1 entries are preserved.
+
+**My correction.**
+
+```
+Synchronize the doc to the config instead of leaving them inconsistent, re-run the
+validation for real, and record what actually happened rather than copying a plausible
+sounding result. Do not amend 88aab30; make a follow-up commit.
+```
+
+CHANGED FILES:
+- docs/architecture/permission-model.md  (modified, approved exception)
+- transcripts/60339160-QiangWanyun.md  (modified, approved exception)
+- docs/ai-use-log.yaml  (modified, approved exception)
+
+
+NOT CHANGED (confirm): src/**, test/**, .opencode/permissions.jsonc,
+docs/architecture/invariants.md, docs/architecture/runtime-policy-catalog.md,
+docs/code-governance/**, logs/**, .env, .DS_Store, docs/.DS_Store

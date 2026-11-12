@@ -157,3 +157,48 @@
     yaml_parse: pass (YAML OK via ./.venv/bin/python)
     git_diff_check: pass
     pytest: no tests ran (empty suite; not evidence of passing)
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 6
+  topic: C1 follow-up — synchronize permission model and correct pytest evidence
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/permission-model.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/code-governance/**
+    - logs/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    User-authorized follow-up to C1. Documented the Phase 2 C1 permission expansion in
+    permission-model.md (§2 rows plus new §3.1): data/**, scripts/** and
+    docs/measurements/** are read and edit allow, and pytest*, python -m py_compile* and
+    python scripts/* are bash allow, for measurement work only; runtime files under data/
+    must not be committed; default-deny, deny-overrides-allow, .env protection and the
+    protected paths are unchanged; permissions.jsonc stays the machine-readable config.
+    The C1 permission entries themselves were not modified. Corrected the session-5 pytest
+    claim: the project venv has no pytest (No module named pytest, exit 1), the pytest CLI
+    is not on PATH (exit 127), and system python3 -m pytest collected no tests (exit 5).
+    No tests passed.
+  human_review:
+    - required the permission model to match permissions.jsonc rather than stay stale
+    - required the pytest row to reflect what actually ran, not a copied "no tests ran"
+    - required a follow-up commit rather than amending 88aab30
+    - confirmed .opencode/permissions.jsonc and the pair of .DS_Store files were untouched
+  validation:
+    jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
+    yaml_parse: pass (YAML OK)
+    git_diff_check: pass
+    pytest: not run in project venv (no pytest installed); system pytest collected 0 tests (exit 5); tests did not pass
