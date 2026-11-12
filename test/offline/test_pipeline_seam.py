@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from src import call_llm, pipeline, policy_core
+from src import call_llm, pipeline, policy_core, storage
 
 
 @pytest.fixture
@@ -16,6 +16,7 @@ def captured_log(monkeypatch, tmp_path):
     monkeypatch.setattr(call_llm, "_append_log", lines.append)
     monkeypatch.setattr(call_llm, "BASE_URL", "http://example.invalid")
     monkeypatch.setattr(call_llm, "API_KEY", "test-key")
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "data" / "records.jsonl")
     return lines
 
 
@@ -118,10 +119,17 @@ def test_seam_success_call_id_joins_log_and_record(captured_log, monkeypatch):
         lambda payload: '{"amount": 350, "category": "food"}',
     )
     record = pipeline.process("hotpot 350", 0.0, 1000.0)
-    assert set(record) == {"amount", "category", "total"}
+    assert set(record) == set(storage.REQUIRED_FIELDS)
     assert "__call_id__" not in record
-    assert len(captured_log) == 1
     assert record["amount"] == 350
+    assert record["category"] == "food"
+    assert record["total"] == 350.0
+    assert record["budget_limit"] == 1000.0
+    assert len(captured_log) == 1
+    assert record["call_id"] == captured_log[0]["call_id"]
+    stored = list(storage.iter_records())
+    assert len(stored) == 1
+    assert stored[0] == record
 
 
 def test_process_without_call_id_raises_storage_error(captured_log, monkeypatch, tmp_path):
@@ -130,7 +138,6 @@ def test_process_without_call_id_raises_storage_error(captured_log, monkeypatch,
         call_llm, "extract",
         lambda text: {"amount": 350, "category": "food"},
     )
-    from src import storage
 
     with pytest.raises(storage.StorageError):
         pipeline.process("x", 0.0, 1000.0)
@@ -139,8 +146,6 @@ def test_process_without_call_id_raises_storage_error(captured_log, monkeypatch,
 def test_rejection_write_failure_raises_storage_error_not_policy(
     captured_log, monkeypatch, tmp_path,
 ):
-    from src import storage
-
     blocked = tmp_path / "adir"
     blocked.mkdir()
     monkeypatch.setattr(pipeline, "REVIEW_PATH", blocked)
@@ -168,3 +173,54 @@ def test_private_key_is_popped_before_validation(captured_log, monkeypatch, tmp_
     )
     pipeline.process("x", 0.0, 1000.0)
     assert "__call_id__" not in seen["raw"]
+
+
+def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp_path):
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    storage.append_validated({
+        "call_id": "seed00000001", "amount": 990, "category": "food",
+        "total": 990.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
+    })
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text: {"amount": 20, "category": "food", "__call_id__": "abc123def456"},
+    )
+    with pytest.raises(policy_core.PolicyError) as exc:
+        pipeline.process("x", budget_limit=1000.0)
+    assert exc.value.code == "policy:budget"
+
+
+def test_process_default_budget_limit_is_1000(captured_log, monkeypatch):
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+    )
+    record = pipeline.process("x")
+    assert record["budget_limit"] == 1000.0
+
+
+def test_decided_at_is_utc_iso_seconds(captured_log, monkeypatch):
+    from datetime import datetime
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+    )
+    record = pipeline.process("x")
+    parsed = datetime.fromisoformat(record["decided_at"])
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset().total_seconds() == 0
+    assert parsed.microsecond == 0
+
+
+def test_storage_error_from_persist_propagates(captured_log, monkeypatch, tmp_path):
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    storage.append_validated({
+        "call_id": "abc123def456", "amount": 1, "category": "food",
+        "total": 1.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
+    })
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+    )
+    with pytest.raises(storage.StorageError):
+        pipeline.process("x", 0.0, 1000.0)

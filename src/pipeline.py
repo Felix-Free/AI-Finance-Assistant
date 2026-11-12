@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from datetime import datetime, timezone
 
 from src import call_llm, policy_core, storage
 
@@ -28,12 +29,15 @@ def _append_rejection(record: dict) -> None:
         raise storage.StorageError("evidence write failure: %s" % exc) from exc
 
 
-def process(text: str, spent: float, budget_limit: float) -> dict:
-    """Parse one sentence, validate it, and return the normalised record.
+def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
+    """Parse one sentence, validate it, persist it, and return the stored record.
 
     ``call_llm.extract`` returns an UNVALIDATED parse carrying the private
     transport key ``"__call_id__"``. It is popped here, before validation, so
     the record passed to ``policy_core.validate_record`` never contains it.
+
+    When ``spent`` is None the running total is read from ``storage`` so that
+    INV-003 is checked against what has actually been persisted.
 
     Every policy rejection (INV-001, INV-002, INV-003) appends exactly one line
     to logs/review.jsonl carrying ``error`` = the ORIGINAL rejection code and
@@ -42,14 +46,20 @@ def process(text: str, spent: float, budget_limit: float) -> dict:
     logs/llm_calls.jsonl is untouched (RP-004 preserved: exactly one line per
     model call, written by call_llm.extract).
     ``LlmTransportError`` propagates unchanged and is never retried.
+
+    INV-003 support: a validated record is appended via ``storage.append_validated``
+    and a ``StorageError`` from persistence propagates (never a fake success).
     """
     raw = call_llm.extract(text)
     call_id = raw.pop("__call_id__", None) if isinstance(raw, dict) else None
     if not isinstance(call_id, str) or not call_id:
         raise storage.StorageError("missing call_id from model client")
 
+    if spent is None:
+        spent = storage.current_total()
+
     try:
-        return policy_core.validate_record(raw, spent, budget_limit)
+        validated = policy_core.validate_record(raw, spent, budget_limit)
     except policy_core.PolicyError as exc:
         amount = raw.get("amount") if isinstance(raw, dict) else None
         category = raw.get("category") if isinstance(raw, dict) else None
@@ -67,3 +77,15 @@ def process(text: str, spent: float, budget_limit: float) -> dict:
             "review": exc.review,
         })
         raise
+
+    decided_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    record = {
+        "call_id": call_id,
+        "amount": validated["amount"],
+        "category": validated["category"],
+        "total": validated["total"],
+        "budget_limit": budget_limit,
+        "decided_at": decided_at,
+    }
+    storage.append_validated(record)
+    return record
