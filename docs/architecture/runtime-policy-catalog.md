@@ -160,26 +160,34 @@ Later stages never run when an earlier stage rejects.
 - **Evidence:** the failure surfaces as `StorageError` to the caller; it never produces a
   `review.jsonl` policy line.
 
-### 5.4 C6 — NFR-006 evidence join (conditional evidence rule)
+### 5.4 C6 — NFR-006 evidence join (threshold and conditional evidence shape)
 
-**NFR-006, as measured:** the evidence records belonging to **one decision** carry the
-**same `call_id`**, so the decision can be reconstructed from its evidence trail.
+**NFR-006 threshold (strict).** Three relevant `call_id` locations/evidence records for
+the same decision must carry the same `call_id`. This is the agreed threshold in full; it
+is not weakened to a two-record join, it has no "where applicable" escape, and it is not
+redefined from whatever records happen to exist.
 
-- **Accepted decision.** Evidence = the `llm_calls` record **plus** the normal storage
-  record. The storage record for the decision carries the same `call_id` as its call line.
-- **Rejected decision.** Evidence = the `llm_calls` record **plus** the review evidence
-  (`logs/review.jsonl`). The review line for that rejection carries the same `call_id`.
+> **Pending clarification.** The exact names of the three required `call_id` locations are
+> not available in this repository yet. Until they are fixed by the pipeline/spec, the
+> threshold keeps the agreed wording — three relevant `call_id` locations/evidence records
+> for the same decision carry the same `call_id` — and the precise measurement mapping is
+> marked pending. It is not replaced with a weaker rule.
+
+**Conditional evidence shape (a separate rule, not the threshold).** This rule describes
+*which evidence records a decision has*. It is distinct from the threshold above, which
+governs *how many of those records must share the `call_id`*.
+
+- **Accepted decision.** Evidence shape = the `llm_calls` record **plus** the normal
+  storage evidence. The storage record for the decision carries the same `call_id` as its
+  call line.
+- **Rejected decision.** Evidence shape = the `llm_calls` record **plus** the review
+  evidence (`logs/review.jsonl`). The review line for that rejection carries the same
+  `call_id`.
 - **A rejected decision must not create a normal storage record.** Rejection means the
-  stored data is unchanged (RP-003/005/006); there is nothing to join on the storage side,
-  so the review line is the second evidence record instead.
-- **Conditional rule preserved.** The evidence pairing is **conditional on the outcome**:
-  accepted → llm_calls + storage; rejected → llm_calls + review. A decision has exactly one
-  of the two shapes; it never has both a storage record and a review line for the same
-  decision.
-- **Threshold phrasing.** When used as an automation check, NFR-006 is stated as *"three
-  relevant evidence records carry the same `call_id`"* where a decision's evidence set has
-  three relevant records; otherwise the join is evaluated over the records the decision
-  actually produces.
+  stored data is unchanged (RP-003/005/006); the review line is the second evidence record
+  instead, and no normal storage record exists to join.
+- **Conditional, one shape per decision.** A decision has exactly one of the two shapes; it
+  never has both a storage record and a review line for the same decision.
 
 ### 5.5 Approved D decisions (recorded here for the shared boundary)
 

@@ -478,3 +478,84 @@ NFR-002 come from the requirements source and are recorded, not invented, when c
 **Reflection.** The discipline here is the same as in Phase 1: a contract that is not
 written down is not a contract, and a logbook whose entries are all "green" before anything
 ran is worse than an empty one. Pending is a truthful state.
+
+---
+
+## Session 8
+
+**Date.** 2026-11-12 · Phase 2 C: tighten the NFR-006 threshold and fix logbook table format
+
+**Context.** Session 7 wrote the NFR-006 contract two ways in one breath: the strict
+three-record threshold and the conditional evidence shape were mixed together, and the
+threshold was weaker than agreed ("where applicable", "whatever records happen to exist").
+In `evaluation-logbook.md` the NFR-006 `Observed result` row had also fallen outside the
+table. This session is a documentation-only correction: it separates the threshold from the
+conditional shape and repairs the table. No source, test or runtime file is touched.
+
+**My instruction to the agent.**
+
+```
+The agreed NFR-006 threshold is strict: three relevant call_id locations/evidence records
+for the same decision must carry the same call_id. Remove the "where applicable" wording
+and the "whatever records exist" fallback. Keep the conditional evidence shape as a
+separate rule (accepted -> llm_calls + storage; rejected -> llm_calls + review; rejected
+creates no storage record). If the exact names of the three locations are not in the repo,
+keep the agreed wording and mark the precise measurement mapping pending. Also move the
+NFR-006 Observed result row into its table. Do not change RP-001..RP-006 or NFR-001/002.
+```
+
+**Agent output (excerpt).**
+
+```
+I will rewrite §5.4 so the threshold and the conditional evidence shape are separate, with
+identical threshold wording in the runtime policy catalog and the evaluation logbook. The
+exact three call_id locations are not named in the repo, so I keep the agreed wording and
+mark the mapping pending. I will move the Observed result row into the NFR-006 table and
+leave the explanatory blockquote after it.
+```
+
+**What I caught.** Three things.
+
+1. **The threshold had to stand alone.** Session 7 blended "every decision joins" with the
+   conditional shape and hedged with "where applicable" and "otherwise the join is evaluated
+   over the records that exist". That turns a strict rule into a discretionary one. I
+   required the strict sentence — three relevant `call_id` locations/evidence records for
+   the same decision must carry the same `call_id` — to be stated in full and in both files.
+
+2. **The conditional shape is a different rule.** Accepted → llm_calls + storage; rejected →
+   llm_calls + review; a rejected decision creates no normal storage record. That describes
+   *which* records a decision has, not *how many must share the id*. I required the two to be
+   visibly separate so neither is read as a substitute for the other.
+
+3. **The three locations are not named in this repository.** Rather than invent names or
+   weaken the rule to a two-record join, I kept the agreed wording and marked the precise
+   measurement mapping **pending clarification**.
+
+**My correction.**
+
+```
+State the strict threshold verbatim; drop "where applicable" and any "whatever records
+exist" fallback. Keep the conditional evidence shape as its own rule. Do not invent the
+three location names — mark the mapping pending. Move the NFR-006 Observed result row into
+its table. Do not touch RP-001..RP-006 or NFR-001/002.
+```
+
+**Result.**
+
+- `docs/architecture/runtime-policy-catalog.md` — §5.4 retitled and split into a strict
+  threshold (with a pending-clarification note) and a separate conditional evidence shape.
+  RP-001..RP-006 unchanged.
+- `docs/architecture/evaluation-logbook.md` — NFR-006 rows split into Threshold, Threshold
+  mapping (pending), Conditional evidence shape, and the `Observed result` row moved inside
+  the table; the blockquote remains after the table. NFR-001 and NFR-002 unchanged.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `git diff --check` clean.
+- No tests or measurements were run or claimed; this is a documentation-only correction.
+
+**Open handoffs.** The pipeline/spec owners (D/B) supply the exact names of the three
+required `call_id` locations so the pending measurement mapping can be fixed; until then the
+threshold stays as written and NFR-006 stays `blocked`.
+
+**Reflection.** A threshold and a shape are not the same promise. Writing "three records
+share an id" next to "a decision has these records" invited the weaker reading; separating
+them keeps the rule strict and leaves the unknown — the location names — honestly marked
+pending instead of papered over.

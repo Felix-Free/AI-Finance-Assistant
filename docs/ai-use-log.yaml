@@ -247,3 +247,47 @@
     jsonc_parse: pass (generic JSONC only)
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: 2026-11-12
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 8
+  topic: tighten NFR-006 threshold and fix logbook table format
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/code-governance/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only correction to the Phase 2 C artefacts. In runtime-policy-catalog.md
+    §5.4 the NFR-006 threshold now stands alone as the strict rule "three relevant call_id
+    locations/evidence records for the same decision must carry the same call_id", with the
+    "where applicable" and "whatever records exist" wording removed; the conditional evidence
+    shape is documented as a separate rule (accepted -> llm_calls + storage; rejected ->
+    llm_calls + review; rejected creates no storage record). The exact three call_id
+    locations are not named in the repository, so the precise measurement mapping is marked
+    pending clarification rather than replaced with a weaker rule. The evaluation logbook
+    NFR-006 rows are split into Threshold, Threshold mapping (pending) and Conditional
+    evidence shape, and the Observed result row is moved inside the NFR-006 table. RP-001
+    through RP-006 and NFR-001/NFR-002 were not changed.
+  human_review:
+    - required the strict three-record threshold to replace the hedged wording
+    - required the conditional evidence shape to stay a separate rule
+    - required the unnamed three locations to be marked pending, not weakened to two records
+    - required the NFR-006 Observed result row to move inside its table
+    - required RP-001..RP-006 and NFR-001/NFR-002 to stay unchanged
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only correction); no measurement claimed

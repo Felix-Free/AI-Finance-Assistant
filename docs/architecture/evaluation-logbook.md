@@ -61,20 +61,21 @@
 | Field | Value |
 |---|---|
 | NFR | Evidence records belonging to one decision carry the same `call_id` (`runtime-policy-catalog.md §5.4`). |
-| Metric | Share of decisions whose evidence set is internally joinable by a single `call_id`. |
-| Threshold | Every decision joins: for an accepted decision, the `llm_calls` record and its normal storage record share one `call_id`; for a rejected decision, the `llm_calls` record and its review line share one `call_id`, and **no** normal storage record is created. When phrased as an automation check: *three relevant evidence records carry the same `call_id`* where the decision produces three relevant records. |
+| Metric | Share of decisions whose three relevant `call_id` locations/evidence records carry the same `call_id`. |
+| Threshold | Three relevant `call_id` locations/evidence records for the same decision must carry the same `call_id`. Strict; not weakened to a two-record join, no "where applicable", not redefined from whatever records happen to exist. |
+| Threshold mapping | **Pending clarification.** The exact names of the three required `call_id` locations are not available in this repository yet; the measurement mapping is pending and is not replaced with a weaker rule. |
+| Conditional evidence shape | Separate rule, not the threshold. Accepted decision → `llm_calls` + normal storage evidence. Rejected decision → `llm_calls` + review evidence. A rejected decision must not create a normal storage record. |
 | Input / data source | The logs produced by a measurement run: `logs/llm_calls.jsonl` plus `logs/review.jsonl`, and the stored records for accepted decisions. |
-| Measurement command / procedure | For each decision, group its evidence records by `call_id` and assert (a) a single id per decision and (b) the conditional shape — accepted → llm_calls + storage, rejected → llm_calls + review. Any decision with a storage record *and* a review line, or with mismatched ids, is a failure. |
+| Measurement command / procedure | For each decision, check that the three relevant `call_id` locations/evidence records carry the same `call_id` (threshold), and assert the conditional shape — accepted → llm_calls + storage, rejected → llm_calls + review. Any decision with a storage record *and* a review line, or with mismatched ids, is a failure. |
 | Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl` and `logs/review.jsonl` excerpts used for the check. |
 | Owner | E (measurement), D (pipeline: `call_id` generation and carriage), C (contract). |
 | Status | blocked |
+| Observed result | Not measured — blocked on the `call_id` pipeline (C2/C3). |
 
 > **Why NFR-006 is blocked, not pending.** The join depends on the C2/C3/C4 pipeline
 > actually emitting `call_id` into both log files and removing `__call_id__` before
 > `policy_core`. Until that pipeline exists and produces real log lines, the procedure has
 > nothing to measure; recording "pending" with a numeric result would be misleading.
-
-| Observed result | Not measured — blocked on the `call_id` pipeline (C2/C3). |
 
 ---
 
@@ -84,7 +85,7 @@
 |---|---|---|---|---|---|
 | NFR-001 | fixture parse-match rate | as per requirements (not asserted yet) | E / D | pending | not measured |
 | NFR-002 | invariant violations reaching storage | zero | E / D | pending | not measured |
-| NFR-006 | decisions joinable by one `call_id` | all decisions; conditional evidence shape | E / D / C | blocked | not measured |
+| NFR-006 | decisions whose three relevant call_id locations share one call_id | three relevant call_id locations/evidence records share the same call_id | E / D / C | blocked | not measured |
 
 ---
 
