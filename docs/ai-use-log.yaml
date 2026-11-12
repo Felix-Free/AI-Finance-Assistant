@@ -20,16 +20,16 @@
   files_not_modified:
     - src/**
   summary: >
-    Reviewed PR #6 (Initial project skeleton). Identified that the AI agent 
-    missed critical governance directories (.github/workflows, .opencode, .agent). 
-    Manually added the missing directories to enforce architectural constraints 
+    Reviewed PR #6 (Initial project skeleton). Identified that the AI agent
+    missed critical governance directories (.github/workflows, .opencode, .agent).
+    Manually added the missing directories to enforce architectural constraints
     and CI governance.
   human_review:
     - rejected the incomplete AI-generated structure.
     - manually supplemented hidden directories to ensure compliance with PDF requirements.
   validation:
     structure_check: pass (aligned with PDF page 24)
-    
+
 - date: "2026-11-06"
   role: D
   student_id: "60915652"
@@ -67,7 +67,7 @@
     py_compile: pass (Python 3.9.7 system interpreter)
     live_call: pass (parsed amount=350, category=food; one JSONL line appended)
     pytest: no tests existed at this point (suite created in session 2)
-    
+
 - date: "2026-11-09"
   role: C
   student_id: "60339160"
@@ -219,7 +219,9 @@
   files_not_modified:
     - src/policy_core.py
     - src/call_llm.py
-    - docs/**
+    - docs/architecture/**
+    - docs/code-governance/**
+    - docs/req/**
     - AGENTS.md
     - requirements.txt
   summary: >
@@ -295,8 +297,8 @@
     - src/**
     - test/**
   summary: >
-    Conducted cross-review of PR #8 (security specs) and PR #9 (core logic). 
-    Used OpenCode to semantically compare C's updated invariants.md against the logging 
+    Conducted cross-review of PR #8 (security specs) and PR #9 (core logic).
+    Used OpenCode to semantically compare C's updated invariants.md against the logging
     requirements, and ran boundary-value harness tests on D's policy_core.py.
   human_review:
     - verified PR #8 Evidence fields were correctly updated to logs/review.jsonl.

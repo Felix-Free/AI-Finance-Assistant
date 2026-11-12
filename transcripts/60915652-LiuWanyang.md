@@ -361,3 +361,50 @@ minutes of field-by-field comparison found a defect that 36 green tests could no
 required a decision from the specification owner, not from me and not from the agent. The division
 of labour that finally worked was: **I read the spec and found the gap; the owner chose the
 resolution; the agent wrote the code; I verified the diff.**
+
+---
+
+## 2026-11-10 · Reviewing the team's AI use log — what "not modified" actually means
+
+**Context.** Role A opened a PR that rewrote `docs/ai-use-log.yaml` (his own entries, plus a
+reformatting of mine). While reviewing it I found that one of my entries listed `src/__init__.py`
+under **both** `files_created` and `files_not_modified`.
+
+**What I claimed.** A file cannot be in two states at once, so the three file lists should be
+disjoint. I found three overlaps of that shape: `src/__init__.py` in `files_created` and
+`files_not_modified`; `src/call_llm.py` in `files_created` and `files_modified`; and `docs/**` in
+`files_not_modified` covering `docs/ai-use-log.yaml`, which the same entry put in `files_modified`.
+
+**Where I was unsure.** My own reading had been: "the file was created and afterwards never
+modified, so listing it as unmodified is consistent." I could not decide between that reading and
+the disjoint-lists reading, so I put the question to the owner instead of editing his PR:
+
+> "src/__init__.py 同时出现在 files_created 和 files_not_modified 这两个字段内容里了…
+> 理论上同一文件不能既'创建'又'未修改'… 我之前想的是——创建了之后没修改所以才这么填的，
+> 所以应该按哪个逻辑来呢？"
+
+**The owner's answer.** He defined the field, which is the part I could not derive from the data:
+
+> "这个其实严格来说不是报错，是互斥。Git 里，一次提交里的文件状态只能是'新增 (Added)'或
+> '修改 (Modified)'或'未变 (Unchanged)'。你建了 `src/__init__.py`，它这次的状态就是'新增'。"
+>
+> "`files_not_modified` 这个字段，是用来做'安全声明'（比如声明我没动核心代码），它代表的是
+> 那些**本来就存在**且这次没碰的文件。"
+
+So `files_not_modified` is not a free-form negative claim: it is a **safety declaration about
+pre-existing files**, and something added in the same session has no standing in it. The three lists
+describe three Git states of a single commit and are therefore mutually exclusive by construction.
+
+**Outcome.** The owner accepted the correction ("按 agent 来") and asked for the exchange to be
+recorded here, which is this entry.
+
+**What I actually learned.** My finding was about a *field's semantics*, not about a fact.
+`git status` cannot tell you whether "created and never modified" should count as unmodified — that
+is a convention someone has to own. The reviewer's job is to surface the ambiguity with a concrete
+example and hand the definition back to the owner; the owner's job is to define it once so the next
+ten entries are mechanical. Writing the rule down (three Git states, mutually exclusive) is what
+turns a one-off correction into a schema.
+
+**Follow-up recorded for the team.** A CI check asserting that the three lists are pairwise disjoint
+after expanding `**`, and that `date` is a quoted string, would turn all four findings into a gate
+instead of a habit. Reported to role E as a Phase 2 item.
