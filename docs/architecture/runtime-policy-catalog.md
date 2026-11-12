@@ -5,8 +5,11 @@
 > record, or an unwritable log. Distinct from `invariants.md`, which defines the business
 > rules that must never be violated.
 >
-> Status: **Phase 1 · C-Security (transcript 60339160).** Specs only. Role C defines the
-> trigger, action and degradation; role D implements; role E verifies.
+> Status: **Phase 1 · C-Security (transcript 60339160); extended in Phase 2 (§5).**
+> Specs only. Role C defines the trigger, action and degradation; role D implements; role
+> E verifies. Phase 1 policies RP-001..RP-006 keep their ids and meaning; the Phase 2
+> addendum adds the `call_id`, token, storage-failure and NFR-006 evidence contracts
+> without renaming or renumbering any existing policy.
 
 ---
 
@@ -98,3 +101,92 @@ Later stages never run when an earlier stage rejects.
 - [ ] A test in `test/offline/` exercises the trigger (deterministic, no network).
 - [ ] The degradation matches the `Action` column.
 - [ ] The evidence is exactly one log line with the documented `error` code.
+
+---
+
+## 5. Phase 2 addendum (C2–C6)
+
+> **Scope.** Phase 2 introduces a `call_id` that joins a model call to its downstream
+> evidence, optional token accounting, an independent storage-failure error, and the
+> NFR-006 evidence-join rule. This section records the agreed contracts. It **does not
+> change** RP-001..RP-006: their triggers, actions and evidence codes stay exactly as
+> written in §2. The pipeline behavior that implements C2/C3/C4 is D's; the NFR-006
+> measurement is E's. C defines the contracts only.
+
+### 5.1 C2 — `call_id` generation and carriage
+
+- **Generation.** `call_id` is generated **inside `src/call_llm.py`** as
+  `uuid4().hex[:12]` — a 12-hex-character string. No other format is valid; no caller
+  may synthesize or override one.
+- **Return channel.** `call_llm` returns the value to its caller through the private
+  dictionary key **`__call_id__`** on the returned object.
+- **Carriage.** The pipeline carries that value along the evidence path so that the
+  downstream evidence records for one decision can be joined by the same `call_id`.
+- **Boundary.** `__call_id__` is **removed before the payload reaches
+  `src/policy_core.py`**. `policy_core` never sees a private key; it judges only the
+  business payload.
+- **Fail-closed interaction.** Because the id is produced in the same module that writes
+  the audit line (RP-004), a call that cannot be logged keeps producing no usable result;
+  `call_id` never rescues an unlogged call.
+
+### 5.2 C3 — `llm_calls.jsonl` logging contract
+
+- **Required fields, unchanged.** `input`, `raw`, `parsed` and `error` keep their names and
+  meaning (RP-004). They are never renamed, dropped or reinterpreted.
+- **Extra fields.** `call_id` and `tokens` **may** be added as extra fields. They are
+  additive: a reader that ignores them still sees the four required fields as before.
+- **Token semantics.** `tokens` records model-token accounting supplied by the gateway
+  (for example prompt/completion token counts from the response usage object). Its meaning
+  is "tokens the gateway reported for this call"; it is **not** a derived estimate.
+- **Never fabricate.** `tokens` is recorded **only when the gateway supplies it**. If the
+  gateway omits usage data, the field is absent (or `null`); it is never estimated,
+  back-filled, or computed from the raw text.
+- **One line per call.** Exactly **one** `logs/llm_calls.jsonl` record per model call is
+  preserved. Adding `call_id` / `tokens` does not add a second line, and policy outcomes
+  still go to `logs/review.jsonl` (RP-003/RP-005/RP-006), not here.
+
+### 5.3 C4 — storage failure is not a policy rejection
+
+- **Trigger.** A write to storage fails (I/O error, unwritable path, persistence error).
+- **Action:** raise an **independent `StorageError`**. It is a transport/infrastructure
+  failure, not a rule decision.
+- **Reserved prefix.** `policy:*` error codes are reserved **only** for deterministic
+  policy/rule rejection (amount, category, budget — RP-003/005/006). A storage failure
+  **must not** be rewritten as `policy:*`; doing so would make "correctly refused" and
+  "failed to persist" indistinguishable.
+- **No partial state.** A storage failure must leave **no partial state change**: the
+  write either completes or the previous state stands. No write-then-check, no
+  half-applied record.
+- **Evidence:** the failure surfaces as `StorageError` to the caller; it never produces a
+  `review.jsonl` policy line.
+
+### 5.4 C6 — NFR-006 evidence join (conditional evidence rule)
+
+**NFR-006, as measured:** the evidence records belonging to **one decision** carry the
+**same `call_id`**, so the decision can be reconstructed from its evidence trail.
+
+- **Accepted decision.** Evidence = the `llm_calls` record **plus** the normal storage
+  record. The storage record for the decision carries the same `call_id` as its call line.
+- **Rejected decision.** Evidence = the `llm_calls` record **plus** the review evidence
+  (`logs/review.jsonl`). The review line for that rejection carries the same `call_id`.
+- **A rejected decision must not create a normal storage record.** Rejection means the
+  stored data is unchanged (RP-003/005/006); there is nothing to join on the storage side,
+  so the review line is the second evidence record instead.
+- **Conditional rule preserved.** The evidence pairing is **conditional on the outcome**:
+  accepted → llm_calls + storage; rejected → llm_calls + review. A decision has exactly one
+  of the two shapes; it never has both a storage record and a review line for the same
+  decision.
+- **Threshold phrasing.** When used as an automation check, NFR-006 is stated as *"three
+  relevant evidence records carry the same `call_id`"* where a decision's evidence set has
+  three relevant records; otherwise the join is evaluated over the records the decision
+  actually produces.
+
+### 5.5 Approved D decisions (recorded here for the shared boundary)
+
+- **`call_id` format:** `uuid4().hex[:12]`. Fixed; see §5.1.
+- **`_append_review` preserves the original rejection code.** When review evidence is
+  written, `_append_review` keeps the **original** `error` code (for example
+  `policy:category`) rather than replacing or re-coding it. The code that caused the
+  rejection is the one recorded, so the review line and the routing decision agree.
+
+---

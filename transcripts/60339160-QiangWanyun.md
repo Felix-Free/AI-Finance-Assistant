@@ -274,7 +274,34 @@ new Phase 2 C session to the transcript and the ai-use-log. Do not touch src/,
 test/, docs/architecture/ or docs/code-governance/. Do not generate runtime data.
 ```
 
-**Result (files changed this session).**
+**Agent output (excerpt).**
+
+```
+C1 completed. The measurement paths were added to the read and edit allowlists,
+the three measurement commands were added to the bash allowlist, and the
+transcript and ai-use-log were updated. No source, test or runtime data files
+were changed.
+```
+
+**What I caught.** Two things.
+
+1. The permission expansion had to remain limited to the three measurement path
+   trees and the three requested command patterns. Storage, `call_id`, token
+   accounting and NFR-006 were deliberately left for D/E.
+
+2. The initial pytest statement was not enough evidence because it did not establish
+   that pytest had actually run in the project environment. The exact result was
+   re-run and corrected in Session 6.
+
+**My correction.**
+
+```
+Keep C1 limited to the requested permission entries and evidence records. Do not
+describe pytest as having run or passed unless the exact command succeeds; record
+the interpreter and exit status when the environment cannot execute the suite.
+```
+
+**Result.**
 
 - `.opencode/permissions.jsonc` — added `data/**`, `scripts/**` and
   `docs/measurements/**` to `read` and to `edit` as `allow`; added `pytest*`,
@@ -286,17 +313,10 @@ test/, docs/architecture/ or docs/code-governance/. Do not generate runtime data
 
 No `src/` or `test/` file changed. No file was written under `data/`.
 
-**Validation (what actually ran).**
-
-- `permissions.jsonc` parsed after stripping `//` comments (generic JSONC only; no
-  OpenCode-specific validator exists in this repository, so schema conformance is not
-  verified).
-- `docs/ai-use-log.yaml` parsed under `./.venv/bin/python` (`YAML OK`).
-- `git diff --check` clean; `git status` shows only the three intended files plus the
-  pre-existing untracked `.DS_Store` and `docs/.DS_Store`.
-- `pytest test/offline -q` — **corrected in Session 6.** Session 5 recorded "no tests ran"
-  without establishing that the command could run; the project venv has no pytest, so the
-  suite was not actually executed here. See Session 6 for the re-run.
+Validation included generic JSONC parsing, YAML parsing under
+`./.venv/bin/python`, and a clean `git diff --check`. The project venv had no pytest;
+the later Session 6 re-run recorded the system `python3 -m pytest` result as zero tests
+collected with exit code 5, not as a passing test run.
 
 **Open handoffs.** The measurement scripts themselves, the `data/` inputs and the
 `docs/measurements/` reports are subsequent Phase 2 steps. The `python scripts/*`
@@ -370,3 +390,91 @@ CHANGED FILES:
 NOT CHANGED (confirm): src/**, test/**, .opencode/permissions.jsonc,
 docs/architecture/invariants.md, docs/architecture/runtime-policy-catalog.md,
 docs/code-governance/**, logs/**, .env, .DS_Store, docs/.DS_Store
+
+---
+
+## Session 7
+
+**Date.** 2026-11-12 · Phase 2 C-side: policy contracts (C2/C3/C4/C6) and evaluation logbook
+
+**Context.** Phase 2 agreed the `call_id` contract (C2), the `llm_calls` logging contract
+(C3), the storage-failure rule (C4) and the NFR-006 evidence-join rule (C6). None of it was
+written down on the C side. This session records those contracts in the runtime policy
+catalog, creates the evaluation logbook the NFRs are measured in, and leaves D/E code
+untouched. Specs and documentation only.
+
+**My instruction to the agent.**
+
+```
+Document the agreed Phase 2 contracts without changing Phase 1 policy ids. Record C2
+call_id (uuid4().hex[:12], returned via __call_id__, removed before policy_core), C3
+llm_calls extra fields (call_id, tokens; tokens only from the gateway, never fabricated),
+C4 StorageError independent of policy:*, no partial state, and C6 NFR-006 conditional
+evidence (accepted → llm_calls + storage; rejected → llm_calls + review; rejected
+decisions create no storage record; "three relevant records carry the same call_id").
+Also record the approved D decisions: call_id format, and _append_review preserving the
+original rejection code. Create docs/architecture/evaluation-logbook.md with pending,
+not invented, results. Do not touch src/ or test/. Only update the MCP manifest if a real
+new tool exists.
+```
+
+**Agent output (excerpt).**
+
+```
+I will add a §5 Phase 2 addendum to runtime-policy-catalog.md covering C2/C3/C4/C6 and
+the approved D decisions, create docs/architecture/evaluation-logbook.md with NFR-001,
+NFR-002 and NFR-006 as pending/blocked (no fabricated results), and leave
+mcp-tool-manifest.md unchanged because no new MCP tool or entry point exists.
+```
+
+**What I caught.** Three things.
+
+1. **The `call_id` had to stay at `uuid4().hex[:12]`.** It is tempting to let a caller
+   pass or shorten its own id, but C2 fixes both the format and the location of generation
+   inside `call_llm`. I kept the spec to that one format and one producer, and required
+   `__call_id__` to be removed before `policy_core` so the guard never sees a private key.
+
+2. **`tokens` must not be invented.** Token accounting is easy to guess at, so I required
+   the field to be recorded only when the gateway supplies usage data, and to be absent or
+   `null` otherwise. `policy:*` also stays reserved for rule rejection, so a storage
+   failure (`StorageError`) is never dressed up as a policy outcome.
+
+3. **The NFRs must not claim results.** I required NFR-001, NFR-002 and NFR-006 to be
+   recorded as `pending`/`blocked` with no observed value, and the manifest left untouched
+   because there is no new MCP tool — an application entry point is not an MCP tool.
+
+**My correction.**
+
+```
+Keep the call_id format and generation site fixed; do not let callers synthesize ids.
+tokens only when the gateway reports them. StorageError is independent of policy:*.
+NFR-006 evidence is conditional: accepted → llm_calls + storage, rejected → llm_calls +
+review, and a rejected decision creates no storage record. Leave every NFR result
+pending or blocked; do not invent a measurement. Do not add an MCP tool entry.
+```
+
+**Result.**
+
+- `docs/architecture/runtime-policy-catalog.md` — status line extended for Phase 2, and a
+  new §5 addendum: §5.1 C2 `call_id`, §5.2 C3 `llm_calls` contract, §5.3 C4 storage
+  failure, §5.4 C6 NFR-006 conditional evidence, §5.5 approved D decisions. RP-001..RP-006
+  keep their ids and meaning.
+- `docs/architecture/evaluation-logbook.md` — new; NFR-001, NFR-002 and NFR-006 with
+  metric, threshold, input, procedure, expected evidence, owner and status. All results are
+  `pending` or `blocked`; NFR-006 is blocked on the `call_id` pipeline.
+- `docs/code-governance/mcp-tool-manifest.md` — **not** modified; no new MCP tool or entry
+  point exists.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `.opencode/permissions.jsonc`
+  parses under generic JSONC; `git diff --check` clean; `git status` shows only the
+  intended files plus the pre-existing untracked `.DS_Store` files.
+- No test was run for this session (documentation only) and no measurement was claimed.
+  `src/` and `test/` are unchanged.
+
+**Open handoffs.** D implements C2/C3/C4 in the pipeline (`call_id` generation, `tokens`
+from gateway usage only, `StorageError`); E runs NFR-001/NFR-002 and, once the `call_id`
+pipeline exists, NFR-006, recording real results in the logbook. Thresholds for NFR-001 and
+NFR-002 come from the requirements source and are recorded, not invented, when confirmed.
+
+**Reflection.** The discipline here is the same as in Phase 1: a contract that is not
+written down is not a contract, and a logbook whose entries are all "green" before anything
+ran is worse than an empty one. Pending is a truthful state.

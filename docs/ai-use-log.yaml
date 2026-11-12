@@ -202,3 +202,48 @@
     yaml_parse: pass (YAML OK)
     git_diff_check: pass
     pytest: not run in project venv (no pytest installed); system pytest collected 0 tests (exit 5); tests did not pass
+
+- date: 2026-11-12
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 7
+  topic: Phase 2 policy contracts (C2/C3/C4/C6) and evaluation logbook
+  tool: opencode
+  files_created:
+    - docs/architecture/evaluation-logbook.md
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - docs/code-governance/mcp-tool-manifest.md
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documented the agreed Phase 2 contracts on the C side. Added a §5 addendum to the
+    runtime policy catalog: C2 call_id (uuid4().hex[:12], returned via __call_id__, removed
+    before policy_core), C3 llm_calls contract (input/raw/parsed/error preserved; call_id
+    and tokens may be added; tokens only when the gateway supplies them; one line per call),
+    C4 StorageError independent of policy:* with no partial state, C6 NFR-006 conditional
+    evidence (accepted -> llm_calls + storage; rejected -> llm_calls + review; rejected
+    decisions create no storage record; three relevant records share the call_id where
+    applicable), plus the approved D decisions (call_id format; _append_review preserves the
+    original rejection code). RP-001..RP-006 were preserved. Created evaluation-logbook.md
+    with NFR-001, NFR-002 and NFR-006 as pending/blocked and no invented results. The MCP
+    manifest was not modified because no new MCP tool or entry point exists.
+  human_review:
+    - required call_id to stay uuid4().hex[:12] with no caller-synthesized ids
+    - required tokens to be recorded only from gateway usage, never fabricated
+    - required storage failure to be an independent StorageError, not a policy:* code
+    - required NFR-006 conditional evidence for accepted versus rejected decisions
+    - required all NFR results to be pending/blocked, with none invented
+    - required the MCP manifest to stay untouched (no new MCP tool)
+  validation:
+    yaml_parse: pass
+    jsonc_parse: pass (generic JSONC only)
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
