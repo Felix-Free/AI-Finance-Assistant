@@ -156,7 +156,7 @@
     jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
     yaml_parse: pass (YAML OK via ./.venv/bin/python)
     git_diff_check: pass
-    pytest: no tests ran (empty suite; not evidence of passing)
+    pytest: not run in project venv (no pytest installed); system python3 -m pytest collected 0 tests (exit 5); tests did not pass
 
 - date: "2026-11-12"
   role: C
