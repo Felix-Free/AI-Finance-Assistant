@@ -13,38 +13,40 @@ from __future__ import annotations
 import json
 import pathlib
 
-from src import call_llm, policy_core
+from src import call_llm, policy_core, storage
 
 REVIEW_PATH = pathlib.Path("logs/review.jsonl")
 
 
-def _append_review(record: dict) -> None:
-    """Append exactly one review line. Fail-closed: raise if it cannot be written."""
+def _append_rejection(record: dict) -> None:
+    """Append exactly one rejection line. Fail-closed: raise StorageError on failure."""
     try:
         REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
         with REVIEW_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:  # pragma: no cover - environment failure
-        raise policy_core.PolicyError(
-            "cannot write review log: %s" % exc,
-            code="policy:budget", review=True,
-        ) from exc
+        raise storage.StorageError("evidence write failure: %s" % exc) from exc
 
 
 def process(text: str, spent: float, budget_limit: float) -> dict:
     """Parse one sentence, validate it, and return the normalised record.
 
-    ``call_llm.extract`` returns an UNVALIDATED parse. It is passed straight to
-    ``policy_core.validate_record``; nothing here trusts the model output.
+    ``call_llm.extract`` returns an UNVALIDATED parse carrying the private
+    transport key ``"__call_id__"``. It is popped here, before validation, so
+    the record passed to ``policy_core.validate_record`` never contains it.
 
     Every policy rejection (INV-001, INV-002, INV-003) appends exactly one line
-    to logs/review.jsonl carrying ``error`` = the rejection code, then re-raises.
-    The ``review`` field keeps the distinction: False for amount, True for
-    category/budget. logs/llm_calls.jsonl is untouched (RP-004 preserved:
-    exactly one line per model call, written by call_llm.extract).
+    to logs/review.jsonl carrying ``error`` = the ORIGINAL rejection code and
+    the same ``call_id`` as the call line, then re-raises. The ``review`` field
+    keeps the distinction: False for amount, True for category/budget.
+    logs/llm_calls.jsonl is untouched (RP-004 preserved: exactly one line per
+    model call, written by call_llm.extract).
     ``LlmTransportError`` propagates unchanged and is never retried.
     """
     raw = call_llm.extract(text)
+    call_id = raw.pop("__call_id__", None) if isinstance(raw, dict) else None
+    if not isinstance(call_id, str) or not call_id:
+        raise storage.StorageError("missing call_id from model client")
 
     try:
         return policy_core.validate_record(raw, spent, budget_limit)
@@ -55,7 +57,8 @@ def process(text: str, spent: float, budget_limit: float) -> dict:
             total = spent + amount
         except TypeError:
             total = None
-        _append_review({
+        _append_rejection({
+            "call_id": call_id,
             "error": exc.code,
             "amount": amount,
             "category": category,

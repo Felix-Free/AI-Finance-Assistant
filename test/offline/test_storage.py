@@ -79,6 +79,27 @@ def test_append_validated_rejects_missing_required_field(data_path):
         storage.append_validated(rec)
 
 
+def test_append_validated_rejects_unknown_private_key(data_path):
+    with pytest.raises(storage.StorageError):
+        storage.append_validated(_record(**{"__call_id__": "x"}))
+    assert not data_path.exists()
+
+
+@pytest.mark.parametrize("bad_category", ["", None, 123])
+def test_append_validated_rejects_non_string_category(data_path, bad_category):
+    with pytest.raises(storage.StorageError):
+        storage.append_validated(_record(category=bad_category))
+
+
+def test_current_total_raises_on_non_numeric_amount(data_path):
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    data_path.write_text(
+        json.dumps({"call_id": "x", "amount": "350"}) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(storage.StorageError):
+        storage.current_total()
+
+
 def test_current_total_sums_amounts(data_path):
     storage.append_validated(_record(call_id="a", amount=100))
     storage.append_validated(_record(call_id="b", amount=50))

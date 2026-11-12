@@ -9,6 +9,7 @@ import json
 import os
 import pathlib
 import sys
+import uuid
 
 import requests
 from dotenv import load_dotenv
@@ -40,6 +41,11 @@ class LlmTransportError(RuntimeError):
         super().__init__(message)
         self.status_code = status_code
         self.body = body
+
+
+def _new_call_id() -> str:
+    """Correlation id joining the call line to its rejection line (12 hex chars)."""
+    return uuid.uuid4().hex[:12]
 
 
 def _append_log(record: dict) -> None:
@@ -108,20 +114,25 @@ def extract(text: str) -> dict:
 
     The returned dict is raw model output and is NOT trusted. The caller MUST
     pass it to policy_core.validate_record() before anything may be stored; it
-    must never be persisted directly.
+    must never be persisted directly. It carries the private key
+    ``"__call_id__"`` (transport metadata) which the caller MUST pop before
+    validation; it is never data and never stored.
 
     Exactly one line is appended to logs/llm_calls.jsonl on every path
     (success, non-JSON content, HTTP non-200, transport failure): log first,
-    then raise or return. If the log cannot be written, the result is not
-    returned (fail-closed).
+    then raise or return. Every line carries ``call_id``. If the log cannot be
+    written, the result is not returned (fail-closed).
 
     Raises LlmTransportError on transport / protocol failure, and
     json.JSONDecodeError when the model returns something that is not JSON
     (logged, then re-raised; the caller decides whether that becomes a
     rejection).
     """
+    call_id = _new_call_id()
+
     if not BASE_URL or not API_KEY:
-        _append_log({"input": text, "error": "config: missing base url or key"})
+        _append_log({"input": text, "call_id": call_id,
+                     "error": "config: missing base url or key"})
         raise LlmTransportError("LLM_BASE_URL / LLM_API_KEY missing (.env)")
 
     payload = {
@@ -137,7 +148,7 @@ def extract(text: str) -> dict:
     try:
         raw = _post(payload)
     except LlmTransportError as exc:
-        log_record = {"input": text, "error": str(exc)}
+        log_record = {"input": text, "call_id": call_id, "error": str(exc)}
         status_code = getattr(exc, "status_code", None)
         if status_code is not None:
             log_record["error"] = "http %s" % status_code
@@ -149,11 +160,14 @@ def extract(text: str) -> dict:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         # Log the failure, then let the caller decide (do not swallow).
-        _append_log({"input": text, "raw": raw, "parsed": None,
-                     "error": "not_json"})
+        _append_log({"input": text, "call_id": call_id, "raw": raw,
+                     "parsed": None, "error": "not_json"})
         raise
 
-    _append_log({"input": text, "raw": raw, "parsed": parsed})
+    _append_log({"input": text, "call_id": call_id, "raw": raw,
+                 "parsed": parsed})
+    if isinstance(parsed, dict):
+        parsed["__call_id__"] = call_id
     return parsed
 
 

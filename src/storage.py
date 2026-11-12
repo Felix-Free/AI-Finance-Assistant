@@ -43,9 +43,15 @@ def _validate_record(record: dict) -> None:
     for field in REQUIRED_FIELDS:
         if field not in record:
             raise StorageError("missing required field %r" % (field,))
+    unknown = set(record) - set(REQUIRED_FIELDS)
+    if unknown:
+        raise StorageError("unexpected field(s): %r" % sorted(unknown))
     call_id = record["call_id"]
     if not isinstance(call_id, str) or not call_id:
         raise StorageError("call_id must be a non-empty str, got %r" % (call_id,))
+    category = record["category"]
+    if not isinstance(category, str) or not category:
+        raise StorageError("category must be a non-empty str, got %r" % (category,))
     for field in _NUMERIC_FIELDS:
         if not _is_number(record[field]):
             raise StorageError(
@@ -95,7 +101,13 @@ def current_total() -> float:
     """INV-003 support: sum of stored amounts; 0.0 when nothing is stored yet."""
     total = 0.0
     for record in iter_records():
-        total += record["amount"]
+        amount = record.get("amount") if isinstance(record, dict) else None
+        if not _is_number(amount):
+            raise StorageError(
+                "stored record has no numeric amount: %r"
+                % (record.get("call_id") if isinstance(record, dict) else record,)
+            )
+        total += amount
     return total
 
 
