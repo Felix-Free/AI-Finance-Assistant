@@ -11,7 +11,7 @@
 #    They are collected in `pending_decisions` and also flagged inline.
 #
 # Primary sources:
-#   - docs/architecture/invariants.md            (C-INV-001/002/003)
+#   - docs/architecture/invariants.md            (INV-001/002/003)
 #   - docs/architecture/runtime-policy-catalog.md (RP-001..RP-006)
 #   - docs/architecture/permission-model.md
 #   - AGENTS.md

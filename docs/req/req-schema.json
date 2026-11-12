@@ -164,7 +164,7 @@
       "additionalProperties": false,
       "required": ["id", "source_ref", "rule", "enforcement", "owner_spec", "owner_impl", "status"],
       "properties": {
-        "id": { "type": "string", "pattern": "^(C-INV|INV)-\\d{3}$|^C-INV-PENDING-\\d{2}$" },
+        "id": { "type": "string", "pattern": "^(INV|INV)-\\d{3}$|^INV-PENDING-\\d{2}$" },
         "source_ref": { "type": "string", "minLength": 1 },
         "rule": { "type": "string", "minLength": 1 },
         "enforcement": { "type": "string" },
