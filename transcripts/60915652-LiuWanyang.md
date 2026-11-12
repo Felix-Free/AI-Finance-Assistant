@@ -459,3 +459,57 @@ a definition I never wrote down*. My job here was not to write the field myself 
 finished design, but to state the invariant the design must satisfy, ask for alternatives, and pick
 one using public criteria. That is also why this entry records the two rejected options: the reason
 they lost is the evidence that the choice was made, not guessed.
+
+---
+
+## 2026-11-12 · Phase 2: persistence, a joinable audit trail, and token evidence
+
+**Context.** Phase 2 asked for three things from role D: a persistence layer that only accepts
+validated data, a rejection line that can be joined to its call line, and measurement evidence for
+NFR-001/NFR-002. Three task sheets were used (v4 storage + debts, v5.1 usage capture, v6 the
+memory-design document), each written from the team template and pasted whole.
+
+**What was delivered.** `src/storage.py` (single write entry `append_validated`, duplicates by
+`call_id` refused, `StorageError` on any write failure, parent directory created at write time);
+`call_id` threaded from `call_llm` through `pipeline` into both logs and the stored record;
+`_append_review` renamed to `_append_rejection` with the original rejection code preserved; the
+`-0.01` boundary smoke case; two measurement scripts; and `docs/architecture/memory-design.md`.
+`pytest test/offline -q` went from 39 → 105 passing.
+
+**Three things I caught in review, in ascending order of importance.**
+
+1. *A ragged log schema.* The failure paths emitted eight keys while the success path emitted ten:
+   `raw` and `parsed` were absent rather than `null`. Every consumer would have needed `.get()`,
+   and a `pandas.read_json` would have silently filled columns. I required a single `_line()`
+   builder that seeds all ten keys, plus one test asserting `set(line) == TEN` on **every** path,
+   not `⊆`.
+
+2. *A word with two meanings.* The plan classified every failure as `usage_source="missing"`. That
+   is self-consistent code and wrong for the owner's metric: a configuration failure makes **no**
+   HTTP request, so counting it as "a call that lacked usage" inflates `missing_usage_calls`. I did
+   not hand over a field name; I asked for three designs and fixed the criteria first (one line per
+   attempt, four original names untouched, storage untouched, "no request" distinguishable from
+   "request without usage", no zero-filling). The chosen design added `request_made`, which the
+   contract owner then approved with a written condition: configuration, parameter and local
+   pre-check failures must all be `false`.
+
+3. *A numbering leak.* `memory-design.md` came back with sections numbered `3.1–3.6` — inherited
+   from §3 of the task sheet. Correct content, wrong self-numbering: a reader opens the document and
+   asks where 1 and 2 went. Small, but it is the kind of defect that survives every content review
+   because nobody reads headings as a reader would.
+
+**The practice worth keeping.** For that last fix the agent did not simply say "renumbered". It
+copied the file to `/tmp`, ran a script whose every replacement was guarded by
+`assert text.count(old) == 1`, then ran `diff` and showed that exactly seven lines changed — six
+headings and one cross-reference — with everything else byte-identical. That is the difference
+between *"I changed it, trust me"* and *"here is the proof that only the intended bytes moved"*.
+It is also cheap to demand: one command in the task sheet, and the reviewer stops having to
+re-read 152 lines to find the two that were supposed to change.
+
+**What this says about the division of labour.** Every defect above was found by comparing the
+output against a written contract, not by reading for style. The agent's code was internally
+consistent in all three cases; the gap was always between what the code claimed and what an owner
+had actually specified. Two of the three needed an owner's decision, and one needed nothing more
+than an `assert` before `replace`. That is the whole job: keep the contract written down, and make
+the agent prove its edits.
+
