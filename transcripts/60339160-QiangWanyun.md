@@ -250,3 +250,57 @@ RP-001, RP-002 and RP-004 remain unchanged.
 Before committing, I checked that the diff contains only the requested three edits and
 that the unrelated .DS_Store file is excluded.
 ```
+
+---
+
+## Session 5
+
+**Date.** 2026-11-12 · Phase 2 C1: measurement permission configuration
+
+**Context.** Phase 2 introduces measurement work (inputs under `data/`, scripts under
+`scripts/`, results under `docs/measurements/`). C1 is the permission step only: widen the
+agent's whitelist just enough to read and edit those three paths and to run the
+measurement commands, without opening anything else. Storage, `call_id`, token accounting
+and NFR-006 belong to D/E and are deliberately out of scope.
+
+**My instruction to the agent.**
+
+```
+Complete only C1. In .opencode/permissions.jsonc add data/**, scripts/** and
+docs/measurements/** to read and to edit as allow, and add the bash allow
+patterns pytest*, python -m py_compile* and python scripts/*. Preserve every
+existing deny/ask rule, comment and default; broaden nothing else. Then append a
+new Phase 2 C session to the transcript and the ai-use-log. Do not touch src/,
+test/, docs/architecture/ or docs/code-governance/. Do not generate runtime data.
+```
+
+**Result (files changed this session).**
+
+- `.opencode/permissions.jsonc` — added `data/**`, `scripts/**` and
+  `docs/measurements/**` to `read` and to `edit` as `allow`; added `pytest*`,
+  `python -m py_compile*` and `python scripts/*` to `bash` as `allow`. All other rules
+  (`"*": "deny"`, `"*": "ask"`, `.env`, `git push`/`git commit`, `rm -rf`, the
+  architecture/governance `ask` rules and the expandable denominators) are unchanged.
+- `transcripts/60339160-QiangWanyun.md` — this entry.
+- `docs/ai-use-log.yaml` — matching session 5 entry.
+
+No `src/` or `test/` file changed. No file was written under `data/`.
+
+**Validation (what actually ran).**
+
+- `permissions.jsonc` parsed after stripping `//` comments (generic JSONC only; no
+  OpenCode-specific validator exists in this repository, so schema conformance is not
+  verified).
+- `docs/ai-use-log.yaml` parsed under `./.venv/bin/python` (`YAML OK`).
+- `git diff --check` clean; `git status` shows only the three intended files plus the
+  pre-existing untracked `.DS_Store` and `docs/.DS_Store`.
+- `pytest test/offline -q` still reports **no tests ran** (empty suite); reported as such,
+  not claimed as passing.
+
+**Open handoffs.** The measurement scripts themselves, the `data/` inputs and the
+`docs/measurements/` reports are subsequent Phase 2 steps. The `python scripts/*`
+allow is deliberately scoped to the repo's own scripts directory.
+
+**Reflection.** A permission change is the one edit where "it works" is not the goal:
+every added line is a new capability for the agent, so the session records both what was
+granted and what was explicitly left denied.

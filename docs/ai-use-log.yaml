@@ -122,3 +122,38 @@
   validation:
     git_diff_check: pass
     yaml_parse: pass
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 5
+  topic: Phase 2 C1 measurement permission configuration
+  tool: opencode
+  files_created: []
+  files_modified:
+    - .opencode/permissions.jsonc
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/architecture/**
+    - docs/code-governance/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    C1 only. Added data/**, scripts/** and docs/measurements/** to the read and edit
+    whitelists as allow, and added pytest*, python -m py_compile* and python scripts/*
+    to bash as allow. Every existing deny/ask rule, comment and default was preserved;
+    no other permission was broadened and no runtime data was generated.
+  human_review:
+    - limited scope to C1 only (no storage, call_id, tokens or NFR-006 work)
+    - required existing deny/ask rules and comments to be preserved unchanged
+    - required the pre-existing untracked .DS_Store files to be left alone
+    - required the diff to contain only the three intended files
+  validation:
+    jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
+    yaml_parse: pass (YAML OK via ./.venv/bin/python)
+    git_diff_check: pass
+    pytest: no tests ran (empty suite; not evidence of passing)
