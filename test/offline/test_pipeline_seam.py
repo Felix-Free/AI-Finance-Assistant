@@ -21,13 +21,13 @@ def captured_log(monkeypatch, tmp_path):
 
 
 def test_seam_returns_parsed_object_and_logs_once(captured_log, monkeypatch):
-    monkeypatch.setattr(call_llm, "_post", lambda payload: '{"amount": 350, "category": "food"}')
+    monkeypatch.setattr(call_llm, "_post", lambda payload: ('{"amount": 350, "category": "food"}', None))
     result = call_llm.extract("hotpot 350")
     assert result["amount"] == 350
     assert result["category"] == "food"
     call_id = result["__call_id__"]
-    assert isinstance(call_id, str) and len(call_id) == 12
-    int(call_id, 16)  # raises ValueError if not 12-char hex
+    assert isinstance(call_id, str) and len(call_id) == 32
+    int(call_id, 16)  # raises ValueError if not 32-char hex
     assert len(captured_log) == 1
     rec = captured_log[0]
     assert set(rec) >= {"input", "raw", "parsed", "call_id"}
@@ -35,7 +35,7 @@ def test_seam_returns_parsed_object_and_logs_once(captured_log, monkeypatch):
 
 
 def test_seam_non_json_is_logged_then_reraised(captured_log, monkeypatch):
-    monkeypatch.setattr(call_llm, "_post", lambda payload: "not json")
+    monkeypatch.setattr(call_llm, "_post", lambda payload: ("not json", None))
     with pytest.raises(json.JSONDecodeError):
         call_llm.extract("x")
     assert len(captured_log) == 1
@@ -93,7 +93,7 @@ def test_policy_rejection_writes_one_review_line(
 ):
     review_path = tmp_path / "review.jsonl"
     monkeypatch.setattr(pipeline, "REVIEW_PATH", review_path)
-    def fake_extract(text):
+    def fake_extract(text, request_id=None):
         return dict(raw, __call_id__="abc123def456")
     monkeypatch.setattr(call_llm, "extract", fake_extract)
 
@@ -104,8 +104,8 @@ def test_policy_rejection_writes_one_review_line(
     lines = review_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     record = json.loads(lines[0])
-    assert set(record) == {"call_id", "error", "amount", "category",
-                           "spent", "total", "review"}
+    assert set(record) == {"call_id", "request_id", "error", "amount",
+                           "category", "spent", "total", "review"}
     assert record["call_id"] == "abc123def456"
     assert record["error"] == expected_error
     assert record["review"] is expected_review
@@ -116,7 +116,7 @@ def test_policy_rejection_writes_one_review_line(
 def test_seam_success_call_id_joins_log_and_record(captured_log, monkeypatch):
     monkeypatch.setattr(
         call_llm, "_post",
-        lambda payload: '{"amount": 350, "category": "food"}',
+        lambda payload: ('{"amount": 350, "category": "food"}', None),
     )
     record = pipeline.process("hotpot 350", 0.0, 1000.0)
     assert set(record) == set(storage.REQUIRED_FIELDS)
@@ -136,7 +136,7 @@ def test_process_without_call_id_raises_storage_error(captured_log, monkeypatch,
     monkeypatch.setattr(pipeline, "REVIEW_PATH", tmp_path / "review.jsonl")
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "food"},
+        lambda text, request_id=None: {"amount": 350, "category": "food"},
     )
 
     with pytest.raises(storage.StorageError):
@@ -151,7 +151,7 @@ def test_rejection_write_failure_raises_storage_error_not_policy(
     monkeypatch.setattr(pipeline, "REVIEW_PATH", blocked)
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "Food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 350, "category": "Food", "__call_id__": "abc123def456"},
     )
     with pytest.raises(storage.StorageError) as exc:
         pipeline.process("x", 0.0, 1000.0)
@@ -169,7 +169,7 @@ def test_private_key_is_popped_before_validation(captured_log, monkeypatch, tmp_
     monkeypatch.setattr(pipeline.policy_core, "validate_record", spy_validate)
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
     )
     pipeline.process("x", 0.0, 1000.0)
     assert "__call_id__" not in seen["raw"]
@@ -183,7 +183,7 @@ def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp
     })
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 20, "category": "food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 20, "category": "food", "__call_id__": "abc123def456"},
     )
     with pytest.raises(policy_core.PolicyError) as exc:
         pipeline.process("x", budget_limit=1000.0)
@@ -193,7 +193,7 @@ def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp
 def test_process_default_budget_limit_is_1000(captured_log, monkeypatch):
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
     )
     record = pipeline.process("x")
     assert record["budget_limit"] == 1000.0
@@ -203,7 +203,7 @@ def test_decided_at_is_utc_iso_seconds(captured_log, monkeypatch):
     from datetime import datetime
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
     )
     record = pipeline.process("x")
     parsed = datetime.fromisoformat(record["decided_at"])
@@ -220,7 +220,60 @@ def test_storage_error_from_persist_propagates(captured_log, monkeypatch, tmp_pa
     })
     monkeypatch.setattr(
         call_llm, "extract",
-        lambda text: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
+        lambda text, request_id=None: {"amount": 350, "category": "food", "__call_id__": "abc123def456"},
     )
     with pytest.raises(storage.StorageError):
         pipeline.process("x", 0.0, 1000.0)
+
+
+def test_rejection_is_evidence_only_never_persisted(captured_log, monkeypatch, tmp_path):
+    review_path = tmp_path / "review.jsonl"
+    data_path = tmp_path / "data" / "records.jsonl"
+    monkeypatch.setattr(pipeline, "REVIEW_PATH", review_path)
+    monkeypatch.setattr(storage, "DATA_PATH", data_path)
+    monkeypatch.setattr(
+        call_llm, "_post",
+        lambda payload: ('{"amount": 350, "category": "Food"}', None),
+    )
+
+    with pytest.raises(policy_core.PolicyError) as exc:
+        pipeline.process("x", 0.0, 1000.0)
+    assert exc.value.code == "policy:category"
+
+    # (a) exactly one review line
+    review_lines = review_path.read_text(encoding="utf-8").splitlines()
+    assert len(review_lines) == 1
+    rejection = json.loads(review_lines[0])
+
+    # (b) storage untouched / never created
+    assert not data_path.exists()
+
+    # (c) call line exists and carries a non-empty call_id == rejection's
+    assert len(captured_log) == 1
+    call_line = captured_log[0]
+    assert rejection["call_id"]
+    assert rejection["call_id"] == call_line["call_id"]
+
+    # (d) rejection carries the request_id generated for this process() call
+    assert rejection["request_id"] == call_line["request_id"]
+    assert rejection["request_id"]
+
+
+def test_request_id_generated_once_per_process(captured_log, monkeypatch, tmp_path):
+    monkeypatch.setattr(pipeline, "REVIEW_PATH", tmp_path / "review.jsonl")
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    monkeypatch.setattr(
+        call_llm, "_post",
+        lambda payload: ('{"amount": 350, "category": "food"}', None),
+    )
+    record = pipeline.process("x", 0.0, 1000.0)
+    first = captured_log[0]
+    assert isinstance(first["request_id"], str) and len(first["request_id"]) == 32
+    int(first["request_id"], 16)
+    assert record["call_id"] == first["call_id"]
+    assert first["request_id"] not in record.values()
+
+    pipeline.process("y", 0.0, 1000.0)
+    second = captured_log[1]
+    assert second["request_id"] != first["request_id"]
+    assert second["session_id"] == first["session_id"]

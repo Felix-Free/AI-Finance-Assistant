@@ -408,3 +408,54 @@ turns a one-off correction into a schema.
 **Follow-up recorded for the team.** A CI check asserting that the three lists are pairwise disjoint
 after expanding `**`, and that `date` is a quoted string, would turn all four findings into a gate
 instead of a habit. Reported to role E as a Phase 2 item.
+
+---
+
+## 2026-11-12 · "Missing usage" has two meanings: no request, versus a request with no data
+
+**Context.** Phase 2 asks role D to supply token-usage evidence, and the owner (role B) computes
+`usage_missing_calls` as "actual LLM calls that had no usable usage". To satisfy this, the log has
+to distinguish two situations that both look like "a log line without token numbers":
+
+- **no HTTP request was made at all** — e.g. the base URL or key is absent, so the client refuses
+  before dialling out;
+- **a request was made and came back without usable usage** — transport failure, non-200,
+  malformed envelope, or a 200 whose body simply has no `usage`.
+
+**What the agent proposed.** Its plan sent every failure path to `usage_source="missing"`. That is
+self-consistent code. It is also wrong for the owner's metric: a config failure would be counted as
+a call that had no usage, inflating `usage_missing_calls` and `total_api_calls` with calls that
+never happened.
+
+**Where the ambiguity sits.** This is not an implementation bug. "Call" is a word with two
+readings — *attempted to call* and *actually called out* — and the plan silently picked one. The
+data contract (B's counting rule) picked the other. Nothing in the code could reveal the
+disagreement, because both readings compile and pass whatever test the author imagined.
+
+**What I did instead of dictating a fix.** I asked for three designs before any code, and gave the
+agent the criteria any design had to meet: exactly one log line per attempt, the four original
+field names unchanged, storage untouched, "no request" distinguishable from "request without
+usage", and no zero-filling or estimation. Three came back:
+
+| Option | Shape | Rejected for |
+|---|---|---|
+| 1 | `api_call: true\|false` | same as 3 but an abstract name that collides with "business call" |
+| 2 | `phase` enum in {config, transport, protocol, response} | "request made" is decided by **set membership**, so a new request-making phase silently vanishes from the totals; also duplicates `error` |
+| **3** | **`request_made: true\|false`** | chosen |
+
+**Why option 3.** One new field, names the physical fact a reader actually needs, orthogonal to
+`error` and to `tokens`, and the split is a direct read of one boolean:
+`usage_missing_calls = request_made ∧ usage_source == "missing"`. Its residual risk — a future
+path setting the flag incorrectly — is shared by all three options, so it is a reason to add a test,
+not a reason to buy a costlier enum.
+
+**The guard I added.** One consistency test ties the flag to what actually happened: `request_made`
+is false if and only if the config path ran; `gateway` implies three ints; `partial` implies at
+least one null and one int; `missing` implies `tokens is None`. A future path that forgets the flag
+now fails a test instead of quietly corrupting a metric.
+
+**Transcript note on the working relationship.** The agent was not sloppy; it was *consistent with
+a definition I never wrote down*. My job here was not to write the field myself and not to hand it a
+finished design, but to state the invariant the design must satisfy, ask for alternatives, and pick
+one using public criteria. That is also why this entry records the two rejected options: the reason
+they lost is the evidence that the choice was made, not guessed.

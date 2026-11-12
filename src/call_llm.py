@@ -2,6 +2,14 @@
 
 Why a single entry point: it makes "log every call" a structural guarantee
 rather than a habit. Nothing else may import `requests` for model calls.
+
+Token measurement (NFR-002):
+
+Source: the gateway response's `usage` object, mapped to
+        {"input": usage.prompt_tokens, "output": usage.completion_tokens,
+         "total": usage.total_tokens}
+Missing data is recorded as null and is never estimated or zero-filled.
+`request_made` is false only when no HTTP request was attempted (missing base url or key).
 """
 from __future__ import annotations
 
@@ -21,6 +29,8 @@ API_KEY = os.environ.get("LLM_API_KEY") or ""
 MODEL = os.environ.get("LLM_MODEL", "CS5351/DeepSeek-V4-Flash")
 
 LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")
+
+_SESSION_ID = uuid.uuid4().hex
 
 SYSTEM_PROMPT = (
     "You extract a spending record from one sentence. "
@@ -44,8 +54,49 @@ class LlmTransportError(RuntimeError):
 
 
 def _new_call_id() -> str:
-    """Correlation id joining the call line to its rejection line (12 hex chars)."""
-    return uuid.uuid4().hex[:12]
+    """Per actual LLM API call. Full uuid4 hex (32 chars), no truncation."""
+    return uuid.uuid4().hex
+
+
+def _new_request_id() -> str:
+    """Per user request. Full uuid4 hex (32 chars); one request may span calls."""
+    return uuid.uuid4().hex
+
+
+def session_id() -> str:
+    """Session id: generated once per process run and shared by every call."""
+    return _SESSION_ID
+
+
+_USAGE_KEYS = (
+    ("input", "prompt_tokens"),
+    ("output", "completion_tokens"),
+    ("total", "total_tokens"),
+)
+
+
+def _map_usage(raw_usage: dict) -> dict:
+    """Map a gateway ``usage`` object to {input,output,total}; unknown -> None.
+
+    Never estimates or zero-fills: a missing or non-int source value stays None.
+    """
+    mapped = {}
+    for dest, source in _USAGE_KEYS:
+        value = raw_usage.get(source)
+        mapped[dest] = value if isinstance(value, int) and not isinstance(value, bool) else None
+    return mapped
+
+
+def _usage_source(tokens) -> str:
+    """Classify a tokens dict: all present -> gateway, some -> partial, none -> missing."""
+    if tokens is None:
+        return "missing"
+    present = [v for v in tokens.values() if v is not None]
+    if len(present) == len(tokens):
+        return "gateway"
+    if present:
+        return "partial"
+    return "missing"
 
 
 def _append_log(record: dict) -> None:
@@ -58,10 +109,12 @@ def _append_log(record: dict) -> None:
         raise LlmTransportError(f"cannot write call log: {exc}") from exc
 
 
-def _post(payload: dict) -> str:
-    """Perform the HTTP call and return the model's raw response string.
+def _post(payload: dict):
+    """Perform the HTTP call and return ``(content, usage)``.
 
-    Module-level (not a closure) so a test can replace it with monkeypatch.
+    ``usage`` is ``{"input":.., "output":.., "total":..}`` (each ``int`` or
+    ``None``) or ``None`` when the envelope carries no ``usage`` object. Module-level
+    (not a closure) so a test can replace it with monkeypatch.
 
     Raises LlmTransportError on any transport or protocol failure: network
     error, non-200 status, or a response envelope that cannot be parsed into
@@ -106,11 +159,17 @@ def _post(payload: dict) -> str:
         raise LlmTransportError(
             "protocol: content is not a string: %r" % (type(content).__name__,)
         )
-    return content
+
+    raw_usage = envelope.get("usage")
+    usage = _map_usage(raw_usage) if isinstance(raw_usage, dict) else None
+    return content, usage
 
 
-def extract(text: str) -> dict:
+def extract(text: str, request_id=None) -> dict:
     """Call the model once and return the UNVALIDATED parsed JSON object.
+
+    ``request_id`` is a keyword with a default so ``extract(text)`` keeps
+    working; when omitted a fresh id is generated for this call.
 
     The returned dict is raw model output and is NOT trusted. The caller MUST
     pass it to policy_core.validate_record() before anything may be stored; it
@@ -119,9 +178,10 @@ def extract(text: str) -> dict:
     validation; it is never data and never stored.
 
     Exactly one line is appended to logs/llm_calls.jsonl on every path
-    (success, non-JSON content, HTTP non-200, transport failure): log first,
-    then raise or return. Every line carries ``call_id``. If the log cannot be
-    written, the result is not returned (fail-closed).
+    (config, transport / non-200, protocol / non-JSON, success): log first, then
+    raise or return. Every line carries ``call_id``, ``request_id``,
+    ``session_id``, ``tokens``, ``usage_source`` and ``request_made``. If the
+    log cannot be written, the result is not returned (fail-closed).
 
     Raises LlmTransportError on transport / protocol failure, and
     json.JSONDecodeError when the model returns something that is not JSON
@@ -129,10 +189,31 @@ def extract(text: str) -> dict:
     rejection).
     """
     call_id = _new_call_id()
+    if request_id is None:
+        request_id = _new_request_id()
+    session = session_id()
+
+    def _line(**extra) -> dict:
+        base = {
+            "input": text,
+            "raw": None,
+            "parsed": None,
+            "error": None,
+            "call_id": call_id,
+            "request_id": request_id,
+            "session_id": session,
+            "tokens": None,
+            "usage_source": "missing",
+            "request_made": True,
+        }
+        base.update(extra)
+        return base
 
     if not BASE_URL or not API_KEY:
-        _append_log({"input": text, "call_id": call_id,
-                     "error": "config: missing base url or key"})
+        _append_log(_line(
+            request_made=False, usage_source="missing",
+            error="config: missing base url or key",
+        ))
         raise LlmTransportError("LLM_BASE_URL / LLM_API_KEY missing (.env)")
 
     payload = {
@@ -146,26 +227,34 @@ def extract(text: str) -> dict:
     }
 
     try:
-        raw = _post(payload)
+        raw, usage = _post(payload)
     except LlmTransportError as exc:
-        log_record = {"input": text, "call_id": call_id, "error": str(exc)}
         status_code = getattr(exc, "status_code", None)
         if status_code is not None:
-            log_record["error"] = "http %s" % status_code
-            log_record["body"] = getattr(exc, "body", "")
-        _append_log(log_record)
+            body = (getattr(exc, "body", "") or "")[:120]
+            error = "http %s: %s" % (status_code, body)
+        else:
+            error = str(exc)
+        _append_log(_line(
+            request_made=True, usage_source="missing", error=error,
+        ))
         raise
 
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         # Log the failure, then let the caller decide (do not swallow).
-        _append_log({"input": text, "call_id": call_id, "raw": raw,
-                     "parsed": None, "error": "not_json"})
+        _append_log(_line(
+            request_made=True, usage_source="missing",
+            raw=raw, parsed=None, error="not_json",
+        ))
         raise
 
-    _append_log({"input": text, "call_id": call_id, "raw": raw,
-                 "parsed": parsed})
+    tokens = usage
+    _append_log(_line(
+        request_made=True, tokens=tokens, usage_source=_usage_source(tokens),
+        raw=raw, parsed=parsed,
+    ))
     if isinstance(parsed, dict):
         parsed["__call_id__"] = call_id
     return parsed

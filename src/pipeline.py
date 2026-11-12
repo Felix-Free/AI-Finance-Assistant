@@ -49,8 +49,11 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
 
     INV-003 support: a validated record is appended via ``storage.append_validated``
     and a ``StorageError`` from persistence propagates (never a fake success).
+    Rejections are evidence, not state: they are logged to logs/review.jsonl and
+    are never persisted.
     """
-    raw = call_llm.extract(text)
+    request_id = call_llm._new_request_id()
+    raw = call_llm.extract(text, request_id=request_id)
     call_id = raw.pop("__call_id__", None) if isinstance(raw, dict) else None
     if not isinstance(call_id, str) or not call_id:
         raise storage.StorageError("missing call_id from model client")
@@ -58,6 +61,8 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
     if spent is None:
         spent = storage.current_total()
 
+    # C's rule: rejections are evidence, not state — they are written to
+    # logs/review.jsonl only and are NEVER passed to storage.
     try:
         validated = policy_core.validate_record(raw, spent, budget_limit)
     except policy_core.PolicyError as exc:
@@ -69,6 +74,7 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
             total = None
         _append_rejection({
             "call_id": call_id,
+            "request_id": request_id,
             "error": exc.code,
             "amount": amount,
             "category": category,
