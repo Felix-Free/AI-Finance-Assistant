@@ -112,7 +112,7 @@ functional_requirements:
     preconditions: "Record is a dict."
     expected_behavior: >-
       Reject when amount is missing, boolean, non-numeric, non-finite (NaN/Inf), <= 0, or has
-      more than 2 decimal places (money is cents). See C-INV-001.
+      more than 2 decimal places (money is cents). See INV-001.
     acceptance_criteria:
       - "Reject -1, 0, 0.005, 100.001, \"350\", null, true, NaN, Inf."
       - "Accept 0.01 and integers such as 350."
@@ -130,7 +130,7 @@ functional_requirements:
     preconditions: "Record is a dict."
     expected_behavior: >-
       Compare against the closed vocabulary defined in code (CATEGORY_WHITELIST), never in a
-      prompt and never inferred from the model. See C-INV-002.
+      prompt and never inferred from the model. See INV-002.
     acceptance_criteria:
       - "Reject \"Food\", \"餐饮\", \"meal\", \"\", null, and non-string values."
       - "Accept every value in the code-defined whitelist."
@@ -153,7 +153,7 @@ functional_requirements:
     expected_behavior: >-
       Reject only when spent + amount > budget_limit (strictly greater than). Decimal
       comparison is used. budget_limit comes from stored configuration (source pending).
-      See C-INV-003.
+      See INV-003.
     acceptance_criteria:
       - "spent+amount == budget_limit is accepted."
       - "spent+amount > budget_limit is rejected with review=true."
@@ -288,7 +288,7 @@ nonfunctional_requirements:
     name: Testability
     metric: "fraction of approved invariants with at least one offline, network-free negative test that fails when the corresponding guard is removed"
     threshold: 1.0
-    verification: "map every approved C-INV to at least one corresponding guard-removal negative test; run the complete offline invariant test suite using pytest test/offline; verify that all tests pass with guards enabled and that each corresponding test fails when its guard is removed."
+    verification: "map every approved INV to at least one corresponding guard-removal negative test; run the complete offline invariant test suite using pytest test/offline; verify that all tests pass with guards enabled and that each corresponding test fails when its guard is removed."
     priority: high
     status: pending_confirmation
     owner: E
@@ -296,28 +296,28 @@ nonfunctional_requirements:
     notes: "Full boundary suite (test/offline/test_invariants.py) is E's deliverable and pending; only D smoke tests exist."
 
 invariants:
-  - id: C-INV-001
-    source_ref: "docs/architecture/invariants.md#C-INV-001"
+  - id: INV-001
+    source_ref: "docs/architecture/invariants.md#INV-001"
     rule: "amount is a finite positive number with at most two decimal places"
     enforcement: "src/policy_core.py::enforce_amount"
     owner_spec: C
     owner_impl: D
     status: approved
-  - id: C-INV-002
-    source_ref: "docs/architecture/invariants.md#C-INV-002"
+  - id: INV-002
+    source_ref: "docs/architecture/invariants.md#INV-002"
     rule: "category is in the code-defined closed whitelist (case-sensitive exact match)"
     enforcement: "src/policy_core.py::enforce_category"
     owner_spec: C
     owner_impl: D
     status: approved
-  - id: C-INV-003
-    source_ref: "docs/architecture/invariants.md#C-INV-003"
+  - id: INV-003
+    source_ref: "docs/architecture/invariants.md#INV-003"
     rule: "cumulative spending never exceeds the budget; equality is allowed"
     enforcement: "src/policy_core.py::enforce_budget"
     owner_spec: C
     owner_impl: D
     status: approved
-  - id: C-INV-PENDING-01
+  - id: INV-PENDING-01
     source_ref: "pending"
     rule: "Exact membership of the category whitelist (currently 8 code-defined values)"
     enforcement: "src/policy_core.py::CATEGORY_WHITELIST"
@@ -338,13 +338,13 @@ data_requirements:
       type: number
       required: true
       legal_values: "finite, > 0, at most 2 decimal places"
-      validation: "C-INV-001 / enforce_amount"
+      validation: "INV-001 / enforce_amount"
     - name: category
       layer: ai_raw -> deterministic_validated
       type: string
       required: true
       legal_values: "one of the code-defined whitelist (case-sensitive)"
-      validation: "C-INV-002 / enforce_category"
+      validation: "INV-002 / enforce_category"
     - name: total
       layer: deterministic_validated
       type: number
@@ -534,17 +534,17 @@ traceability:
   note: "Lightweight registry only; the formal Trace Matrix is a Phase 3 deliverable."
   mappings:
     - requirement: FR-003
-      invariant: C-INV-001
+      invariant: INV-001
       runtime_policy: RP-003
       code: "src/policy_core.py::enforce_amount"
       tests: ["test_inv001_rejects_invalid_amount", "test_inv001_accepts_boundary_and_returns_unchanged"]
     - requirement: FR-004
-      invariant: C-INV-002
+      invariant: INV-002
       runtime_policy: RP-006
       code: "src/policy_core.py::enforce_category"
       tests: ["test_inv002_rejects_out_of_vocabulary", "test_inv002_accepts_every_whitelisted_category"]
     - requirement: FR-005
-      invariant: C-INV-003
+      invariant: INV-003
       runtime_policy: RP-005
       code: "src/policy_core.py::enforce_budget"
       tests: ["test_inv003_equality_is_allowed", "test_inv003_over_budget_rejected_with_review"]
