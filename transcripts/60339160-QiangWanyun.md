@@ -559,3 +559,92 @@ threshold stays as written and NFR-006 stays `blocked`.
 share an id" next to "a decision has these records" invited the weaker reading; separating
 them keeps the rule strict and leaves the unknown — the location names — honestly marked
 pending instead of papered over.
+
+---
+
+## Session 9
+
+**Date.** 2026-11-12 · Phase 2 C: document the four approved logging metadata fields
+
+**Context.** Phase 2 logging needs more than `call_id` and `tokens` to answer the questions
+role B asks about the system: how a user session behaved, how one user request fanned out
+into several API calls, whether a call actually hit the network, and where the token numbers
+came from. Four additional fields were approved — `session_id`, `request_id`,
+`usage_source` and `request_made`. This session is documentation-only: it extends the C3
+contract and the NFR-002 evidence in the logbook. No source, test, log, permission or MCP
+file is touched.
+
+**My instruction to the agent.**
+
+```
+The user approved four more llm_calls fields: session_id, request_id, usage_source
+(enum: gateway, partial, missing), request_made (boolean; true only when an HTTP request
+was actually sent). Extend the C3 section with their exact meaning and keep every existing
+C3 requirement intact. Do not define request_made from error text. If the local-failure
+lifecycle is undefined, mark it pending rather than inventing a rule. Update NFR-002 to
+cover per-session and per-request aggregation, request_made counts, usage-source counts,
+missing-usage counts and usage_source/tokens consistency. Do not invent thresholds. Keep
+NFR-006 exactly as it is.
+```
+
+**Agent output (excerpt).**
+
+```
+I will add a §5.2.1 subsection to the C3 contract defining session_id, request_id,
+usage_source (gateway/partial/missing) and request_made (HTTP-only true), preserving
+input/raw/parsed/error, call_id uniqueness, gateway-only tokens, no fabricated or zero
+token counts, policy:* reservation and one-line-per-call. I will mark the pre-HTTP local
+failure lifecycle pending. I will extend NFR-002's procedure with the aggregation and
+consistency checks and leave NFR-006 unchanged.
+```
+
+**What I caught.** Three things.
+
+1. **The four fields answer different questions and must not collapse into one.** `call_id`
+   identifies one actual API call; `request_id` groups the calls one user request triggers
+   (one request may make several); `session_id` groups a whole session. I required the
+   contract to say plainly that neither new id replaces `call_id`.
+
+2. **`request_made` had to stay a structured boolean.** Deriving it from `error` text would
+   make it unparseable and fragile. I required `true` only when an HTTP request was actually
+   sent and `false` for local/configuration/preflight failures, independent of message
+   wording — and left the exact pre-HTTP lifecycle pending rather than inventing it.
+
+3. **The logbook must not smuggle in thresholds.** I required NFR-002's new aggregation and
+   consistency checks (per-session, per-request, `request_made` counts, usage-source and
+   missing-usage counts, `usage_source`↔`tokens`) to be documented as procedure, with their
+   numeric thresholds **pending clarification**, and to state that gateway usage is never
+   treated as zero when usage is missing.
+
+**My correction.**
+
+```
+Keep call_id, request_id and session_id distinct; state that the new ids group calls but
+do not identify one. request_made is a structured boolean, not derived from error text;
+pre-HTTP local failure lifecycle is pending. Do not invent thresholds for the NFR-002
+aggregates. Leave NFR-006's strict three-call_id threshold and conditional evidence shape
+exactly as they are.
+```
+
+**Result.**
+
+- `docs/architecture/runtime-policy-catalog.md` — §5.2 C3 extended with §5.2.1 defining
+  `session_id`, `request_id`, `usage_source` (`gateway`/`partial`/`missing`) and
+  `request_made`, plus a pending-clarification note for the pre-HTTP local failure. All
+  earlier C3 requirements preserved.
+- `docs/architecture/evaluation-logbook.md` — NFR-002 entry extended with per-session and
+  per-request aggregation, `request_made` request count, usage-source and missing-usage
+  counts, and `usage_source`↔`tokens` consistency; thresholds marked pending. Summary row
+  and change protocol updated. NFR-006 unchanged in meaning.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `git diff --check` clean.
+- No tests or measurements were run or claimed; documentation-only.
+
+**Open handoffs.** D implements the four fields in `call_llm` (including the structured
+`request_made` boolean and `usage_source` derivation), and must fix the pre-HTTP local
+failure record shape once clarified. E tests the fields and runs the NFR-002 aggregation and
+consistency checks, recording real results and confirming no fabricated or zeroed tokens.
+
+**Reflection.** More metadata is only useful if each field has one job. Separating the call
+id from the request and session ids, and keeping `request_made` a real boolean instead of a
+guess from message text, is what makes the logbook's counts trustworthy rather than
+plausible.

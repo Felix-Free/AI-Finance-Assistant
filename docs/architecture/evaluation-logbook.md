@@ -47,12 +47,12 @@
 | Field | Value |
 |---|---|
 | NFR | Deterministic safety boundary: no model output that violates `C-INV-001..003` ever affects stored data. |
-| Metric | Number of invariant-violating inputs that slip past `policy_core` into storage (must be zero). |
-| Threshold | Zero violations. Every violating fixture is rejected with the documented `policy:*` code. |
-| Input / data source | Adversarial fixtures under `data/` covering the boundary values in `invariants.md §2` (amount, category, budget). |
-| Measurement command / procedure | Feed each violating fixture through the pipeline; assert rejection and absence of a storage record. This is the negative-test property from `invariants.md §3` applied across the fixture set. |
-| Expected evidence files | `docs/measurements/` report for NFR-002; `logs/review.jsonl` rejection lines for the rejected cases. |
-| Owner | E (measurement), D (guards). |
+| Metric | Number of invariant-violating inputs that slip past `policy_core` into storage (must be zero), reported together with the logging-metadata aggregates below. |
+| Threshold | Zero violations. Every violating fixture is rejected with the documented `policy:*` code. The associated aggregation/consistency thresholds (below) are **pending clarification** — the requirements source does not state them here. |
+| Input / data source | Adversarial fixtures under `data/` covering the boundary values in `invariants.md §2` (amount, category, budget), plus the resulting `logs/llm_calls.jsonl` with the approved metadata fields (`session_id`, `request_id`, `usage_source`, `request_made`). |
+| Measurement command / procedure | Feed each violating fixture through the pipeline; assert rejection and absence of a storage record. This is the negative-test property from `invariants.md §3` applied across the fixture set. Then, over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **actual request count** = records with `request_made: true`; (d) **usage-source counts** for `gateway`, `partial`, `missing`; (e) **missing-usage count** = records with `usage_source: missing`. Consistency checks: `usage_source` must agree with `tokens` — `gateway`/`partial` imply token data present, `missing` implies token data absent; and **gateway usage must not be treated as zero when usage is missing** (a `missing` record is not `0` tokens). |
+| Expected evidence files | `docs/measurements/` report for NFR-002; `logs/review.jsonl` rejection lines for the rejected cases; the `llm_calls` excerpts used for the aggregation and consistency checks. |
+| Owner | E (measurement), D (guards and logging fields). |
 | Status | pending |
 | Observed result | Not measured. |
 
@@ -84,7 +84,7 @@
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
 | NFR-001 | fixture parse-match rate | as per requirements (not asserted yet) | E / D | pending | not measured |
-| NFR-002 | invariant violations reaching storage | zero | E / D | pending | not measured |
+| NFR-002 | invariant violations reaching storage; plus per-session (`session_id`) and per-request (`request_id`) aggregation, `request_made` request count, and usage-source/missing-usage counts with `usage_source`↔`tokens` consistency | zero violations; aggregation/consistency thresholds pending clarification | E / D | pending | not measured |
 | NFR-006 | decisions whose three relevant call_id locations share one call_id | three relevant call_id locations/evidence records share the same call_id | E / D / C | blocked | not measured |
 
 ---
@@ -98,3 +98,7 @@
 - Thresholds are owned by role B's requirements; C records them here from the requirements
   source and does not invent them. If the requirements source does not state a threshold,
   the cell says so rather than guessing.
+- NFR-002's logging-metadata aggregates (`session_id`, `request_id`, `request_made`,
+  `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
+  `gateway` usage is never treated as zero when usage is `missing`. Their numeric thresholds
+  are pending clarification until the requirements source states them.

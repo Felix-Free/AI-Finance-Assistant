@@ -141,9 +141,51 @@ Later stages never run when an earlier stage rejects.
 - **Never fabricate.** `tokens` is recorded **only when the gateway supplies it**. If the
   gateway omits usage data, the field is absent (or `null`); it is never estimated,
   back-filled, or computed from the raw text.
-- **One line per call.** Exactly **one** `logs/llm_calls.jsonl` record per model call is
-  preserved. Adding `call_id` / `tokens` does not add a second line, and policy outcomes
-  still go to `logs/review.jsonl` (RP-003/RP-005/RP-006), not here.
+- **One line per call.** Exactly **one** `logs/llm_calls.jsonl` record per actual model
+  call is preserved. Adding `call_id` / `tokens` / the approved metadata fields does not add
+  a second line, and policy outcomes still go to `logs/review.jsonl`
+  (RP-003/RP-005/RP-006), not here.
+
+#### 5.2.1 Approved additional metadata fields
+
+The user approved four further logging fields for Phase 2. They are **additive** next to
+the required four (`input`, `raw`, `parsed`, `error`) and the C2/C3 extras (`call_id`,
+`tokens`); nothing above is renamed or removed.
+
+- **`session_id`** — a stable identifier for the user/session context, used for
+  **per-session aggregation** (all calls in one user session share it). It is distinct from
+  `call_id`: one session may span many calls.
+- **`request_id`** — an identifier for **one user request**. One request may trigger
+  **multiple** actual LLM API calls, so several `llm_calls` records may share one
+  `request_id`. `call_id` remains the unique identifier for **one actual LLM API call**;
+  `request_id` groups calls, `call_id` identifies a call.
+- **`usage_source`** — an enum with **exactly** these values: `gateway`, `partial`,
+  `missing`. It records where the token-usage figure came from: `gateway` = supplied by the
+  gateway, `partial` = only part of the usage was supplied, `missing` = none was supplied.
+- **`request_made`** — a boolean; **`true` only when an HTTP request was actually sent**,
+  **`false` for local/configuration/preflight failures** (missing config, no API key, a
+  preflight rejection, and any other failure that never reached the network). It is a
+  structured boolean, not inferred from `error` text: error-message wording must not be the
+  only machine-readable definition of `request_made`.
+
+Preserved requirements (unchanged by these fields):
+
+- `input`, `raw`, `parsed` and `error` keep their names and meaning (RP-004).
+- `call_id` remains the unique identifier for one actual LLM API call.
+- `tokens` remains additive and is recorded **only when supplied by the gateway**.
+- Missing token usage is **never** written as zero and is **never** fabricated; when usage
+  is absent, `usage_source` is `missing` and `tokens` is absent (or `null`), not `0`.
+- `policy:*` remains reserved for deterministic rule rejection (RP-003/005/006).
+- Exactly one `llm_calls` record per actual model call remains the contract.
+- `usage_source` must stay consistent with `tokens`: `gateway`/`partial` imply token data
+  exists, `missing` implies it does not.
+
+> **Pending clarification.** The exact lifecycle behavior for a **local failure before any
+> HTTP call is sent** (for example, which fields are present on the single `llm_calls` line,
+> and whether such a failure is logged at all) is **not** defined elsewhere in this
+> repository. This section requires only that `request_made` be `false` in that case and
+> does **not** invent a new lifecycle rule; the precise record shape is pending
+> clarification until the pipeline/spec fixes it.
 
 ### 5.3 C4 — storage failure is not a policy rejection
 

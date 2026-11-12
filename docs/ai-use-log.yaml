@@ -291,3 +291,50 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only correction); no measurement claimed
+
+- date: 2026-11-12
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 9
+  topic: document approved logging metadata fields
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/code-governance/**
+    - logs/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only. Extended the C3 llm_calls contract with the four user-approved
+    fields: session_id (stable user/session context for per-session aggregation), request_id
+    (one user request, which may span multiple actual API calls), usage_source (enum gateway,
+    partial, missing) and request_made (boolean, true only when an HTTP request was actually
+    sent). call_id stays the unique id for one actual call; the new ids group calls and do
+    not replace it. Preserved input/raw/parsed/error, gateway-only tokens, no fabricated or
+    zeroed token usage, policy:* reservation and one llm_calls record per actual call.
+    request_made is a structured boolean, not derived from error text; the pre-HTTP local
+    failure lifecycle is marked pending clarification. Extended the NFR-002 logbook entry
+    with per-session and per-request aggregation, request_made request counts, usage-source
+    and missing-usage counts, and usage_source/tokens consistency; thresholds are pending and
+    gateway usage is never treated as zero when usage is missing. NFR-006 is unchanged in
+    meaning.
+  human_review:
+    - approved the four additional fields (session_id, request_id, usage_source, request_made)
+    - required request_made to be a structured boolean, not inferred from error text
+    - required the pre-HTTP local failure behavior to be marked pending, not invented
+    - required the NFR-002 aggregates to have no invented thresholds
+    - required NFR-006 to keep the strict three-call_id threshold and conditional evidence
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
