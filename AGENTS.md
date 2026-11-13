@@ -13,7 +13,7 @@
 > | `AGENTS.md` (this file) | the unified contract: overall behaviour, project context, approval workflow | B (C for the security sections) |
 > | `.opencode/rules.md` + `.opencode/permissions.jsonc` | OpenCode-specific rules and machine-enforced permissions | C |
 > | `.agent/rules.md` | tool-agnostic covenant for any agent | C |
-> | `docs/architecture/invariants.md` | business invariants C-INV-001/002/003 | C |
+> | `docs/architecture/invariants.md` | business invariants INV-001/002/003 | C |
 > | `docs/architecture/runtime-policy-catalog.md` | RP-001..RP-006 degradation policies | C |
 > | `docs/architecture/permission-model.md` | path permission boundaries and rationale | C |
 > | `docs/code-governance/structural-constraints.md` | code/test/naming conventions | C (D drafted v0.1) |
@@ -34,7 +34,7 @@
 - **Document index (read the relevant ones before a task):**
   - Requirements: `docs/req/requirements.yaml` (schema: `docs/req/req-schema.json`).
   - Architecture: `architecture-blueprint.md`.
-  - Business invariants: `docs/architecture/invariants.md` (`C-INV-001/002/003`).
+  - Business invariants: `docs/architecture/invariants.md` (`INV-001/002/003`).
   - Runtime policies: `docs/architecture/runtime-policy-catalog.md` (`RP-001..006`).
   - Permission model: `docs/architecture/permission-model.md`.
   - Code conventions: `docs/code-governance/structural-constraints.md`.
@@ -144,8 +144,8 @@ summarised here must never be weakened.
   (`RP-004`, `SEC-005`.)
 
 Business invariants (authoritative in `docs/architecture/invariants.md`):
-`C-INV-001` finite positive amount (≤ 2 decimals), `C-INV-002` category in the code-defined
-closed whitelist, `C-INV-003` cumulative spend ≤ budget (equality allowed). Do not restate,
+`INV-001` finite positive amount (≤ 2 decimals), `INV-002` category in the code-defined
+closed whitelist, `INV-003` cumulative spend ≤ budget (equality allowed). Do not restate,
 weaken, or invent invariant thresholds here — change them only via C.
 
 ---
@@ -182,7 +182,7 @@ weaken, or invent invariant thresholds here — change them only via C.
 ## 7. Reporting and security
 
 **Every task report must state:** changed files; reason for the change; the relevant
-requirement ID(s) (`FR-###`, `C-INV-###`, `NFR-###`); the test command(s) run; the test
+requirement ID(s) (`FR-###`, `INV-###`, `NFR-###`); the test command(s) run; the test
 results (truthfully); remaining risks; and anything not yet done.
 
 **Security and secrets:**
