@@ -362,3 +362,52 @@
     log_schema: pass (exactly ten keys on all six paths)
     rejection_not_persisted: pass (review line written, records.jsonl unchanged)
     memory_design: 152 lines, six sections, one valid section-numbering pass
+
+- date: "2026-11-13"
+  role: D
+  student_id: "60915652"
+  phase: 2
+  session: 5
+  topic: resilient latency sampling, a varied-corpus token sampler and the NFR-001/002 measurements
+  tool: opencode
+  files_created:
+    - src/measure_tokens.py
+    - test/offline/test_evidence_join.py
+  files_modified:
+    - src/measure_latency.py
+    - test/offline/test_measurement_scripts.py
+    - transcripts/60915652-LiuWanyang.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/call_llm.py
+    - src/pipeline.py
+    - src/storage.py
+    - src/report_tokens.py
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+  summary: >
+    Fixed two defects found by running the measurement scripts once. Latency sampling no longer
+    aborts on the first transport failure: every attempt is counted, the loop always runs n
+    attempts, percentiles are computed over successful samples only and each prints its own (n=ok),
+    failure labels are whitelisted so no URL, body or raw exception text reaches the summary, an
+    explicit low-confidence line appears when fewer than five samples succeed, and the process exits
+    2 when nothing succeeded. Tokens are now sampled over a 20-sentence corpus instead of one fixed
+    probe, so the call log contains a real distribution; the sampler reads and writes no log, and
+    report_tokens remains the single interpreter. Also wrote the evidence-join test skeleton handed
+    to role E. Measurements produced NFR-001 (p50 2356.7 ms, p95 4759.5 ms, n=20, 0 failures) and
+    NFR-002 (three sessions: 1339* incomplete, 2154 complete, 2060 complete).
+  human_review:
+    - rejected the first token sample as evidence because all values were identical (91/12/103); required varied inputs
+    - required failed attempts to be counted rather than aborting the run, and percentiles to print (n=ok)
+    - required both LlmTransportError and JSONDecodeError to be treated as failed samples
+    - required failure labels to be a whitelist, after noting that str(exc) can carry the request URL
+    - required exit code 2 when no sample succeeded, and a low-confidence line below five samples
+    - rejected reading the call log from the token sampler; required the sampler to stay pure and report_tokens to remain the only interpreter
+    - caught that the proposed summary needed the log it had just been forbidden to read, and resolved it by dropping the derived lines
+    - refused to let the agent commit or revert the working tree; the agent correctly reported instead of acting
+  validation:
+    pytest_offline: 122 passed, 4 skipped
+    guard_removal: verified per rule (abort on failure, exception kinds, (n=), exit 2, low-confidence, whitelisted label, corpus cycling)
+    nfr001_latency: pass (n=20, p50 2356.7 ms, p95 4759.5 ms, max 5771.2 ms, 0 failures)
+    nfr002_tokens: pass (varied corpus produced 13 distinct totals across 20 calls; fixed probe produced exactly 103 x 20)
+    log_schema: unchanged (ten keys), report_tokens untouched
