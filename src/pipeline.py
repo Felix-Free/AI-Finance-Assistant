@@ -94,5 +94,5 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
         "budget_limit": budget_limit,
         "decided_at": decided_at,
     }
-    storage.append_validated(record)
+    storage.append_validated(record, expected_spent=spent)
     return record

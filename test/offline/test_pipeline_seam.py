@@ -164,7 +164,7 @@ def test_private_key_is_popped_before_validation(captured_log, monkeypatch, tmp_
     def spy_validate(raw, spent, budget):
         seen["raw"] = dict(raw)
         return {"amount": raw.get("amount"), "category": raw.get("category"),
-                "total": 0.0}
+                "total": spent + raw.get("amount")}
 
     monkeypatch.setattr(pipeline.policy_core, "validate_record", spy_validate)
     monkeypatch.setattr(
@@ -188,6 +188,46 @@ def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp
     with pytest.raises(policy_core.PolicyError) as exc:
         pipeline.process("x", budget_limit=1000.0)
     assert exc.value.code == "policy:budget"
+
+
+def test_process_without_spent_passes_persisted_as_expected_spent(
+    captured_log, monkeypatch, tmp_path,
+):
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    storage.append_validated({
+        "call_id": "seed00000001", "amount": 500, "category": "food",
+        "total": 500.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
+    })
+    seen = {}
+    real = storage.append_validated
+
+    def spy(record, expected_spent=None):
+        seen["expected_spent"] = expected_spent
+        return real(record, expected_spent=expected_spent)
+
+    monkeypatch.setattr(storage, "append_validated", spy)
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text, request_id=None: {"amount": 100, "category": "food", "__call_id__": "abc123def456"},
+    )
+    pipeline.process("x", budget_limit=1000.0)
+    assert seen["expected_spent"] == 500.0
+    assert storage.current_total() == 600.0
+
+
+def test_process_explicit_spent_over_budget_is_policy_not_storage_error(
+    captured_log, monkeypatch, tmp_path,
+):
+    monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    monkeypatch.setattr(pipeline, "REVIEW_PATH", tmp_path / "review.jsonl")
+    monkeypatch.setattr(
+        call_llm, "extract",
+        lambda text, request_id=None: {"amount": 20, "category": "food", "__call_id__": "abc123def456"},
+    )
+    with pytest.raises(policy_core.PolicyError) as exc:
+        pipeline.process("x", 990.0, 1000.0)
+    assert exc.value.code == "policy:budget"
+    assert not isinstance(exc.value, storage.StorageError)
 
 
 def test_process_default_budget_limit_is_1000(captured_log, monkeypatch):
@@ -273,7 +313,7 @@ def test_request_id_generated_once_per_process(captured_log, monkeypatch, tmp_pa
     assert record["call_id"] == first["call_id"]
     assert first["request_id"] not in record.values()
 
-    pipeline.process("y", 0.0, 1000.0)
+    pipeline.process("y", 350.0, 1000.0)
     second = captured_log[1]
     assert second["request_id"] != first["request_id"]
     assert second["session_id"] == first["session_id"]
