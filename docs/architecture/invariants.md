@@ -40,10 +40,13 @@ owns the specification. Consequences:
 ## 2. Guard specification blocks (handoff format, `structural-constraints.md §2.2`)
 
 > **Rejection evidence (decision 2026-11-09, option B; aligned in Phase 2 with the call-id contract).** Every policy
-> rejection — for all three invariants, including `C-INV-001` — appends exactly one line to
-> `logs/review.jsonl` with the fields `error`, `amount`, `category`, `spent`, `total`, `review`,
-> and `call_id`. `logs/llm_calls.jsonl` keeps exactly one line per model call
-> (`runtime-policy-catalog.md` RP-004), so a policy outcome never adds a second line there. The
+> rejection — for all three invariants, including `C-INV-001` — attempts to append exactly
+> one line to `logs/review.jsonl` with the fields `error`, `amount`, `category`, `spent`,
+> `total`, `review`, `call_id` and `request_id`. If the review write fails, D surfaces
+> `StorageError` and does not persist the rejected record. With a writable call log,
+> `logs/llm_calls.jsonl` keeps exactly one line per `extract` attempt, including a
+> pre-HTTP configuration failure (`runtime-policy-catalog.md` RP-004). A policy outcome
+> never adds a second line there. The
 > rejection line must carry the **same `call_id`** as the related `llm_calls` record, so a
 > rejection can be joined to its call. The rejection line does **not** duplicate the full input
 > text; the input remains on the `llm_calls` line that shares the `call_id`.
@@ -81,7 +84,7 @@ Evidence    : logs/review.jsonl line with error="policy:category" and review=tru
 ```
 C-INV-003
 Condition   : if existing accepted total + new amount > budget_limit then reject the new record
-Threshold   : budget_limit comes from stored configuration for the period; equality (== ) is allowed
+Threshold   : budget_limit is passed to pipeline.process (current default 1000.0); equality (==) is allowed. A stored per-period configuration source is not implemented in D.
 Exception   : PolicyError
 On failure  : reject  (new record discarded; the existing total is unchanged); flag REVIEW
 Boundary    : budget-0.01 (accepted), budget (accepted), budget+0.01 (rejected)

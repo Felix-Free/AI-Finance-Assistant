@@ -32,23 +32,29 @@ MCP tools; it may read or write them under the normal path permissions.
 | ID | Entry point | Purpose | Network | Owner |
 |---|---|---|---|---|
 | EP-001 | `src/call_llm.py::extract` | the only path that calls the model | gateway only | D |
-| EP-002 | `src/policy_core.py::enforce_*` | deterministic guard functions | none | D/E |
-| EP-003 | `src/storage.py::append_validated(record)` | validated storage write at the persistence boundary (single `record` argument; no `expected_spent`) | none | D |
+| EP-002 | `src/policy_core.py::validate_record` and `enforce_*` | deterministic record validation and its guard functions | none | D/E |
+| EP-003 | `src/storage.py::append_validated(record)` | record append with field/type and duplicate-id checks (single `record` argument; no `expected_spent`) | none | D |
 | EP-004 | `src/measure_tokens.py` — `python -m src.measure_tokens` | token-usage measurement entry point | gateway | D/E |
 | EP-005 | `src/measure_latency.py` — `python -m src.measure_latency` | model-call latency measurement entry point | gateway | D/E |
 | EP-006 | `src/report_tokens.py` — `python -m src.report_tokens` | read-only token-usage report (reads `logs/llm_calls.jsonl`, writes nothing) | none | D/E |
+| EP-007 | `src/pipeline.py::process(text, spent=None, budget_limit=1000.0)` | normal model → policy validation → persistence/rejection workflow | gateway via EP-001 | D |
+| EP-008 | `src/storage.py::current_total()` and `iter_records()` | read persisted records and cumulative amount; malformed data raises `StorageError` | none | D |
 
-- EP-001 must append exactly one `logs/llm_calls.jsonl` line per call and is fail-closed
+- EP-001 must append exactly one `logs/llm_calls.jsonl` line per `extract` attempt when the
+  log is writable, including pre-HTTP configuration failures, and is fail-closed
   (`runtime-policy-catalog.md RP-004`).
 - EP-002 is the only place that decides an outcome from model output; it must never be
   bypassed (`AGENTS.md §3`).
-- EP-003 is the sole validated storage entry point; it re-validates its `record` and must
-  not be used to bypass `policy_core` validation (`runtime-policy-catalog.md` RP-007). It
-  does **not** take an `expected_spent` parameter (that boundary is approved but not yet
-  implemented).
+- EP-003 is the sole record-storage write entry point. Its recheck is structural only:
+  direct callers can bypass C-INV-001/002/003 with policy-invalid but correctly typed
+  values. Production writes must pass through EP-007 and EP-002; D has not enforced this
+  boundary inside EP-003 (`runtime-policy-catalog.md` §5.5). EP-003 does **not** take an
+  `expected_spent` parameter (that boundary is approved but not yet implemented).
 - EP-004 and EP-005 are measurement entry points, not MCP tools. EP-006 is a read-only
   report entry point (uses a relative default `logs/llm_calls.jsonl`, overridable by an
   argument).
+- EP-008 is a read-only storage interface; `process` uses `current_total()` when `spent`
+  is omitted.
 
 ---
 
@@ -72,11 +78,13 @@ approval, **D** = denied.
 | Item | Kind | A | B | C | D | E |
 |---|---|---|---|---|---|---|
 | EP-001 `call_llm.extract` | entry point | A | A | A | A | A |
-| EP-002 `policy_core.enforce_*` | entry point | A | A | A | A | A |
+| EP-002 `policy_core.validate_record` / `enforce_*` | entry point | A | A | A | A | A |
 | EP-003 `storage.append_validated` | entry point | A | A | A | A | A |
 | EP-004 `measure_tokens` | measurement entry point | A | A | A | A | A |
 | EP-005 `measure_latency` | measurement entry point | A | A | A | A | A |
 | EP-006 `report_tokens` | report entry point | A | A | A | A | A |
+| EP-007 `pipeline.process` | entry point | A | A | A | A | A |
+| EP-008 `storage.current_total` / `iter_records` | read entry point | A | A | A | A | A |
 | TC-001 `pytest test/offline` | test cmd | A | A | A | A | A |
 | TC-002 `pytest test/live` | test cmd | D | D | P | P | A |
 | Any MCP server | MCP tool | D | D | D | D | D |

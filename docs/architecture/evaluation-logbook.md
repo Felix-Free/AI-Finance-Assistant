@@ -48,10 +48,13 @@
 | Field | Value |
 |---|---|
 | NFR | Token usage per request and per session. |
-| Metric | Per-request aggregation, per-session aggregation, actual API-call count, usage-source distribution, missing-usage count, and `usage_source`↔`tokens` consistency. |
-| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, actual API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. No numeric threshold is stated in the repository. |
+| Metric | Per-request aggregation, per-session aggregation, attempted API-call count, usage-source distribution, missing-usage count, and `usage_source`↔`tokens` consistency. |
+| Session grouping | D generates `session_id` once when `src/call_llm.py` is loaded and shares it across calls in that process. A `session_id` group therefore represents a process run, not necessarily one user's session if the process serves multiple users. |
+| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, attempted API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. No numeric threshold is stated in the repository. |
 | Input / data source | `logs/llm_calls.jsonl` records produced by the measurement run, including `session_id`, `request_id`, `call_id`, `tokens`, `usage_source` and `request_made`. |
-| Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and the missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` enum value. Token classification: three integers → `gateway`; at least one integer and at least one `null` → `partial`; all `null` → `missing`; non-integer values normalize to `null`. Check `usage_source` agrees with `tokens`, missing usage is never replaced with `0` or an estimate, and `tokens` is always an object with `input`, `output` and `total`. All values are reported only; no pass/fail judgment. |
+| Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` value. Three recorded integers → `gateway`; at least one recorded integer and one `null` → `partial`; `tokens: null` or three `null` counts → `missing`. Non-integer counts in a processed usage object normalize to `null`. Check `usage_source` agrees with recorded `tokens` and missing counts are never replaced with `0` or estimates. `tokens` is always present: it is `null` when usage was not recorded (including model-content JSON parse failure), or an object with `input`, `output` and `total` when usage was processed (missing counts `null`). These are descriptive statistics, with no pass/fail judgment. |
+| Meaning of `api_call_count` | `request_made: true` counts attempted HTTP calls, including DNS, connection and timeout failures. It does not count only requests known to have reached the gateway. |
+| Meaning of `usage_source: missing` | No usable token counts were recorded in that log line. On a JSON parsing failure, D records `tokens: null` and `usage_source: missing` even if the gateway response included usage. Therefore the missing-usage count cannot establish how often the gateway omitted usage. |
 | D's current report implementation (verified) | `src/report_tokens.py` produces: **per-call rows** (columns include `call_id`, `request_id`, `session_id`, `input`, `output`, `total`), **per-session aggregation** grouped by `session_id`, and **global counters** (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). It does **not** implement per-request aggregation — `request_id` appears only as a per-call column, not as a grouping aggregate. So requirement (b) is **C-required but not yet implemented in `report_tokens`**. |
 | Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
 | Owner | B (definition), E (measurement), D (logging fields and report). |
@@ -70,10 +73,10 @@
 |---|---|
 | NFR | Wall-clock latency of actual LLM calls. |
 | Canonical requirement ID | **Unconfirmed.** D's `src/measure_latency.py` labels this "NFR-002", the same label its token script uses; the repository maps no canonical `REQ-NFR-###` to latency. This entry deliberately does **not** claim NFR-001 or NFR-002; the id awaits role B's confirmation. |
-| Metric | `attempted`, `ok`, `failed`, `failure_rate`; percentiles `p50`, `p95`, `max` (ms), each printed with its own `(n=ok)` sample size. |
+| Metric | `attempted`, `ok`, `failed`, `failure_rate`; `p50` and `p95` in ms each printed with `(n=ok)`, plus `max_ms` without an inline sample count. All three use the `ok` successful samples. |
 | Threshold | No numeric latency threshold is stated in the repository. A pass/fail threshold is **pending confirmation**; none is invented. |
 | Input / data source | `logs/latency.jsonl` samples produced by `src/measure_latency.py`, measured against a fixed probe sentence (`"hotpot last night cost 350"`). Successful attempts only feed the percentiles. |
-| Measurement command / procedure | `python -m src.measure_latency` (module invocation; see the manifest EP-005). Runs `n` real calls, counts failures without aborting the run, and prints the nearest-rank percentiles with `(n=ok)`. |
+| Measurement command / procedure | `python -m src.measure_latency` (module invocation; see the manifest EP-005). Attempts `n` real calls; `LlmTransportError` and model-content `JSONDecodeError` are counted without ending the run. Other failures, including inability to append a successful sample to `logs/latency.jsonl`, are not caught and can stop it early. Successful samples produce nearest-rank p50/p95 with `(n=ok)`; `max_ms` is printed separately. |
 | Expected evidence files | `logs/latency.jsonl` (gitignored, runtime); any `docs/measurements/` latency report, if produced. |
 | Owner | C (contract), D (measurement script), E (run/verification). |
 | Status | pending |
@@ -107,14 +110,17 @@
 ### C-side storage security review
 
 A C review of the storage boundary, separated into **what the code shows** and **what tests
-have verified**. No committed test or measurement run exists in the repository, so the
-"verified" column is mostly pending.
+have verified**. D has committed offline storage tests, but no committed test-run or
+measurement output proves these checks passed in the reviewed branch. The evidence-join
+tests are skipped, so the join remains unverified.
 
 | Check | What the code shows (verified by reading `src/pipeline.py`, `src/storage.py`) | Verified by a run/test? |
 |---|---|---|
-| Validation before writing | `pipeline.process` calls `policy_core.validate_record(...)` **before** `storage.append_validated(record)`; `append_validated` re-validates its input. | Code path only; no committed run. |
-| Rejected records are not persisted | On `PolicyError`, `process` writes a rejection line to `logs/review.jsonl` and re-raises **before** any `append_validated` call; rejections never reach storage. | Code path only; evidence-join tests slipped. |
+| Validation before writing | `pipeline.process` calls `policy_core.validate_record(...)` **before** `storage.append_validated(record)`. Storage checks field names/basic types and duplicate `call_id`; it does **not** repeat the business invariants. Direct calls to `append_validated` can bypass `policy_core` and write a negative amount, an unknown category, or a total beyond the budget. | Code path only; D's storage tests cover shape/duplicate checks, not direct-call business-invariant bypass. |
+| Rejected records are not persisted | On `PolicyError`, `process` attempts to write a rejection line to `logs/review.jsonl` and re-raises **before** any `append_validated` call. If that evidence write fails, D raises `StorageError` instead; it still does not persist the rejected record. | Code path only; evidence-join tests skipped. |
 | Independent `StorageError` | A storage write failure raises `storage.StorageError`, distinct from `PolicyError`; it is not converted to a `policy:*` code. | Code only. |
+| Other storage failures | Storage also raises `StorageError` on invalid record shape, duplicate `call_id`, unreadable/malformed persisted data, and a nonnumeric stored amount. `pipeline.process` can encounter read failures when `spent is None`, before business validation. | D has offline tests for several read/shape/duplicate cases; no committed test-run output. |
+| Rejection-evidence write failure | `pipeline._append_rejection` raises `storage.StorageError` if it cannot write `logs/review.jsonl`, replacing the pending `PolicyError`; no normal data record is appended. Append-mode review writes have no demonstrated rollback of partial bytes. | No committed failure-injection result. |
 | No partial state | **Required boundary; verification pending.** Append-mode write raises `StorageError` on `OSError`, but the code shows no rollback of bytes written before the error. Not demonstrated. | Not verified. |
 | `call_id` linkage | The stored record and the rejection line both carry the same `call_id` as the `llm_calls` line; `request_id` is additionally present on the rejection line. | Code only; `test_evidence_join.py` skipped. |
 
@@ -123,6 +129,10 @@ have verified**. No committed test or measurement run exists in the repository, 
   compare against persisted cumulative spend. A lower caller-supplied `spent` can weaken the
   cumulative budget check. See `runtime-policy-catalog.md §5.5` for the approved-but-unimplemented
   `expected_spent` boundary.
+- **Direct storage-call gap (not secured).** The `append_validated(record)` name and its
+  structural recheck do not guarantee the record passed `policy_core`. Calling it directly
+  with correctly typed but policy-invalid values can bypass C-INV-001/002/003. C requires
+  all production writes to follow `pipeline.process` until D enforces this boundary in code.
 
 ---
 
