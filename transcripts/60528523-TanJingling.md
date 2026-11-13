@@ -343,6 +343,27 @@ I acknowledged that my instruction over-scoped the Phase 1 requirement. I correc
 
 This taught me a valuable lesson in agile project management: a leader must not let the "ideal final state" block the "necessary current milestone". Recognizing and correcting scope creep in real-time is essential for maintaining team velocity and morale.
 
+## Session 10: 2026-11-13 - Deep Code Audit and Security Boundary Verification (PR #18)
+
+**Context.** I used OpenCode to review PR #18. Instead of just reading the code, I instructed the agent to actively test the boundary conditions of the storage layer.
+
+**Agent Output (excerpt).**
+
+```
+Verdict: Not LGTM.
+Blocking Issue 1: src/storage.py is not a policy gate. I reproduced this by calling append_validated directly with an invalid record (amount=999999, budget=1.0) and it was accepted and written to disk.
+Blocking Issue 2: report_tokens.LOG_PATH is still cwd-relative, and the test suite omits checking it.
+```
+
+**What I caught.** 
+The AI agent successfully breached the storage layer by bypassing the `pipeline` and calling `storage` directly. It proved that the "fail-closed" claim in the storage layer's docstring was only a shape check, not a true invariant check.
+
+**My decision.** 
+I formally rejected PR #18 and requested changes. I instructed Role D to either enforce `policy_core` validation directly in `storage.py` or update the architectural contract to clarify that the `pipeline` is the sole gatekeeper.
+
+**Reflection.** 
+This is a classic "defense in depth" scenario. Humans might assume that because the main pipeline works, the system is safe. However, the AI agent actively tried to bypass the main route and found a vulnerability in the public API of the storage layer. This demonstrates that AI can act as a ruthless adversary to test our security boundaries, proving the necessity of AI-assisted architectural audits.
+
 ## Overall Reflection — Role A (Leader)
 
 Across both sessions the same pattern held: the agent's usefulness was proportional to how
