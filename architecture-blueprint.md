@@ -6,7 +6,7 @@
 > It does not create ADRs (Phase 2) or the Trace Matrix (Phase 3).
 >
 > Companion documents (authoritative for their scope, not redefined here):
-> - `docs/architecture/invariants.md` (C-INV-001/002/003) — role C
+> - `docs/architecture/invariants.md` (INV-001/002/003) — role C
 > - `docs/architecture/runtime-policy-catalog.md` (RP-001..RP-006) — role C
 > - `docs/architecture/permission-model.md` — role C
 > - `requirements.yaml` — role B (functional / non-functional requirements)
@@ -116,9 +116,9 @@ flowchart TD
 
     RAW --> V["src/policy_core.py::validate_record(raw, spent, budget_limit)"]
     V --> S["Structural/field check<br/>isinstance dict + amount/category present<br/>(inlined, not a separate module)"]
-    S --> INV1["enforce_amount  (C-INV-001)"]
-    INV1 --> INV2["enforce_category  (C-INV-002)"]
-    INV2 --> INV3["enforce_budget  (C-INV-003)"]
+    S --> INV1["enforce_amount  (INV-001)"]
+    INV1 --> INV2["enforce_category  (INV-002)"]
+    INV2 --> INV3["enforce_budget  (INV-003)"]
 
     INV1 -->|fail| REJ["PolicyError<br/>policy:amount"]
     INV2 -->|fail| REVIEW["PolicyError + REVIEW<br/>policy:category"]
@@ -149,7 +149,7 @@ flowchart TD
 | Input | Receive one sentence | — | untrusted (user) |
 | Model call (`call_llm`) | Send request, parse envelope, log, fail-closed | `requests`, gateway | produces untrusted output |
 | Schema/field check (in `validate_record`) | Reject non-dict / missing fields | `policy_core` | deterministic |
-| Policy (`policy_core`) | Enforce C-INV-001/002/003 | stdlib `decimal`, `math` | authoritative |
+| Policy (`policy_core`) | Enforce INV-001/002/003 | stdlib `decimal`, `math` | authoritative |
 | Pipeline (`pipeline`) | Ordering + review logging | `call_llm`, `policy_core` | deterministic |
 | Persistence | Store accepted record | — | **not implemented** |
 
@@ -163,16 +163,16 @@ flowchart TD
 | `src/call_llm.py::_post` | HTTP call + envelope parse; converts all transport/protocol failures to `LlmTransportError` | `payload: dict` | raw content `str` | `requests` | D | implemented |
 | `src/call_llm.py::_append_log` | Append exactly one JSONL line; fail-closed on OSError | `record: dict` | (writes `logs/llm_calls.jsonl`) | filesystem | D | implemented |
 | `src/call_llm.py::SYSTEM_PROMPT` | Static instruction: return only JSON `{amount, category}` | — | prompt string | — | D | implemented (constant) |
-| `src/policy_core.py::enforce_amount` | C-INV-001 guard | amount | amount / `PolicyError(policy:amount)` | `math`, `decimal` | D | implemented |
-| `src/policy_core.py::enforce_category` | C-INV-002 guard | category | category / `PolicyError(policy:category, review=True)` | `CATEGORY_WHITELIST` | D | implemented |
-| `src/policy_core.py::enforce_budget` | C-INV-003 guard | spent, amount, limit | new total / `PolicyError(policy:budget, review=True)` | `decimal` | D | implemented |
+| `src/policy_core.py::enforce_amount` | INV-001 guard | amount | amount / `PolicyError(policy:amount)` | `math`, `decimal` | D | implemented |
+| `src/policy_core.py::enforce_category` | INV-002 guard | category | category / `PolicyError(policy:category, review=True)` | `CATEGORY_WHITELIST` | D | implemented |
+| `src/policy_core.py::enforce_budget` | INV-003 guard | spent, amount, limit | new total / `PolicyError(policy:budget, review=True)` | `decimal` | D | implemented |
 | `src/policy_core.py::validate_record` | Structural check + ordered guards | raw, spent, budget_limit | `{amount, category, total}` / `PolicyError` | the guards | D | implemented |
 | `src/pipeline.py::process` | Orchestrate extract → validate; write review line on rejection | text, spent, budget_limit | validated record | `call_llm`, `policy_core` | D | implemented |
 | `src/pipeline.py::_append_review` | Append one `review.jsonl` line; fail-closed | record | (writes `logs/review.jsonl`) | filesystem | D | implemented |
 | Schema Validator (standalone) | Validate JSON against a schema before field checks | raw | pass/fail | — | — | **planned, not implemented** |
 | Persistence | Store accepted records | record | stored | — | — | **not implemented** |
 | Budget store | Provide `budget_limit` | — | limit | — | — | **not implemented** |
-| Full boundary tests | Exhaustive C-INV boundary suite | — | tests | `pytest` | E | **planned** |
+| Full boundary tests | Exhaustive INV boundary suite | — | tests | `pytest` | E | **planned** |
 | CI | Run `pytest test/offline` on PRs | — | pass/fail | GitHub Actions | E | **not implemented** |
 
 > The `Parser` in the requirement wording is `call_llm.extract` (envelope→JSON) plus the
@@ -210,7 +210,7 @@ sequenceDiagram
     end
     Note over P,PC: AI output is NOT trusted data.
     P->>PC: validate_record(raw, spent, budget_limit)
-    PC->>PC: check dict + amount (C-INV-001) -> category (C-INV-002) -> budget (C-INV-003)
+    PC->>PC: check dict + amount (INV-001) -> category (INV-002) -> budget (INV-003)
     alt any invariant fails
         PC-->>P: raise PolicyError(code, review)
         P->>RL: append 1 line (error, amount, category, spent, total, review)
@@ -250,9 +250,9 @@ place that decides an outcome. This mirrors `AGENTS.md §3` and `structural-cons
 
 | ID | Rule (from `invariants.md`) | Enforced by |
 |---|---|---|
-| C-INV-001 | amount is a finite positive number, ≤ 2 decimals | `enforce_amount` |
-| C-INV-002 | category in code-defined closed whitelist | `enforce_category` |
-| C-INV-003 | cumulative spend ≤ budget; equality allowed | `enforce_budget` |
+| INV-001 | amount is a finite positive number, ≤ 2 decimals | `enforce_amount` |
+| INV-002 | category in code-defined closed whitelist | `enforce_category` |
+| INV-003 | cumulative spend ≤ budget; equality allowed | `enforce_budget` |
 
 Degradation follows RP-003/RP-005/RP-006; logging follows RP-004. Category and budget
 rejections set `review=True`; amount rejection sets `review=False` (per `invariants.md §2`).
@@ -270,7 +270,7 @@ design intent for later versions, clearly marked.
 |---|---|---|---|---|---|
 | 1 | Static System Instructions | `call_llm.py::SYSTEM_PROMPT` | highest | trusted (code-owned) | Yes |
 | 2 | Approved Project Requirements | `requirements.yaml`, this blueprint | high | trusted | No — not sent to model |
-| 3 | Relevant Business Rules | `invariants.md` C-INV-001/002/003 | high | trusted | No — enforced in code, not prompt |
+| 3 | Relevant Business Rules | `invariants.md` INV-001/002/003 | high | trusted | No — enforced in code, not prompt |
 | 4 | User Input | the sentence | lowest | **untrusted** | Yes (as a `user` message) |
 | 5 | Structured Output Requirements | system prompt + `response_format={"type":"json_object"}` | high | trusted (code-owned) | Yes |
 
@@ -351,10 +351,10 @@ All behaviours below are the real, implemented ones unless marked. Sources: RP-0
 | 3 | Model returns invalid JSON | `extract` → `json.loads` | raise `JSONDecodeError` | `llm_calls.jsonl` error=`not_json`, `parsed=null` | none — RP-001 |
 | 4 | Malformed response envelope (200) | `_post` key access | raise `LlmTransportError("protocol: ...")` | `llm_calls.jsonl` error=`protocol: ...` | none |
 | 5 | Record not a dict / field missing | `validate_record` | raise `PolicyError(policy:amount, review=False)` | `review.jsonl` one line | record discarded |
-| 6 | Type error in amount | `enforce_amount` | `PolicyError(policy:amount)` | `review.jsonl` | discarded — C-INV-001 |
-| 7 | Illegal amount (≤0, >2dp, NaN/Inf) | `enforce_amount` | `PolicyError(policy:amount)` | `review.jsonl` | discarded — C-INV-001 |
-| 8 | Illegal category | `enforce_category` | `PolicyError(policy:category, review=True)` | `review.jsonl` | discarded — C-INV-002 |
-| 9 | Budget exceeded | `enforce_budget` | `PolicyError(policy:budget, review=True)` | `review.jsonl` | discarded — C-INV-003 |
+| 6 | Type error in amount | `enforce_amount` | `PolicyError(policy:amount)` | `review.jsonl` | discarded — INV-001 |
+| 7 | Illegal amount (≤0, >2dp, NaN/Inf) | `enforce_amount` | `PolicyError(policy:amount)` | `review.jsonl` | discarded — INV-001 |
+| 8 | Illegal category | `enforce_category` | `PolicyError(policy:category, review=True)` | `review.jsonl` | discarded — INV-002 |
+| 9 | Budget exceeded | `enforce_budget` | `PolicyError(policy:budget, review=True)` | `review.jsonl` | discarded — INV-003 |
 | 10 | Prompt injection attempt | (not a distinct runtime detector) | neutralised architecturally: user text cannot change code rules; bad output fails validation | normal logs | rules still enforced by code |
 | 11 | Schema/field validation failure | inlined in `validate_record` | `PolicyError(policy:amount)` (#5) | `review.jsonl` | discarded |
 | 12 | Policy validation failure | `enforce_*` | `PolicyError`: `policy:amount` / `policy:category` / `policy:budget` | `review.jsonl` | discarded |
@@ -396,16 +396,16 @@ Grounded in `requirements.yaml` (role B) and the real code.
 | Requirement | Component | Invariant / Policy | Status |
 |---|---|---|---|
 | FR-001 | `call_llm.extract` | RP-001, RP-002 | implemented |
-| FR-002 | `validate_record` (struct) | C-INV-001 (dict check) | implemented |
-| FR-003 | `enforce_amount` | C-INV-001 / RP-003 | implemented |
-| FR-004 | `enforce_category` | C-INV-002 / RP-006 | implemented |
-| FR-005 | `enforce_budget` | C-INV-003 / RP-005 | implemented |
+| FR-002 | `validate_record` (struct) | INV-001 (dict check) | implemented |
+| FR-003 | `enforce_amount` | INV-001 / RP-003 | implemented |
+| FR-004 | `enforce_category` | INV-002 / RP-006 | implemented |
+| FR-005 | `enforce_budget` | INV-003 / RP-005 | implemented |
 | FR-006 | `extract`, `_post` | RP-001, RP-002 | implemented |
 | FR-007 | `validate_record` ordering | RP-003 | implemented |
 | FR-008 | `_append_log`, `_append_review` | RP-004 | implemented |
 | Persistence | — | — | not implemented |
-| Budget store | — | C-INV-003 source | not implemented |
-| Full boundary tests | — | C-INV-001/002/003 | planned (E) |
+| Budget store | — | INV-003 source | not implemented |
+| Full boundary tests | — | INV-001/002/003 | planned (E) |
 | CI | — | — | not implemented (E) |
 
 ## Appendix B — Open questions handed to others
