@@ -16,6 +16,9 @@
     ".agent/**": "allow",
     ".github/workflows/**": "allow",
     "transcripts/**": "allow",
+    "data/**": "allow",
+    "scripts/**": "allow",
+    "docs/measurements/**": "allow",
     ".env": "deny"
   },
 
@@ -23,6 +26,11 @@
   "edit": {
     "src/**": "allow",
     "test/**": "allow",
+
+    // Phase 2 measurement inputs, scripts and reports (C1).
+    "data/**": "allow",
+    "scripts/**": "allow",
+    "docs/measurements/**": "allow",
 
     // Architecture/governance docs may be written only when a task asks.
     "docs/architecture/**": "ask",
@@ -47,6 +55,9 @@
     "git reset --hard": "deny",
     "git clean": "deny",
     "rm -rf": "deny",
+    "pytest*": "allow",
+    "python -m py_compile*": "allow",
+    "python scripts/*": "allow",
     "*": "ask"
   }
 }

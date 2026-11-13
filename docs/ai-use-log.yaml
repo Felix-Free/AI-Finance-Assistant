@@ -502,3 +502,359 @@
     lint: Selected Ruff rules passed.
     ai_use_log: A new session passed. An unchanged, malformed or duplicate log failed.
     schema: B's PR files passed. Missing files and a missing required field failed.
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 5
+  topic: Phase 2 C1 measurement permission configuration
+  tool: opencode
+  files_created: []
+  files_modified:
+    - .opencode/permissions.jsonc
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/architecture/**
+    - docs/code-governance/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    C1 only. Added data/**, scripts/** and docs/measurements/** to the read and edit
+    whitelists as allow, and added pytest*, python -m py_compile* and python scripts/*
+    to bash as allow. Every existing deny/ask rule, comment and default was preserved;
+    no other permission was broadened and no runtime data was generated.
+  human_review:
+    - limited scope to C1 only (no storage, call_id, tokens or NFR-006 work)
+    - required existing deny/ask rules and comments to be preserved unchanged
+    - required the pre-existing untracked .DS_Store files to be left alone
+    - required the diff to contain only the three intended files
+  validation:
+    jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
+    yaml_parse: pass (YAML OK via ./.venv/bin/python)
+    git_diff_check: pass
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 6
+  topic: C1 follow-up — synchronize permission model
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/permission-model.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/code-governance/**
+    - logs/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    User-authorized follow-up to C1. Documented the Phase 2 C1 permission expansion in
+    permission-model.md (§2 rows plus new §3.1): data/**, scripts/** and
+    docs/measurements/** are read and edit allow, and pytest*, python -m py_compile* and
+    python scripts/* are bash allow, for measurement work only; runtime files under data/
+    must not be committed; default-deny, deny-overrides-allow, .env protection and the
+    protected paths are unchanged; permissions.jsonc stays the machine-readable config.
+    The C1 permission entries themselves were not modified.
+  human_review:
+    - required the permission model to match permissions.jsonc rather than stay stale
+    - required a follow-up commit rather than amending 88aab30
+    - confirmed .opencode/permissions.jsonc and the pair of .DS_Store files were untouched
+  validation:
+    jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
+    yaml_parse: pass (YAML OK)
+    git_diff_check: pass
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 7
+  topic: Phase 2 policy contracts (C2/C3/C4/C6) and evaluation logbook
+  tool: opencode
+  files_created:
+    - docs/architecture/evaluation-logbook.md
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - docs/code-governance/mcp-tool-manifest.md
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documented the agreed Phase 2 contracts on the C side. Added a §5 addendum to the
+    runtime policy catalog: C2 uses 32-character uuid4().hex for call_id, returned
+    via __call_id__ and removed before policy_core. C3 preserves input/raw/parsed/error and adds
+    call_id and gateway-derived tokens. D now writes one call-log line per extract attempt
+    when logging succeeds, with tokens=null if usage is not recorded. C4 required an
+    independent StorageError and no partial state; the latter remains unverified in D's
+    append-mode writer. C6 added a call_id join to main's NFR-006 log-traceability
+    requirement. It uses the applicable evidence pair: accepted -> llm_calls +
+    storage, rejected -> llm_calls + review, with no storage record for a rejection. The
+    rejection writer is _append_rejection (not _append_review) and preserves the original
+    PolicyError.code. Evaluation-logbook.md follows main's NFR-001 model response time,
+    NFR-002 token usage and NFR-006 log traceability; observed results remain pending.
+    Input parsing is an unnumbered proposal. The MCP manifest distinguishes application
+    and measurement entry points from MCP tools.
+  human_review:
+    - required generated call_id values with no caller-synthesized ids
+    - required tokens to be recorded only from gateway usage, never fabricated
+    - required storage failure to be an independent StorageError, not a policy:* code
+    - required NFR-006 conditional evidence for accepted versus rejected decisions
+    - required all NFR results to be pending/blocked, with none invented
+    - required the MCP manifest to stay untouched (no new MCP tool)
+  validation:
+    yaml_parse: pass
+    jsonc_parse: pass (generic JSONC only)
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 8
+  topic: NFR-006 traceability and logbook table format
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/code-governance/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Main defines NFR-006 as log traceability. Its numeric coverage threshold is null;
+    measurement remains pending. Phase 2 adds path-specific call-id joins: accepted ->
+    llm_calls + storage; rejected -> llm_calls + review, with no storage record for a
+    rejection. The logbook records these evidence shapes and its Observed result inside
+    the NFR-006 table.
+  human_review:
+    - required path-specific accepted and rejected evidence pairs
+    - required the conditional evidence shape to stay a separate rule
+    - required the NFR-006 Observed result row to move inside its table
+    - required RP-001..RP-006 to stay unchanged
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only correction); no measurement claimed
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 9
+  topic: document approved logging metadata fields
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/code-governance/**
+    - logs/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only. Extended the C3 llm_calls contract with the four user-approved
+    fields: session_id, request_id, usage_source (enum gateway, partial, missing) and
+    request_made. D's session_id is generated once per call_llm module load and groups a
+    process run, not necessarily a user session. D generates call_id per extract attempt,
+    including pre-HTTP failures; request_made=true means HTTP was attempted, not proven sent
+    to the gateway. The ids do not replace call_id as the evidence join key. Preserved
+    input/raw/parsed/error, no fabricated or zeroed token usage, and policy:* reservation.
+    The pre-HTTP lifecycle was pending at this session and was confirmed later. Extended
+    the NFR-002 logbook entry with per-session and per-request aggregation, attempted
+    HTTP-call counts, usage-source and missing-usage counts, and usage_source/tokens
+    consistency; thresholds are pending and
+    gateway usage is never treated as zero when usage is missing. NFR-006 later gained the
+    path-specific accepted/rejected evidence mapping.
+  human_review:
+    - approved the four additional fields (session_id, request_id, usage_source, request_made)
+    - required request_made to be a structured boolean, not inferred from error text
+    - required the pre-HTTP local failure behavior to be marked pending at the time; later confirmed against D's code
+    - required the NFR-002 aggregates to have no invented thresholds
+    - required the then-current strict three-call_id proposal and conditional evidence; later superseded by the approved path-specific pair
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-12"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 10
+  topic: align C2 rejection evidence and add RP-007
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/permission-model.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/code-governance/**
+    - logs/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only correction. Fixed the C2 evidence inconsistency: the invariants.md
+    rejection-evidence note now lists call_id and requires the review.jsonl line to carry the
+    same call_id as its llm_calls record; the stale "no call_id, cannot be joined" sentence
+    was removed while keeping the statement that the rejection line does not duplicate the
+    input text. RP-003/RP-005/RP-006 Evidence now state the review line includes the relevant
+    call_id, with policy:amount / policy:category / policy:budget unchanged. Added a formal
+    RP-007 Storage write failure entry (independent StorageError, policy:* reserved, never
+    rewritten as policy:*, no partial state required but not yet verified, no policy review
+    line) and a precedence step; RP-007 later expanded to cover storage read/validation
+    failures as well. The storage-failure evidence record was marked pending rather than
+    invented. The four newly approved metadata fields and C2 generation/carriage contract
+    were not changed. The then-pending NFR-006 three-location proposal was later replaced
+    by path-specific evidence pairs. No source, test or measurement was run.
+  human_review:
+    - required the stale "review line has no call_id" statement to be removed, not kept
+    - required the rejection line to share call_id with its llm_calls record
+    - required the no-duplicated-input statement to stay
+    - required RP-007 as a formal numbered policy with a precedence position
+    - required storage-failure evidence detail to be marked pending, not invented
+    - required the four new metadata fields and NFR-006 mapping to stay unchanged
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-13"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 11
+  topic: align C contracts with confirmed D implementation and approved storage validation
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/code-governance/**
+    - logs/**
+    - data/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only alignment with the latest D clarification and the approved NFR-002
+    definition. api_call_count counts attempted HTTP calls (request_made=true rows), not
+    distinct user requests; no separate user_request_count requirement was added. NFR-002
+    token aggregates are descriptive statistics only, with no pass/fail threshold. Reports
+    may show gateway, partial, missing and derived not_called, while the stored
+    usage_source enum remains gateway/partial/missing.
+    NFR-006's Phase 2 call-id supplement uses path-specific joins: accepted llm_calls↔storage and rejected
+    llm_calls↔review; a decision does not need all three evidence records. call_id is recorded
+    as uuid4().hex (32 hex characters). The approved storage design, not implemented in D's
+    current code, is append_validated(record, expected_spent=None), requiring total ==
+    expected_spent + amount and expected_spent not below persisted cumulative spend. D's
+    actual signature is append_validated(record). D's unrelated test-count
+    discrepancy was not changed.
+  human_review:
+    - confirmed that user_request_count is optional and is not required for C's contract
+    - confirmed the NFR-002 image's statistics-only treatment for token aggregates
+    - required D's four reporting categories without making not_called a fourth usage_source enum
+    - approved path-specific NFR-006 evidence joins
+    - approved the numeric expected_spent storage validation rule
+    - approved the 32-hex call_id format
+    - required no source, test, measurement, or unrelated test-count changes
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-13"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 12
+  topic: match confirmed D logging, token and storage clarifications
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - logs/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only. Aligned C's contracts with the confirmed D behavior. The pre-HTTP
+    local-failure lifecycle is no longer pending: it writes exactly one llm_calls.jsonl line
+    with all ten schema keys present, 32-character uuid4().hex call_id/session_id/request_id,
+    usage_source=missing, tokens=null, raw/parsed=null, and request_made=false, the only
+    such path in D's current code. When usage is processed, tokens is an input/output/total
+    object with missing or non-integer counts normalized to null. Three integers -> gateway,
+    some integer and some null -> partial, tokens=null or all counts null -> missing; zero is
+    never substituted. not_called is documented as a derived reporting category from
+    request_made=false, not a fourth usage_source enum; request_made=false rows are excluded
+    from the usage-source distribution and missing-usage count, and api_call_count is the
+    count of request_made=true rows. RP-004 gained an explicit appended-fields statement
+    preserving input/raw/parsed/error and listing the additive Phase 2 fields. The approved
+    append_validated(record, expected_spent=None) design is documented but not implemented
+    (total == expected_spent + amount; expected_spent >= persisted cumulative spend;
+    expected_spent is a validation parameter, not a persisted field).
+  human_review:
+    - required the pre-HTTP lifecycle to be confirmed, not left pending
+    - required all ten schema keys to be present; D uses tokens=null on pre-HTTP failure, while a processed usage object retains null values for missing counts
+    - required the exact token classification and that zero is never substituted
+    - required not_called to stay a derived category excluded from usage statistics
+    - required api_call_count to remain request_made=true rows with no user_request_count metric
+    - required RP-004 to state the additive fields while preserving the original four
+    - required the approved but unimplemented append_validated expected_spent design to use a validation input only
+    - required the historical 12-character proposal to remain identifiable as an earlier decision
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed

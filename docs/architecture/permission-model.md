@@ -5,7 +5,8 @@
 > boundaries between roles sit. This document and the config must never disagree; if they
 > do, the config is wrong and must be corrected.
 >
-> Status: **Phase 1 · C-Security (transcript 60339160).**
+> Status: **Phase 1 · C-Security (transcript 60339160)**; amended in **Phase 2** for
+> measurement permissions (§3.1).
 
 ---
 
@@ -39,6 +40,9 @@
 | `.env` | ❌ | ❌ | — | secrets |
 | `logs/**` | ✅ | ❌ | runtime | produced by the application |
 | `transcripts/**` | ✅ | ❌ | A | human-authored evidence |
+| `data/**` | ✅ | ✅ | C (Phase 2) | measurement inputs; see §3.1 |
+| `scripts/**` | ✅ | ✅ | C (Phase 2) | measurement scripts; see §3.1 |
+| `docs/measurements/**` | ✅ | ✅ | C (Phase 2) | measurement reports; see §3.1 |
 | `main` branch | — | ❌ | — | protected; never push/commit |
 
 ⚠️ = allowed only when the current task explicitly asks (see `AGENTS.md §2`).
@@ -57,6 +61,41 @@
 
 The mapping from §2 to the config is direct: every ✅ write becomes an `allow`, every ❌
 becomes a `deny`, and every ⚠️ becomes `ask` (human confirmation per use).
+
+### 3.1 Measurement permissions
+
+Phase 2 measurement work needs the agent to read and write measurement material. The measurement permissions add
+exactly three path trees and three command patterns to the config:
+
+| Scope | Kind | Permission |
+|---|---|---|
+| `data/**` | path | read `allow`, edit `allow` |
+| `scripts/**` | path | read `allow`, edit `allow` |
+| `docs/measurements/**` | path | read `allow`, edit `allow` |
+| `pytest*` | bash | `allow` |
+| `python -m py_compile*` | bash | `allow` |
+| `python scripts/*` | bash | `allow` |
+
+These permissions exist **only for Phase 2 measurement work**: measurement inputs live in
+`data/`, the scripts that consume them live in `scripts/`, and the resulting reports live
+in `docs/measurements/`.
+
+Constraints that this expansion does not relax:
+
+- **Runtime-generated files under `data/` must not be committed.** The edit `allow` lets
+  the agent write measurement scratch/output there; committing those files is a human
+  decision and they are expected to be excluded from version control. The agent may not
+  create or commit runtime data.
+- The **default-deny** rule (`"*": "deny"`) is unchanged.
+- **Deny overrides allow** is unchanged; no earlier `deny` is weakened by the new
+  `allow` entries.
+- **`.env` protection** (denied for read and write) is unchanged.
+- **Protected paths** (`docs/req/**`, `.opencode/**`, `.agent/**`, `.github/**`,
+  `transcripts/**`, `logs/**`, `main`) are unchanged.
+- Every other `deny`/`ask` rule and default in the config is unchanged.
+
+`.opencode/permissions.jsonc` remains the **machine-readable configuration**; this section
+documents the same change so the document and the config stay in agreement.
 
 ---
 

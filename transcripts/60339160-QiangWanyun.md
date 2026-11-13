@@ -1,11 +1,9 @@
 # 60339160 — QiangWanyun
 
-> Annotated transcript of my work with the AI coding agent (OpenCode).
-> Every entry records: what I instructed, what the agent produced, what I caught, and
-> what I changed. This file is evidence of human authorship and supervision.
+> Record of my C-side security, governance and evaluation work with AI coding agents.
+> Session entries document the requirements, decisions and evidence relevant to that work.
 >
-> Role: **C — security and governance.** Append a new entry after every working
-> session; do not rewrite earlier entries.
+> Role: **C — security and governance.**
 
 ---
 
@@ -250,3 +248,408 @@ RP-001, RP-002 and RP-004 remain unchanged.
 Before committing, I checked that the diff contains only the requested three edits and
 that the unrelated .DS_Store file is excluded.
 ```
+
+---
+
+## Session 5
+
+**Date.** 2026-11-12 · Phase 2: measurement permission configuration
+
+**Context.** Phase 2 introduces measurement work (inputs under `data/`, scripts under
+`scripts/`, results under `docs/measurements/`). This session only covers permission changes: widen the
+agent's whitelist just enough to read and edit those three paths and to run the
+measurement commands, without opening anything else. Storage, `call_id`, token accounting
+and NFR-006 belong to D/E and are deliberately out of scope.
+
+**My instruction to the agent.**
+
+```
+Complete only the permission change. In .opencode/permissions.jsonc add data/**, scripts/** and
+docs/measurements/** to read and to edit as allow, and add the bash allow
+patterns pytest*, python -m py_compile* and python scripts/*. Preserve every
+existing deny/ask rule, comment and default; broaden nothing else. Then append a
+new Phase 2 C session to the transcript and the ai-use-log. Do not touch src/,
+test/, docs/architecture/ or docs/code-governance/. Do not generate runtime data.
+```
+
+**Agent output (excerpt).**
+
+```
+The measurement permission change is complete. The measurement paths were added to the read and edit allowlists,
+the three measurement commands were added to the bash allowlist, and the
+transcript and ai-use-log were updated. No source, test or runtime data files
+were changed.
+```
+
+**What I caught.** The permission expansion had to remain limited to the three
+measurement path trees and the three requested command patterns. Storage, `call_id`,
+token accounting and NFR-006 were deliberately left for D/E.
+
+**My correction.**
+
+```
+Keep this change limited to the requested permission entries and evidence records.
+```
+
+**Result.**
+
+- `.opencode/permissions.jsonc` — added `data/**`, `scripts/**` and
+  `docs/measurements/**` to `read` and to `edit` as `allow`; added `pytest*`,
+  `python -m py_compile*` and `python scripts/*` to `bash` as `allow`. All other rules
+  (`"*": "deny"`, `"*": "ask"`, `.env`, `git push`/`git commit`, `rm -rf`, the
+  architecture/governance `ask` rules and the expandable denominators) are unchanged.
+- `transcripts/60339160-QiangWanyun.md` — this entry.
+- `docs/ai-use-log.yaml` — matching session 5 entry.
+
+No `src/` or `test/` file changed. No file was written under `data/`.
+
+Validation included generic JSONC parsing, YAML parsing under
+`./.venv/bin/python`, and a clean `git diff --check`.
+
+**Open handoffs.** The measurement scripts themselves, the `data/` inputs and the
+`docs/measurements/` reports are subsequent Phase 2 steps. The `python scripts/*`
+allow is deliberately scoped to the repo's own scripts directory.
+
+**Reflection.** A permission change is the one edit where "it works" is not the goal:
+every added line is a new capability for the agent, so the session records both what was
+granted and what was explicitly left denied.
+
+---
+
+## Session 6
+
+**Date.** 2026-11-12 · Phase 2 follow-up: synchronize permission model
+
+**Context.** In permission commit `88aab30`, `.opencode/permissions.jsonc` was widened
+but `docs/architecture/permission-model.md` still described only the Phase 1 boundaries,
+so document and config disagreed. This session synchronizes them without changing the
+permission entries themselves.
+
+**Why the permission model was synchronized.** `permission-model.md` is the authoritative
+statement and `.opencode/permissions.jsonc` is its machine-readable form; the file's own
+preamble says they must never disagree. Adding §3.1 and three rows to the §2 table records
+the measurement expansion (data, scripts, measurements as read+edit `allow`; pytest, py_compile and
+`python scripts/*` as bash `allow`), states that runtime files under `data/` must not be
+committed, and restates that default-deny, deny-overrides-allow, `.env` protection and the
+protected paths are unchanged.
+
+**Files changed in this follow-up.**
+
+- `docs/architecture/permission-model.md` — §2 rows and new §3.1 for the measurement expansion.
+- `transcripts/60339160-QiangWanyun.md` — this entry.
+- `docs/ai-use-log.yaml` — matching Session 6 entry.
+
+`.opencode/permissions.jsonc` was not modified; its measurement entries are preserved.
+
+**My correction.**
+
+```
+Synchronize the doc to the config instead of leaving them inconsistent. Do not amend
+88aab30; make a follow-up commit.
+```
+
+CHANGED FILES:
+- docs/architecture/permission-model.md  (modified, approved exception)
+- transcripts/60339160-QiangWanyun.md  (modified, approved exception)
+- docs/ai-use-log.yaml  (modified, approved exception)
+
+
+NOT CHANGED (confirm): src/**, test/**, .opencode/permissions.jsonc,
+docs/architecture/invariants.md, docs/architecture/runtime-policy-catalog.md,
+docs/code-governance/**, logs/**, .env, .DS_Store, docs/.DS_Store
+
+---
+
+## Session 7
+
+**Date.** 2026-11-12 · Phase 2: policy contracts and evaluation logbook
+
+**Scope.** Record the C-side `call_id`, model-call logging, storage-failure and evidence
+contracts without changing Phase 1 policy IDs or D/E source and tests.
+
+**Contract.** `call_llm` generates a 32-character `uuid4().hex` `call_id` for each
+`extract` attempt and returns it through `__call_id__`; the private key is removed
+before deterministic policy validation. The call log retains `input`, `raw`, `parsed`
+and `error` and includes the Phase 2 metadata. Missing recorded usage is represented
+by `tokens: null`, never an invented count. `StorageError` is independent of
+`policy:*`; the no-partial-state boundary remains to be verified.
+
+**Evidence.** Main defines NFR-001 as model API response time, NFR-002 as token
+consumption and NFR-006 as log traceability. Their observed measurements remain
+pending. Phase 2 adds a `call_id` join between `llm_calls` and storage for an accepted
+decision, or between `llm_calls` and review for a rejected decision. A rejected record
+is not persisted. The rejection writer is `_append_rejection`, which retains the
+original `PolicyError.code`.
+
+**Result.** The runtime policy catalog records the contracts; the evaluation logbook
+records the metrics, evidence procedures and pending results. The MCP manifest
+separates application and measurement entry points from MCP tools.
+
+---
+
+## Session 8
+
+**Date.** 2026-11-12 · Phase 2: NFR-006 evidence shape
+
+**Requirement.** NFR-006 measures log-line coverage for model calls and policy
+rejections. Main gives it no numeric coverage threshold. The Phase 2 `call_id` join is
+an additional structural traceability check: an accepted decision has `llm_calls` +
+storage evidence; a rejected decision has `llm_calls` + review evidence and no normal
+storage record. Each applicable pair carries the same `call_id`. No decision needs all
+three locations.
+
+**Evidence status.** The logbook keeps the observed result pending until a measurement
+is run. The evidence-join tests in `test/offline/test_evidence_join.py` are skipped, so
+they do not establish a verified result.
+
+---
+
+## Session 9
+
+**Date.** 2026-11-12 · Phase 2 C: document the four approved logging metadata fields
+
+**Context.** Phase 2 logging needs more than `call_id` and `tokens` to answer the questions
+role B asks about the system: how one process run behaved, how one user request fanned out
+into several API calls, whether an HTTP attempt was made, and where the token numbers
+came from. Four additional fields were approved — `session_id`, `request_id`,
+`usage_source` and `request_made`. This session is documentation-only: it extends the logging
+contract and the NFR-002 evidence in the logbook. No source, test, log, permission or MCP
+file is touched.
+
+**My instruction to the agent.**
+
+```
+The user approved four more llm_calls fields: session_id, request_id, usage_source
+(enum: gateway, partial, missing), request_made (boolean; true when HTTP was attempted).
+Extend the logging section with their exact meaning and keep every existing
+logging requirement intact. Do not define request_made from error text. A pre-HTTP
+failure writes a call-log line with request_made=false and tokens=null. Update NFR-002 to
+cover per-session and per-request aggregation, request_made counts, usage-source counts,
+missing-usage counts and usage_source/tokens consistency. Do not invent thresholds.
+Treat call-id joins as an additional NFR-006 traceability check.
+```
+
+**Agent output (excerpt).**
+
+```
+I will add a metadata subsection to the logging contract defining session_id, request_id,
+usage_source (gateway/partial/missing) and request_made (HTTP-attempt true), preserving
+input/raw/parsed/error, call_id uniqueness, gateway-only tokens, no fabricated or zero
+token counts, policy:* reservation and one-line-per-extract-attempt. A pre-HTTP local
+failure has request_made=false and tokens=null. I will extend NFR-002's procedure with
+the aggregation and consistency checks.
+```
+
+**What I caught.** Three things.
+
+1. **The four fields answer different questions and must not collapse into one.** `call_id`
+   identifies one `extract` attempt; `request_id` groups the calls one user request triggers
+   (one request may make several); `session_id` groups calls in a process run. I required the
+   contract to say plainly that neither new id replaces `call_id`.
+
+2. **`request_made` had to stay a structured boolean.** Deriving it from `error` text would
+   make it unparseable and fragile. I required `true` when HTTP was attempted and `false`
+   for local/configuration/preflight failures, independent of message wording. The latter
+   path still produces one call-log line.
+
+3. **The logbook must not smuggle in thresholds.** I required NFR-002's new aggregation and
+   consistency checks (per-session, per-request, `request_made` counts, usage-source and
+   missing-usage counts, `usage_source`↔`tokens`) to be documented as procedure, with their
+   numeric thresholds **pending clarification**, and to state that gateway usage is never
+   treated as zero when usage is missing.
+
+**My correction.**
+
+```
+Keep call_id, request_id and session_id distinct; session_id groups a process run.
+request_made is a structured boolean, not derived from error text; pre-HTTP failure
+logs one line with request_made=false and tokens=null. Do not invent a numeric threshold
+for the NFR-002 aggregates. Preserve NFR-006 log coverage and its path-specific Phase 2
+call-id joins.
+```
+
+**Result.**
+
+- `docs/architecture/runtime-policy-catalog.md` — the LLM call logging section extended with
+  a metadata subsection defining
+  `session_id`, `request_id`, `usage_source` (`gateway`/`partial`/`missing`) and
+  `request_made`, including the pre-HTTP local-failure record. All
+  earlier logging requirements preserved.
+- `docs/architecture/evaluation-logbook.md` — NFR-002 entry extended with per-session and
+  per-request aggregation, attempted HTTP-call count from `request_made=true` rows,
+  usage-source and missing-usage counts, and `usage_source`↔`tokens` consistency;
+  numeric token budget remains unset.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `git diff --check` clean.
+- No tests or measurements were run or claimed; documentation-only.
+
+**Open handoffs.** E tests the four fields (including the structured `request_made`
+boolean and `usage_source` derivation) and runs the NFR-002 aggregation and
+consistency checks, recording real results and confirming no fabricated or zeroed tokens.
+
+**Reflection.** More metadata is only useful if each field has one job. Separating the call
+id from the request and session ids, and keeping `request_made` a real boolean instead of a
+guess from message text, is what makes the logbook's counts trustworthy rather than
+plausible.
+
+---
+
+## Session 10
+
+**Date.** 2026-11-12 · Phase 2: rejection evidence and RP-007
+
+**Contract.** A deterministic rejection writes a `review.jsonl` line carrying the same
+`call_id` as its `llm_calls` line and preserves the original `PolicyError.code`.
+RP-003/RP-005/RP-006 cover amount, budget and category rejections. Rejected records
+are not persisted, and review evidence does not duplicate the full input text.
+
+**Storage failure.** RP-007 covers storage read, validation and write failures through
+an independent `StorageError`; these failures do not become `policy:*` rejections and
+do not produce a policy review line. A rejection-evidence write failure also surfaces
+as `StorageError`. The no-partial-state boundary is required but unverified for D's
+append-mode writer. The storage-failure evidence format remains pending.
+
+**Evidence.** These paths supplement main's NFR-006 log-coverage requirement with a
+path-specific `call_id` join. E has not yet recorded a measured result.
+
+---
+
+## Session 11
+
+**Date.** 2026-11-13 · Phase 2: align C's contracts with the confirmed D implementation
+
+**Context.** The latest D clarification resolved several items that were still written as
+open in C's documents. The requirements image also states that the NFR-002 token-usage
+aggregates are for reporting only and must not be treated as pass/fail thresholds. The group
+discussion separately approved an optional numeric `expected_spent` input for the validated
+storage boundary. This session updates the contracts to match those decisions and leaves the
+test-count discrepancy in D's document alone because it is not used by C's deliverable.
+
+**My instruction to the agent.**
+
+```
+Use D's current implementation facts. Keep actual request count as api_call_count, meaning
+rows with request_made=true; do not add a user_request_count requirement. Record NFR-002
+token aggregates as statistics only, with no pass/fail threshold. Report D's four operational
+categories gateway/partial/missing/not_called, but keep usage_source's stored enum at the
+three values gateway/partial/missing and derive not_called from request_made=false.
+For NFR-006 log traceability, check the Phase 2 path-specific joins: accepted is
+llm_calls↔storage and rejected is llm_calls↔review; a decision does not create all three
+records. Record the approved but unimplemented append_validated(record,
+expected_spent=None) design:
+total == expected_spent + amount and expected_spent must not be below persisted cumulative
+spend. Use the 32-hex-character call_id format. Do not change source,
+tests, measurements, or D's unrelated test-count record.
+```
+
+**What I changed.** The evaluation logbook now uses `api_call_count`, describes the four
+reporting categories without making `not_called` a fourth enum value, and records the image's
+"statistics only" rule for token aggregates. NFR-006 measures log-line coverage; Phase 2
+additionally checks the applicable evidence pair for each decision. Its measured result
+remains `pending`. The runtime-policy catalog records the 32-hex
+`call_id`, the path-specific evidence joins, the derived `not_called` category, and the
+approved but unimplemented numeric `expected_spent` storage validation design. D's
+current signature is `append_validated(record)`. No source code or test files were changed.
+
+**Validation.** YAML parsing and `git diff --check` are run after this session. No tests or
+measurements are run or claimed; D's 122-versus-124 test-count discrepancy is outside C's
+deliverable.
+
+**Reflection.** A reporting category does not have to become a stored enum value. Keeping
+`not_called` derived from `request_made` preserves the compact log contract while still
+matching D's four-way report. NFR-006 covers log traceability, with the applicable
+evidence-pair join as a Phase 2 structural check.
+
+---
+
+## Session 12
+
+**Date.** 2026-11-13 · Phase 2 C: match the confirmed D logging/token and storage clarifications
+
+**Context.** D's latest clarification fixed the last open questions in C's Phase 2 contracts:
+the pre-HTTP local-failure path writes a normal `llm_calls` record with
+`request_made=false` and `tokens: null`; processed usage is an object with `input`,
+`output` and `total` counts, including `null` for missing counts; and the `not_called`
+reporting category is derived, not a
+fourth enum. Session 11 had already moved the docs toward D, but the pre-HTTP lifecycle was
+still marked pending, the token rules were incomplete, and RP-004 lacked an explicit
+appended-fields statement. This session closes those gaps. Documentation only.
+
+**My instruction to the agent.**
+
+```
+Match the confirmed D behavior. Record that a pre-HTTP local failure still writes exactly one
+llm_calls line with all ten keys, 32-char uuid4().hex ids, usage_source
+missing, tokens=null, raw/parsed null, request_made
+false — the only request_made=false path. Document token classification (three ints →
+gateway; some int some null → partial; all null → missing; non-int → null) and that zero is
+never substituted. Keep storing only gateway/partial/missing; derive not_called from
+request_made=false and exclude those rows from the usage distribution and missing-usage
+count. Keep api_call_count = rows with request_made=true. Add the RP-004 appended-fields
+statement. Document the approved but unimplemented
+append_validated(record, expected_spent=None) design; D currently implements
+append_validated(record).
+```
+
+**Agent output (excerpt).**
+
+```
+I will replace the pending pre-HTTP block in runtime-policy-catalog.md with the confirmed
+one-line lifecycle, extend the token semantics with the gateway/partial/missing
+classification and null handling, add the RP-004 appended-fields note, tighten the
+append_validated boundary text, and adjust the NFR-002 procedure so not_called rows are
+excluded from missing-usage statistics.
+```
+
+**What I caught.** Three things.
+
+1. **A pre-HTTP failure is still a logged call.** It is tempting to treat "no HTTP request"
+   as "no log line", but D confirmed the opposite: exactly one `llm_calls` line, with all ten
+   keys present; `tokens` is explicitly `null`. The `request_made=false` record is the one
+   and only failure-before-request path.
+
+2. **Token semantics are a classification, not just a value.** "Record only when the gateway
+   supplies it" was too loose: a processed usage object can be all-integer, mixed, or all-null, and
+   that determines `usage_source`. Non-integer values (strings, booleans) must normalize to
+   `null`, and zero is never a substitute. I required the exact mapping.
+
+3. **`not_called` must not pollute the usage statistics.** It is an operational category
+   derived from `request_made=false`, not a fourth stored enum. Rows with `request_made=false`
+   are counted separately and excluded from the usage-source distribution and the
+   missing-usage count; `api_call_count` stays the count of `request_made=true` rows.
+
+**My correction.**
+
+```
+Pre-HTTP failure writes one llm_calls line, ten keys including tokens=null, request_made=false,
+the only such path. Token classification exactly as D defined; zero never substituted.
+not_called derived from request_made=false, excluded from usage distribution and
+missing-usage count; no user_request_count metric. Add RP-004 appended-fields statement and
+record the unimplemented append_validated(record, expected_spent=None) design separately
+from D's append_validated(record) implementation.
+```
+
+**Result.**
+
+- `docs/architecture/runtime-policy-catalog.md` — pre-HTTP lifecycle (§5.2.2) now confirmed
+  and no longer pending; token semantics and the `Never fabricate` rule rewritten to the
+  gateway/partial/missing classification with object/null handling; RP-004 gains an explicit
+  appended-fields note; the unimplemented `append_validated(record, expected_spent=None)` design states
+  `total == expected_spent + amount` and `expected_spent >= persisted cumulative spend`, with
+  `expected_spent` a validation parameter, not a persisted field. D currently has
+  `append_validated(record)`; NFR-006 log coverage has a Phase 2 path-specific join check.
+- `docs/architecture/evaluation-logbook.md` — NFR-002 procedure now excludes
+  `request_made=false` rows (not_called_calls) from the usage distribution and missing-usage
+  count, keeps `api_call_count` as `request_made=true` rows, and states the token
+  classification.
+- Validation (this session): `docs/ai-use-log.yaml` parses; `git diff --check` clean.
+- No source code, tests or measurements were changed.
+
+**Open handoffs.** D's current implementation writes the pre-HTTP call log and classifies
+token usage; the `expected_spent` storage design is not implemented. E runs NFR-002 and
+NFR-006 measurements and records results. The RP-007 storage-failure evidence format
+remains pending.
+
+**Reflection.** The remaining gaps were all cases of "a null is still a value". A skipped
+HTTP call still logs; a missing token is still a key set to `null`; a `not_called` row still
+exists but must not be counted as a usage failure. Writing the nulls explicitly is what keeps
+the statistics honest.
