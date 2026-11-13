@@ -145,6 +145,11 @@ If an invariant cannot be written this way, it is not an invariant yet.
 ## 5. Logging contract
 
 **File:** `logs/llm_calls.jsonl` — one JSON object per line, append-only.
+**Single source of truth.** This table and role C's `runtime-policy-catalog.md` §RP-004 are the only
+places the log contract is defined. The team agenda and chat threads are discussion records, not
+contracts. Any change to a field name, an id format or a value vocabulary must be applied to **both**
+documents and announced in the group **before** code that depends on it is merged.
+
 **Every line carries exactly these ten keys** — identical key set on success and on failure;
 an inapplicable value is `null`, never an omitted key (so any consumer can read every row).
 
