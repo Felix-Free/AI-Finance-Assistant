@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 
 from src import call_llm, policy_core, storage
 
-REVIEW_PATH = pathlib.Path("logs/review.jsonl")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+REVIEW_PATH = _REPO_ROOT / "logs" / "review.jsonl"
 
 
 def _append_rejection(record: dict) -> None:

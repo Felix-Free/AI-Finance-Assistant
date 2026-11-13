@@ -13,7 +13,8 @@ import json
 import pathlib
 from typing import Iterator
 
-DATA_PATH = pathlib.Path("data/records.jsonl")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+DATA_PATH = _REPO_ROOT / "data" / "records.jsonl"
 
 REQUIRED_FIELDS = (
     "call_id",

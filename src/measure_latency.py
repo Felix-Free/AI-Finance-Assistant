@@ -29,7 +29,8 @@ import sys
 import time
 from datetime import datetime, timezone
 
-LATENCY_PATH = pathlib.Path("logs/latency.jsonl")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+LATENCY_PATH = _REPO_ROOT / "logs" / "latency.jsonl"
 PROBE_TEXT = "hotpot last night cost 350"
 
 

@@ -5,11 +5,16 @@ only exercised via --dry-run. No network access, nothing written to logs/.
 """
 import io
 import json
+import os
+import pathlib
+import subprocess
+import sys
 from contextlib import redirect_stdout
 
 import pytest
 
-from src import measure_latency, measure_tokens, report_tokens
+from src import (call_llm, measure_latency, measure_tokens, pipeline,
+                 report_tokens, storage)
 
 
 def _write_log(tmp_path, records):
@@ -319,3 +324,38 @@ def test_failure_kind_label_never_carries_secrets():
     assert "sk-secret" not in label
     assert "https://" not in label
     assert label == measure_latency._failure_kind(err)
+
+
+def _evidence_paths():
+    return {
+        "call_llm.LOG_PATH": call_llm.LOG_PATH,
+        "pipeline.REVIEW_PATH": pipeline.REVIEW_PATH,
+        "storage.DATA_PATH": storage.DATA_PATH,
+        "measure_latency.LATENCY_PATH": measure_latency.LATENCY_PATH,
+    }
+
+
+def test_evidence_paths_are_absolute_and_inside_repo():
+    repo = pathlib.Path(__file__).resolve().parents[2]
+    for name, path in _evidence_paths().items():
+        assert path.is_absolute(), "%s is not absolute: %r" % (name, path)
+        assert str(path).startswith(str(repo)), "%s escapes repo: %r" % (name, path)
+
+
+def test_evidence_paths_follow_the_module_not_the_cwd(tmp_path):
+    repo = pathlib.Path(__file__).resolve().parents[2]
+    code = (
+        "from src import call_llm, pipeline, storage, measure_latency;"
+        "print(call_llm.LOG_PATH); print(pipeline.REVIEW_PATH);"
+        "print(storage.DATA_PATH); print(measure_latency.LATENCY_PATH)"
+    )
+    env = dict(os.environ, PYTHONPATH=str(repo))
+    out = subprocess.run(
+        [sys.executable, "-c", code], cwd=str(tmp_path),
+        capture_output=True, text=True, env=env, check=True,
+    )
+    printed = out.stdout.split()
+    assert len(printed) == 4, out.stdout
+    for line in printed:
+        assert line.startswith(str(repo)), "%r does not follow the module" % (line,)
+        assert not line.startswith(str(tmp_path)), "%r follows the cwd" % (line,)

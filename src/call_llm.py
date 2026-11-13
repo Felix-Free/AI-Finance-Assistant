@@ -28,7 +28,8 @@ BASE_URL = (os.environ.get("LLM_BASE_URL") or "").rstrip("/")
 API_KEY = os.environ.get("LLM_API_KEY") or ""
 MODEL = os.environ.get("LLM_MODEL", "CS5351/DeepSeek-V4-Flash")
 
-LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+LOG_PATH = _REPO_ROOT / "logs" / "llm_calls.jsonl"
 
 _SESSION_ID = uuid.uuid4().hex
 
