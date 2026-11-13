@@ -121,14 +121,15 @@ Take the sentence `"hotpot last night cost 350"`, processed inside one session.
 2. **Record row** (`data/records.jsonl`) — carries the same `call_id`, plus
    `amount: 350`, `category: "food"`, `total: <updated running total>`, `budget_limit`, and
    `decided_at` (ISO-8601 UTC, seconds).
-3. **Joining them:** the `call_id` appears in all three positions required by NFR-006 — the call
-   line, the record row, and (should the record ever be re-examined) the review log if it had
-   been rejected.
+3. **Joining them:** the same `call_id` appears in the call line and in the record row.
 
-The three `call_id` positions are:
-`(a)` the call-log line, `(b)` the storage record, and `(c)` the rejection line when a rejection
-occurred. For an accepted record, `(a)` and `(b)` match. For a rejection, `(a)` and `(c)` match
-and `(b)` is absent.
+NFR-006 names **two log files** (`logs/llm_calls.jsonl`, `logs/review.jsonl`). The traceability rule
+agreed with role C on 2026-11-12 adds a third **evidence record**, the storage row:
+
+`(a)` the call-log line, `(b)` the storage record, `(c)` the rejection line.
+
+For an accepted record, `(a)` and `(b)` match. For a rejection, `(a)` and `(c)` match and `(b)` is
+absent. So "three positions" means three evidence records, not three files named in NFR-006.
 
 A rejection leaves **no record, only evidence**. This is intentional: a rejected value never
 affects stored data, so there is nothing to persist as state — only the proof that it was
