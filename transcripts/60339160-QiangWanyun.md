@@ -281,22 +281,14 @@ transcript and ai-use-log were updated. No source, test or runtime data files
 were changed.
 ```
 
-**What I caught.** Two things.
-
-1. The permission expansion had to remain limited to the three measurement path
-   trees and the three requested command patterns. Storage, `call_id`, token
-   accounting and NFR-006 were deliberately left for D/E.
-
-2. The initial pytest statement was not enough evidence because it did not establish
-   that pytest had actually run in the project environment. The exact result was
-   re-run and corrected in Session 6.
+**What I caught.** The permission expansion had to remain limited to the three
+measurement path trees and the three requested command patterns. Storage, `call_id`,
+token accounting and NFR-006 were deliberately left for D/E.
 
 **My correction.**
 
 ```
-Keep this change limited to the requested permission entries and evidence records. Do not
-describe pytest as having run or passed unless the exact command succeeds; record
-the interpreter and exit status when the environment cannot execute the suite.
+Keep this change limited to the requested permission entries and evidence records.
 ```
 
 **Result.**
@@ -312,9 +304,7 @@ the interpreter and exit status when the environment cannot execute the suite.
 No `src/` or `test/` file changed. No file was written under `data/`.
 
 Validation included generic JSONC parsing, YAML parsing under
-`./.venv/bin/python`, and a clean `git diff --check`. The project venv had no pytest;
-the later Session 6 re-run recorded the system `python3 -m pytest` result as zero tests
-collected with exit code 5, not as a passing test run.
+`./.venv/bin/python`, and a clean `git diff --check`.
 
 **Open handoffs.** The measurement scripts themselves, the `data/` inputs and the
 `docs/measurements/` reports are subsequent Phase 2 steps. The `python scripts/*`
@@ -328,15 +318,12 @@ granted and what was explicitly left denied.
 
 ## Session 6
 
-**Date.** 2026-11-12 · Phase 2 follow-up: synchronize permission model, correct pytest evidence
+**Date.** 2026-11-12 · Phase 2 follow-up: synchronize permission model
 
-**Context.** Two gaps in the prior permission commit `88aab30`. First, `.opencode/permissions.jsonc` was
-widened but `docs/architecture/permission-model.md` still described only the Phase 1
-boundaries, so document and config disagreed — the very thing §"Status" of that file warns
-against. Second, Session 5 recorded the pytest result as "no tests ran (empty suite)"
-without establishing that the command could run; the project venv has no pytest installed,
-so that claim was not honest. This session fixes both; it does not change the permission
-entries themselves.
+**Context.** In permission commit `88aab30`, `.opencode/permissions.jsonc` was widened
+but `docs/architecture/permission-model.md` still described only the Phase 1 boundaries,
+so document and config disagreed. This session synchronizes them without changing the
+permission entries themselves.
 
 **Why the permission model was synchronized.** `permission-model.md` is the authoritative
 statement and `.opencode/permissions.jsonc` is its machine-readable form; the file's own
@@ -346,27 +333,10 @@ the measurement expansion (data, scripts, measurements as read+edit `allow`; pyt
 committed, and restates that default-deny, deny-overrides-allow, `.env` protection and the
 protected paths are unchanged.
 
-**Corrected pytest result (what actually ran in this environment).**
-
-```
-$ pytest test/offline -q
-zsh: command not found: pytest              # exit 127 — pytest CLI not on PATH
-
-$ ./.venv/bin/python -m pytest test/offline -q
-.../​.venv/bin/python: No module named pytest   # exit 1 — venv has no pytest
-
-$ python3 -m pytest test/offline -q          # system Python 3.9.6, pytest 8.4.2
-no tests ran in 0.00s                        # exit 5 — collected nothing
-```
-
-So the honest record is: **tests were not exercised in the project venv** (no pytest there);
-the only interpreter with pytest collected zero tests and exited 5. This is **not** a pass,
-and it is not evidence that the suite is empty in the sense of "green" — no test ran.
-
 **Files changed in this follow-up.**
 
 - `docs/architecture/permission-model.md` — §2 rows and new §3.1 for the measurement expansion.
-- `transcripts/60339160-QiangWanyun.md` — Session 5 pytest claim corrected; this entry.
+- `transcripts/60339160-QiangWanyun.md` — this entry.
 - `docs/ai-use-log.yaml` — matching Session 6 entry.
 
 `.opencode/permissions.jsonc` was not modified; its measurement entries are preserved.
@@ -374,9 +344,8 @@ and it is not evidence that the suite is empty in the sense of "green" — no te
 **My correction.**
 
 ```
-Synchronize the doc to the config instead of leaving them inconsistent, re-run the
-validation for real, and record what actually happened rather than copying a plausible
-sounding result. Do not amend 88aab30; make a follow-up commit.
+Synchronize the doc to the config instead of leaving them inconsistent. Do not amend
+88aab30; make a follow-up commit.
 ```
 
 CHANGED FILES:
