@@ -38,7 +38,7 @@ Before planning, read at least:
 ## 3. Requirement interpretation
 
 - Find the **Requirement ID(s)** the task maps to (`FR-###`, `NFR-###`, `AI-REQ-###`,
-  `SEC-###`, or a `C-INV-###`).
+  `SEC-###`, or a `INV-###`).
 - State the **input**, **output**, and **acceptance criteria** for those requirements.
 - If requirements conflict, or the task implies a requirement not in `requirements.yaml`,
   **report it and stop** — do not invent requirements or expand scope.
@@ -67,7 +67,7 @@ Output a plan with exactly these sections:
 <function-level description of each change>
 
 ## Security Impact
-<effect on SEC-*, C-INV-*, RP-*; how fail-closed and validation-before-write stay intact>
+<effect on SEC-*, INV-*, RP-*; how fail-closed and validation-before-write stay intact>
 
 ## Test Plan
 <which tests you will add/run; positive AND negative; which guard fails without the fix>
