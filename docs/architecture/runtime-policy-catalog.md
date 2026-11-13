@@ -52,7 +52,7 @@ write (`structural-constraints.md §4`).
 - **Action:** `reject`; raise `PolicyError`.
 - **Degradation:** stored data and running totals stay unchanged; the record is not
   applied. `C-INV-002` and `C-INV-003` additionally flag `REVIEW`.
-- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
+- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
 
 ### RP-004 — Logging integrity (fail-closed)
 
@@ -79,14 +79,14 @@ write (`structural-constraints.md §4`).
 - **Trigger:** accepted total + new amount > `budget_limit`.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** previous total is authoritative; the new record is never applied.
-- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
+- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
 
 ### RP-006 — Category out of vocabulary (guard for C-INV-002)
 
 - **Trigger:** category not in the closed whitelist.
 - **Action:** `reject` + `REVIEW`.
 - **Degradation:** never coerce, never fuzzy-match, never ask the model to fix it.
-- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`, carrying the relevant `call_id` so the line joins to its `llm_calls` record.
+- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
 
 ### RP-007 — Storage write failure
 
@@ -96,17 +96,22 @@ write (`structural-constraints.md §4`).
   a rule decision.
 - **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
   rejection (RP-003/005/006). A storage failure **must not** be rewritten as `policy:*`.
-- **No partial state:** no partial state change is allowed; the previous stored state
-  remains authoritative (the write either completes or the prior state stands).
+- **No partial state (C's required boundary — implementation verification pending):** no
+  partial state change is allowed; the previous stored state remains authoritative (the
+  write either completes or the prior state stands). **Current status:** D's
+  `storage.append_validated` uses an append-mode write that raises `StorageError` on
+  `OSError`, but the code does **not** demonstrate rollback of bytes written before the
+  error. The boundary is therefore **required by C and not yet verified by the
+  implementation**; it must not be read as confirmed.
 - **Not a policy rejection:** a storage failure is **not** a normal policy rejection and
   **must not** create a policy review line (`logs/review.jsonl`).
 - **Evidence:** the failure surfaces as `StorageError` to the caller.
 
 > **Pending clarification.** The exact storage-failure evidence detail (whether it is
-> logged at all and, if so, in what record and format) is **not** defined elsewhere in this
-> repository. RP-007 requires only `StorageError` and the absence of a `policy` review line;
-> it does not invent a new log format. The precise evidence record is pending clarification
-> until the pipeline/spec fixes it.
+> logged at all and, if so, in what record and format) is **not** defined by D's current
+> implementation. RP-007 requires only `StorageError`, no `policy:*` conversion, and the
+> absence of a `policy` review line; it does not invent a new log format. The precise
+> evidence record remains pending until the implementation/spec fixes it.
 
 ---
 
@@ -252,9 +257,11 @@ request is actually sent is logged this way, and every path that sends a request
   policy/rule rejection (amount, category, budget — RP-003/005/006). A storage failure
   **must not** be rewritten as `policy:*`; doing so would make "correctly refused" and
   "failed to persist" indistinguishable.
-- **No partial state.** A storage failure must leave **no partial state change**: the
-  write either completes or the previous state stands. No write-then-check, no
-  half-applied record.
+- **No partial state (required boundary; implementation verification pending).** A storage
+  failure must leave **no partial state change**: the write either completes or the previous
+  state stands. No write-then-check, no half-applied record. See RP-007 — the current
+  append-mode write raises `StorageError` but does not demonstrate rollback, so this remains
+  a C-required boundary rather than a verified property.
 - **Evidence:** the failure surfaces as `StorageError` to the caller; it never produces a
   `review.jsonl` policy line.
 
@@ -282,20 +289,64 @@ A decision is **not** required to produce all three records, and the acceptance 
 ### 5.5 Approved D decisions (recorded here for the shared boundary)
 
 - **`call_id` format:** `uuid4().hex`. Fixed 32-hex-character form; see the Call identifiers section.
-- **`_append_review` preserves the original rejection code.** When review evidence is
-  written, `_append_review` keeps the **original** `error` code (for example
-  `policy:category`) rather than replacing or re-coding it. The code that caused the
-  rejection is the one recorded, so the review line and the routing decision agree.
-- **Validated storage spend.** The sole storage entry point is
-  `append_validated(record, expected_spent=None)`. Its approved boundary is:
-  - `total == expected_spent + amount` (the running total must equal the caller's expected
-    prior spend plus this record's amount);
-  - `expected_spent >= already persisted cumulative spend` — the caller may not claim a
-    smaller prior spend than what is already stored.
+- **`request_id` format and role:** also `uuid4().hex`, generated per **user request**. It is
+  an **additive grouping** field: one request may span several calls, so several
+  `llm_calls` records share one `request_id`. `call_id` remains the **primary evidence-join
+  key**; `request_id` groups calls belonging to one user request.
+- **`_append_rejection` preserves the original rejection code.** The rejection writer is
+  `src/pipeline.py::_append_rejection`. It writes the **original** `PolicyError.code` (for
+  example `policy:category`) as the line's `error`, rather than replacing or re-coding it,
+  so the review line and the routing decision agree. Each rejection line carries both
+  `call_id` (join key) and `request_id` (grouping).
 
-  `expected_spent` is a **numeric validation parameter, not a persisted record field**. Its
-  purpose is to prevent **under-reporting prior spending**, which would otherwise let a
-  record slip past the budget guard (`C-INV-003`/`RP-005`). C specifies the boundary only;
-  D owns the implementation in `src/`.
+#### Approved design not yet implemented — validated storage spend
+
+- **Intended boundary (approved by C, not implemented in D's current code):**
+  `append_validated(record, expected_spent=None)` with
+  - `total == expected_spent + amount`, and
+  - `expected_spent >= already persisted cumulative spend`.
+
+  `expected_spent` would be a **numeric validation parameter, not a persisted record
+  field**. Its purpose is to prevent **under-reporting prior spending**, which would
+  otherwise let a record slip past the budget guard (`C-INV-003` / `RP-005`).
+- **Current implementation (verified):** `src/storage.py::append_validated(record)` takes a
+  **single `record` argument** and has no `expected_spent`; it validates the record's
+  fields and rejects a duplicate `call_id`, but it does **not** compare the record against
+  persisted cumulative spend. A repository-wide search finds no `expected_spent` in D's
+  tree.
+- **Consequence — budget-bypass gap (not secured):** `src/pipeline.py::process(spent=None,
+  budget_limit=...)` reads `storage.current_total()` **only when `spent is None`**. When a
+  caller supplies `spent`, that value is trusted and is passed straight to
+  `policy_core.validate_record`. Because neither `process` nor `append_validated` checks the
+  caller-supplied `spent` against the persisted cumulative total, a **lower
+  caller-supplied `spent` can weaken the cumulative budget check** (`C-INV-003` /
+  `RP-005`). This is a **known gap**, not a secured property; closing it requires
+  implementing the `expected_spent` boundary above.
+
+#### Repository-root anchoring of evidence paths (verified per module)
+
+Evidence paths are anchored to the repository root via
+`pathlib.Path(__file__).resolve().parents[1]`, so they follow the module rather than the
+process working directory. This is **confirmed** in:
+
+- `src/call_llm.py` — `LOG_PATH` (`logs/llm_calls.jsonl`)
+- `src/pipeline.py` — `REVIEW_PATH` (`logs/review.jsonl`)
+- `src/storage.py` — `DATA_PATH` (`data/records.jsonl`)
+- `src/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
+
+It is **not** used everywhere: `src/report_tokens.py` still defaults to a **relative**
+`LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")` (working-directory dependent, overridable
+by an argument), and `src/measure_tokens.py` defines no path of its own. The anchoring
+claim applies only to the four modules listed above.
+
+#### D-02 — error logging short-code rule (unresolved implementation debt)
+
+Short, **secret-safe** error information in logs is a **security requirement** (Phase 1,
+`structural-constraints.md §5`): the `error` field is a short code, and a raw exception
+string must not be able to leak a URL, query parameter or credential into the log. D's
+current `src/call_llm.py::_append_log` path still writes full `str(exc)` for transport and
+protocol failures. This is an **unresolved D implementation debt (D-02)**: the security
+requirement stands and must not be weakened; the implementation has not yet been brought
+into line with it.
 
 ---

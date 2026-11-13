@@ -33,11 +33,12 @@
 | Field | Value |
 |---|---|
 | NFR | Input parsing reliability: a well-formed spending sentence yields the correct structured record. |
+| Canonical requirement ID | **Unconfirmed — pending confirmation.** The repository has no requirements file that maps this behaviour to a canonical `REQ-NFR-###`. D's measurement scripts label **latency** and **token usage** as "NFR-002"; that is not evidence for renumbering input parsing. This entry keeps the working label `NFR-001` until role B confirms the canonical id. |
 | Metric | Share of fixture inputs whose parsed `(amount, category)` equals the expected record. |
-| Threshold | Defined by the requirements source; recorded here once confirmed. Until then the threshold is **not** asserted. |
+| Threshold | Defined by the requirements source; recorded here once confirmed. Until then the threshold is **not** asserted. No numeric threshold is stated in the repository, so no value is attributed to it. |
 | Input / data source | Fixed offline fixture set under `data/` (deterministic inputs with expected outputs); no network. |
 | Measurement command / procedure | Run the offline extraction over the fixtures and tally matches against expected records. Exact command is fixed when the harness lands; until then: procedure only. |
-| Expected evidence files | `docs/measurements/` report for NFR-001; the fixture file under `data/`. |
+| Expected evidence files | `docs/measurements/` report for input parsing; the fixture file under `data/`. |
 | Owner | E (measurement), D (pipeline). |
 | Status | pending |
 | Observed result | Not measured. |
@@ -48,13 +49,39 @@
 |---|---|
 | NFR | Token usage per request and per session. |
 | Metric | Per-request aggregation, per-session aggregation, actual API-call count, usage-source distribution, missing-usage count, and `usage_source`↔`tokens` consistency. |
-| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, actual API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. |
+| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, actual API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. No numeric threshold is stated in the repository. |
 | Input / data source | `logs/llm_calls.jsonl` records produced by the measurement run, including `session_id`, `request_id`, `call_id`, `tokens`, `usage_source` and `request_made`. |
-| Measurement command / procedure | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true` (the actual API-call count); no separate user-request-count metric is required; (d) the **usage-source distribution** over rows that participated in a request (`request_made: true`) across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and are **excluded** from the usage-source distribution and the missing-usage count; `not_called` is a derived operational category, not a fourth `usage_source` enum value. Token classification: three integers → `gateway`; at least one integer and at least one `null` → `partial`; all `null` → `missing`; non-integer values normalize to `null`. Check that `usage_source` agrees with `tokens`, that missing usage is never replaced with `0` or an estimate, and that `tokens` is always an object with `input`, `output` and `total` (missing values `null`). All values are reported only; no pass/fail judgment is made. |
+| Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and the missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` enum value. Token classification: three integers → `gateway`; at least one integer and at least one `null` → `partial`; all `null` → `missing`; non-integer values normalize to `null`. Check `usage_source` agrees with `tokens`, missing usage is never replaced with `0` or an estimate, and `tokens` is always an object with `input`, `output` and `total`. All values are reported only; no pass/fail judgment. |
+| D's current report implementation (verified) | `src/report_tokens.py` produces: **per-call rows** (columns include `call_id`, `request_id`, `session_id`, `input`, `output`, `total`), **per-session aggregation** grouped by `session_id`, and **global counters** (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). It does **not** implement per-request aggregation — `request_id` appears only as a per-call column, not as a grouping aggregate. So requirement (b) is **C-required but not yet implemented in `report_tokens`**. |
 | Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
-| Owner | B (definition), E (measurement), D (logging fields). |
+| Owner | B (definition), E (measurement), D (logging fields and report). |
 | Status | pending |
 | Observed result | Not measured. |
+
+> **Reported by D; not verified by committed run evidence.** D's debt ledger reports token
+> totals `1339* (incomplete, 1 missing) / 2154 (complete) / 2060 (complete)` for three
+> sessions. No committed `docs/measurements/` output or log evidence exists in the
+> repository (`logs/` and `data/` are gitignored), so these are **not** recorded as a
+> measured result and the status stays `pending`.
+
+### Latency — model-call wall-clock time (requirement ID unconfirmed)
+
+| Field | Value |
+|---|---|
+| NFR | Wall-clock latency of actual LLM calls. |
+| Canonical requirement ID | **Unconfirmed.** D's `src/measure_latency.py` labels this "NFR-002", the same label its token script uses; the repository maps no canonical `REQ-NFR-###` to latency. This entry deliberately does **not** claim NFR-001 or NFR-002; the id awaits role B's confirmation. |
+| Metric | `attempted`, `ok`, `failed`, `failure_rate`; percentiles `p50`, `p95`, `max` (ms), each printed with its own `(n=ok)` sample size. |
+| Threshold | No numeric latency threshold is stated in the repository. A pass/fail threshold is **pending confirmation**; none is invented. |
+| Input / data source | `logs/latency.jsonl` samples produced by `src/measure_latency.py`, measured against a fixed probe sentence (`"hotpot last night cost 350"`). Successful attempts only feed the percentiles. |
+| Measurement command / procedure | `python -m src.measure_latency` (module invocation; see the manifest EP-005). Runs `n` real calls, counts failures without aborting the run, and prints the nearest-rank percentiles with `(n=ok)`. |
+| Expected evidence files | `logs/latency.jsonl` (gitignored, runtime); any `docs/measurements/` latency report, if produced. |
+| Owner | C (contract), D (measurement script), E (run/verification). |
+| Status | pending |
+| Observed result | Not measured. |
+
+> **Reported by D; not verified by committed run evidence.** D's debt ledger reports
+> `n=20: p50 2356.7 ms / p95 4759.5 ms / max 5771.2 ms`. No committed latency evidence
+> exists in the repository, so this is **not** recorded as a measured result.
 
 ### NFR-006 — Evidence join by `call_id`
 
@@ -72,8 +99,30 @@
 | Status | pending |
 | Observed result | Not measured. The call-id and logging pipeline is available; E still needs to run the measurement. |
 
-> **Why NFR-006 is pending.** D's implementation now emits the call-id and the applicable
-> evidence records. The procedure has not yet been run by E, so no observed result is claimed.
+> **Why NFR-006 is pending.** The evidence-join tests in `test/offline/test_evidence_join.py`
+> are currently all `pytest.skip(...)` (a skeleton for role E to fill in), so the join has
+> **not been verified by tests**, and the procedure has not been run by E. No observed
+> result is claimed.
+
+### C-side storage security review
+
+A C review of the storage boundary, separated into **what the code shows** and **what tests
+have verified**. No committed test or measurement run exists in the repository, so the
+"verified" column is mostly pending.
+
+| Check | What the code shows (verified by reading `src/pipeline.py`, `src/storage.py`) | Verified by a run/test? |
+|---|---|---|
+| Validation before writing | `pipeline.process` calls `policy_core.validate_record(...)` **before** `storage.append_validated(record)`; `append_validated` re-validates its input. | Code path only; no committed run. |
+| Rejected records are not persisted | On `PolicyError`, `process` writes a rejection line to `logs/review.jsonl` and re-raises **before** any `append_validated` call; rejections never reach storage. | Code path only; evidence-join tests slipped. |
+| Independent `StorageError` | A storage write failure raises `storage.StorageError`, distinct from `PolicyError`; it is not converted to a `policy:*` code. | Code only. |
+| No partial state | **Required boundary; verification pending.** Append-mode write raises `StorageError` on `OSError`, but the code shows no rollback of bytes written before the error. Not demonstrated. | Not verified. |
+| `call_id` linkage | The stored record and the rejection line both carry the same `call_id` as the `llm_calls` line; `request_id` is additionally present on the rejection line. | Code only; `test_evidence_join.py` skipped. |
+
+- **Budget-bypass gap (not secured).** `pipeline.process(spent=...)` trusts a caller-supplied
+  `spent` and reads the persisted total only when `spent is None`; `append_validated` does not
+  compare against persisted cumulative spend. A lower caller-supplied `spent` can weaken the
+  cumulative budget check. See `runtime-policy-catalog.md §5.5` for the approved-but-unimplemented
+  `expected_spent` boundary.
 
 ---
 
@@ -81,8 +130,9 @@
 
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
-| NFR-001 | fixture parse-match rate | as per requirements (not asserted yet) | E / D | pending | not measured |
-| NFR-002 | per-request/per-session token aggregation, `api_call_count`, usage-source/missing-usage counts, and `usage_source`↔`tokens` consistency | statistics only; no approved numeric pass/fail threshold | B / E / D | pending | not measured |
+| NFR-001 (canonical id unconfirmed) | fixture parse-match rate | not asserted; no numeric threshold in repo | E / D | pending | not measured |
+| NFR-002 | per-session/per-request token aggregation, `api_call_count`, usage-source/missing-usage counts, `usage_source`↔`tokens` consistency (per-request not yet in `report_tokens`) | statistics only; no numeric threshold in repo | B / E / D | pending | not measured |
+| Latency (requirement id unconfirmed) | attempted/ok/failed/failure_rate, p50/p95/max ms | not asserted; no numeric threshold in repo | C / D / E | pending | not measured |
 | NFR-006 | decisions whose applicable evidence pair shares one `call_id` | accepted: `llm_calls`↔storage; rejected: `llm_calls`↔review | E / D / C | pending | not measured |
 
 ---
@@ -96,6 +146,11 @@
 - Thresholds are owned by role B's requirements; C records them here from the requirements
   source and does not invent them. If the requirements source does not state a threshold,
   the cell says so rather than guessing.
+  - **Threshold sources.** `docs/code-governance/structural-constraints.md` allocates
+    threshold decisions to role C but states **no numeric threshold**; it is therefore not
+    cited as the source of any value here. No numeric threshold for input parsing, token
+    usage, latency or evidence join appears in a committed requirements file, so each is
+    marked **pending confirmation** rather than assigned a number.
 - NFR-002's logging-metadata aggregates (`session_id`, `request_id`, `request_made`,
   `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
   `gateway` usage is never treated as zero when usage is `missing`. The token aggregates are
