@@ -80,13 +80,13 @@
 |---|---|
 | NFR | Behaviour when a model API call fails at the transport or HTTP layer. |
 | Metric | Failure classification, surfaced error, and retry behaviour for transport/HTTP failures. |
-| Threshold | `null` in main; retry policy awaits C confirmation. |
+| Threshold / fallback | `null` numeric threshold in main. C's fallback is no automatic retry for configuration, transport, HTTP-status or response-envelope failure; D currently makes at most one HTTP attempt per `extract` invocation and surfaces `LlmTransportError` after logging when the call log is writable. No record is persisted. |
 | Input / data source | Offline transport/HTTP failure fixtures and `logs/llm_calls.jsonl`. |
-| Measurement command / procedure | Inject transport and HTTP failures; compare the raised error and recorded failure code with RP-002. Check retries against the policy once approved. |
+| Measurement command / procedure | Inject configuration, transport, HTTP-status and response-envelope failures; check one call-log line per `extract` attempt when writable, at most one HTTP attempt per invocation, the surfaced `LlmTransportError`, and no persisted record. A call-log write failure follows RP-004 and must prevent use of the result. |
 | Expected evidence files | Offline test output and failure log excerpts under `docs/measurements/`. |
 | Owner | C (policy), D (implementation), E (verification). |
 | Status | pending |
-| Observed result | Not measured; retry policy remains unapproved. |
+| Observed result | Not measured; the no-automatic-retry fallback is documented from D's code, not verified by an E run. |
 
 ### NFR-004 — Data security (secrets)
 
@@ -123,11 +123,11 @@
 |---|---|
 | NFR | Model calls and policy rejections have corresponding log lines; Phase 2 additionally requires the applicable evidence pair to share `call_id`. |
 | Metric | Percentage of model calls with an `llm_calls.jsonl` line and policy rejections with a `review.jsonl` line; separately, share of decisions whose applicable evidence pair joins on `call_id`. |
-| Threshold | Numeric log-coverage threshold is `null` in main and awaits C confirmation. Phase 2's structural contract requires matching `call_id` in each applicable pair; it does not supply a numeric coverage threshold. |
+| Threshold / fallback | Numeric log-coverage threshold is `null` in main; no numeric target is asserted. D writes one call-log line per `extract` attempt and one review line per policy rejection when the respective log is writable. A failed evidence write stops the operation (RP-004 for call logging; `StorageError` for rejection evidence), never a successful unlogged decision. Phase 2 additionally requires matching `call_id` in each applicable pair. |
 | Phase 2 evidence shape | Accepted → `llm_calls` + storage; rejected → `llm_calls` + review. A decision is not required to produce all three records. |
 | Rejection invariant | A rejected decision must not create a normal storage record. |
 | Input / data source | The logs produced by a measurement run: `logs/llm_calls.jsonl` plus `logs/review.jsonl`, and the stored records for accepted decisions. |
-| Measurement command / procedure | Count attempted model calls versus `llm_calls.jsonl` lines and policy rejections versus `review.jsonl` lines, distinguishing evidence-write failures from ordinary calls/rejections. For accepted decisions join `llm_calls` to storage on `call_id`; for rejected decisions join `llm_calls` to review. Mismatched ids or both a normal record and review line for one decision violate the Phase 2 contract. |
+| Measurement command / procedure | Use an offline harness to count `extract` invocations (including pre-HTTP failures) against `llm_calls.jsonl` lines and policy rejections against `review.jsonl` lines; missing log lines cannot be detected by counting logs alone. Inject evidence-write failures separately and check fail-closed behavior. For accepted decisions join `llm_calls` to storage on `call_id`; for rejected decisions join `llm_calls` to review. Mismatched ids or both a normal record and review line for one decision violate the Phase 2 contract. |
 | Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl`, `logs/review.jsonl` and `data/records.jsonl` excerpts used for the check. |
 | Owner | E (measurement), D (pipeline: `call_id` generation and carriage), C (contract). |
 | Status | pending |
@@ -196,10 +196,10 @@ tests are skipped, so the join remains unverified.
 |---|---|---|---|---|---|
 | NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | pending | not measured |
 | NFR-002 | per-request/per-session token totals and logging statistics (per-request aggregate absent from D's report) | `null`; descriptive statistics only | B / D / E | pending | not measured |
-| NFR-003 | transport/HTTP failure handling and retry behaviour | `null`; retry policy pending C | C / D / E | pending | not measured |
+| NFR-003 | transport/HTTP failure handling and retry behaviour | `null` numeric target; no automatic retry | C / D / E | pending | not measured |
 | NFR-004 | committed secret occurrences | **0**, approved | B / E | pending | no scan recorded |
 | NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | pending | not measured |
-| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` coverage target; structural join required | C / D / E | pending | not measured |
+| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` numeric target; one line per writable evidence path, fail closed on write failure | C / D / E | pending | not measured |
 | NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | pending | not measured |
 
 ---
@@ -210,9 +210,10 @@ tests are skipped, so the join remains unverified.
 - Recording a result means filling `Status` → `measured` and `Observed result` with the
   actual value **and** the evidence file that holds the run. A result without an evidence
   file is not recorded.
-- Thresholds are owned by role B's requirements; C records them here from the requirements
-  source and does not invent them. If the requirements source does not state a threshold,
-  the cell says so rather than guessing.
+- C defines the runtime fallback and threshold decision; B maintains the requirements
+  registry. This logbook uses the registry's numeric NFR values and does not invent a
+  number where main records `null`. The behavioral fallback is stated separately from
+  any numeric target and from E's observed result.
   - **Threshold sources.** The current main `docs/req/requirements.yaml` is the
     source for the NFR IDs, metrics and threshold fields. It gives **0** for NFR-004
     (approved) and **1.0** for NFR-007 (still pending confirmation). NFR-001/002/003/005/006

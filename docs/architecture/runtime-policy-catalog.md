@@ -55,6 +55,9 @@ write (`structural-constraints.md §4`).
   whose envelope is not valid JSON, lacks the expected `choices[0].message.content`, or
   has a non-string `content`.
 - **Action:** surface `LlmTransportError`; do not persist anything.
+- **Retry:** no automatic retry for configuration, transport, HTTP-status or response-envelope
+  failure. D's `extract` makes at most one HTTP attempt per invocation and propagates the
+  failure after writing its call log when that log is writable.
 - **Degradation:** distinct from a policy rejection so tests can tell "correctly refused"
   from "crashed" (`structural-constraints.md §4`). A protocol error concerns the HTTP
   response envelope; invalid JSON inside a valid string `content` follows RP-001 instead.
@@ -337,9 +340,12 @@ configuration stops before the HTTP attempt. Any path that attempts the call rec
 
 Main's NFR-006 measures **log coverage**: the percentage of model calls with a
 `llm_calls.jsonl` line and policy rejections with a `review.jsonl` line. Its numeric
-coverage threshold remains `null` in main, pending C confirmation. The Phase 2
-`call_id` join below is an **additional structural traceability check**, not a
-replacement definition or a numeric coverage threshold.
+coverage threshold is `null` in main. D writes one call-log line per `extract` attempt
+when the log is writable, including pre-HTTP configuration failures, and one review line
+per policy rejection when the review log is writable. If either evidence write fails, the
+operation fails closed (RP-004 or `StorageError`) rather than proceeding as a successful
+decision. The Phase 2 `call_id` join below is an **additional structural traceability
+check**, not a replacement definition or a numeric coverage threshold.
 
 There are three possible evidence locations — the two log files (`llm_calls` and
 `review`) plus the storage record in `data/records.jsonl` — but a
