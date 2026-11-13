@@ -364,6 +364,16 @@ I formally rejected PR #18 and requested changes. I instructed Role D to either 
 **Reflection.** 
 This is a classic "defense in depth" scenario. Humans might assume that because the main pipeline works, the system is safe. However, the AI agent actively tried to bypass the main route and found a vulnerability in the public API of the storage layer. This demonstrates that AI can act as a ruthless adversary to test our security boundaries, proving the necessity of AI-assisted architectural audits.
 
+## Session 12: 2026-11-13 - README Creation via Web UI (Bypassing VM Network Failure)
+
+**Context.** After successfully merging Role B's requirements and Role E's CI pipeline into `main`, the project foundation was fully established. I needed to generate the final `README.md`. However, my local Ubuntu VM encountered a persistent `GnuTLS recv error (-54)` when trying to `git pull`, blocking the local Git workflow.
+
+**Human Intervention.** 
+Instead of wasting time troubleshooting the VM's SSL network configuration, I utilized an agile workaround. I generated the `README.md` content using the AI prompt based on our finalized architecture, and then directly created the file using the GitHub Web UI. I created a new branch (`docs/leader-readme`) directly from the browser and submitted a PR.
+
+**Reflection.** 
+This session highlights a critical aspect of human-in-the-loop engineering: adaptability. While AI and local tools are powerful, they can be blocked by environmental issues (like network failures). A human supervisor can seamlessly pivot to alternative platforms (like the GitHub Web interface) to ensure deliverables are met on time, bypassing technical bottlenecks.
+
 ## Overall Reflection — Role A (Leader)
 
 Across both sessions the same pattern held: the agent's usefulness was proportional to how
