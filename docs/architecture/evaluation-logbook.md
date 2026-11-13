@@ -95,6 +95,7 @@
 | NFR | No secrets committed to tracked repository files. |
 | Metric | Count of committed secret occurrences. |
 | Threshold | **0**, approved in main. |
+| Threshold source and rationale | Main `docs/req/requirements.yaml` sets 0. One committed secret occurrence would violate the no-committed-secrets requirement, so the acceptable count is zero. This explains the recorded threshold; no scan result is inferred from it. |
 | Input / data source | Tracked repository files; `.env` is gitignored. |
 | Measurement command / procedure | Run a secret scan over tracked files and review findings. |
 | Expected evidence files | Scan command, scope, findings and review result under `docs/measurements/`. |
@@ -143,6 +144,7 @@
 | NFR | Approved invariants have offline negative tests that fail when the guard is removed. |
 | Metric | Fraction of approved invariants with such tests. |
 | Threshold | **1.0** in main, with requirement status still `pending_confirmation`. |
+| Threshold source and rationale | Main `docs/req/requirements.yaml` lists 1.0. For this fraction, 1.0 means every approved invariant has an offline negative test that fails when its guard is removed; any missing test lowers coverage. The requirement and threshold still await confirmation, and this is not a measured result. |
 | Input / data source | Approved invariant list and offline negative tests. |
 | Measurement command / procedure | Map each approved invariant to a negative test and verify the test fails when its guard is removed. |
 | Expected evidence files | Invariant-to-test mapping and run output under `docs/measurements/`. |
