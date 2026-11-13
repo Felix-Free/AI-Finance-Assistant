@@ -1,4 +1,4 @@
-"""Wall-clock latency measurement for actual LLM calls (NFR-002 evidence).
+"""Wall-clock latency measurement for actual LLM calls (NFR-001 evidence).
 
 Each iteration performs one real ``call_llm.extract("hotpot last night cost
 350")`` and measures wall-clock milliseconds. Each sample is appended as one

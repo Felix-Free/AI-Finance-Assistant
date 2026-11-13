@@ -100,6 +100,101 @@ def test_report_counts_only_request_made_true(tmp_path):
     assert _counter_value(out, "usage_complete_calls") == 1
 
 
+def _request_row(out, request_id):
+    """Return the split cells of the per-request row for request_id."""
+    in_block = False
+    for line in out.splitlines():
+        if line.startswith("== Per request"):
+            in_block = True
+            continue
+        if in_block and line.startswith("=="):
+            break
+        parts = line.split()
+        if in_block and parts and parts[0] == request_id:
+            return parts
+    raise AssertionError("no per-request row for %r in:\n%s" % (request_id, out))
+
+
+def test_request_block_one_request_three_calls(tmp_path):
+    base = dict(GATEWAY, request_id="rq1", session_id="s1")
+    path = _write_log(tmp_path, [
+        dict(base, call_id="a", tokens={"input": 10, "output": 5, "total": 15}),
+        dict(base, call_id="b", tokens={"input": 20, "output": 6, "total": 26}),
+        dict(base, call_id="c", tokens={"input": 1, "output": 2, "total": 3}),
+    ])
+    _, out = _run([str(path)])
+    row = _request_row(out, "rq1")
+    assert row[1] == "3"
+    assert row[2] == "31" and row[3] == "13" and row[4] == "44"
+    assert row[5] == "gateway" and row[6] == "x3"
+    assert row[-1] == "complete"
+
+
+def test_request_block_two_requests_interleaved(tmp_path):
+    a = dict(GATEWAY, request_id="rq1", session_id="s1")
+    b = dict(GATEWAY, request_id="rq2", session_id="s1")
+    path = _write_log(tmp_path, [
+        dict(a, call_id="a1", tokens={"input": 10, "output": 5, "total": 15}),
+        dict(b, call_id="b1", tokens={"input": 100, "output": 50, "total": 150}),
+        dict(a, call_id="a2", tokens={"input": 2, "output": 3, "total": 5}),
+    ])
+    _, out = _run([str(path)])
+    row1 = _request_row(out, "rq1")
+    row2 = _request_row(out, "rq2")
+    assert row1[1] == "2" and row1[2] == "12" and row1[4] == "20"
+    assert row2[1] == "1" and row2[2] == "100" and row2[4] == "150"
+
+
+def test_request_block_missing_line_is_incomplete_and_footnoted(tmp_path):
+    base = dict(GATEWAY, request_id="rq1", session_id="s1")
+    path = _write_log(tmp_path, [
+        dict(base, call_id="a", tokens={"input": 10, "output": 5, "total": 15}),
+        dict(MISSING, call_id="b", request_id="rq1"),
+    ])
+    _, out = _run([str(path)])
+    row = _request_row(out, "rq1")
+    assert row[1] == "2"
+    assert row[2] == "10" and row[3] == "5" and row[4] == "15"
+    assert row[-1] == "incomplete*"
+    assert "rq1: incomplete: 1 call(s) without full usage" in out
+
+
+def test_request_block_no_known_values_prints_dash_not_zero(tmp_path):
+    path = _write_log(tmp_path, [dict(MISSING, call_id="a", request_id="rq1")])
+    _, out = _run([str(path)])
+    row = _request_row(out, "rq1")
+    assert row[2:5] == ["-", "-", "-"]
+    assert "0" not in "".join(row[2:5])
+
+
+def test_request_block_excludes_not_called_lines(tmp_path):
+    path = _write_log(tmp_path, [
+        dict(GATEWAY, call_id="a", request_id="rq1"),
+        dict(NOT_CALLED, call_id="b", request_id="rq1"),
+        dict(NOT_CALLED, call_id="c", request_id="rq2"),
+    ])
+    _, out = _run([str(path)])
+    assert _request_row(out, "rq1")[1] == "1"
+    with pytest.raises(AssertionError):
+        _request_row(out, "rq2")
+
+
+def test_request_block_single_call_request(tmp_path):
+    path = _write_log(tmp_path, [dict(GATEWAY, call_id="a", request_id="rq1")])
+    _, out = _run([str(path)])
+    assert _request_row(out, "rq1")[1] == "1"
+
+
+def test_existing_blocks_unchanged(tmp_path):
+    path = _write_log(tmp_path, [GATEWAY, PARTIAL, MISSING, NOT_CALLED])
+    _, out = _run([str(path)])
+    assert out.count("== Per call (per actual API call) ==") == 1
+    assert out.count("== Per session ==") == 1
+    for name in ("total_api_calls", "usage_complete_calls", "usage_missing_calls",
+                 "usage_partial_calls", "not_called_calls"):
+        assert out.count(name) == 1, name
+
+
 def test_measure_latency_dry_run_exits_zero_writes_nothing(tmp_path, monkeypatch):
     monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "logs" / "latency.jsonl")
     buf = io.StringIO()

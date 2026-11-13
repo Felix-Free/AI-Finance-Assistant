@@ -13,6 +13,11 @@ call (log lines whose ``request_made`` is true). A session whose contributing
 calls are not all complete has an ``incomplete`` token total; a token value that
 is missing is printed as ``-`` and never as 0.
 
+A third block groups actual calls by ``request_id`` (printed after the per-session
+block and before the global counters). Rows are sorted by ``request_id`` so the
+output is stable and reproducible; a line with no ``request_id`` is surfaced in a
+final ``<missing request_id>`` row instead of being dropped.
+
 Read-only: this module writes nothing.
 """
 from __future__ import annotations
@@ -101,6 +106,59 @@ def _session_summary(records):
     return sessions
 
 
+def _request_groups(records):
+    """(B2) aggregate actual calls by request_id, sorted by request_id.
+
+    Only lines whose ``request_made`` is true count as calls. A line without a
+    ``request_id`` is surfaced in a final ``<missing request_id>`` group, never
+    dropped. Sums use known values only; a group is complete only when every
+    contributing line has full usage.
+    """
+    groups = {}
+    for record in records:
+        if record.get("request_made") is not True:
+            continue
+        rid = record.get("request_id")
+        key = rid if isinstance(rid, str) and rid else "<missing request_id>"
+        bucket = groups.setdefault(key, {
+            "calls": 0, "gateway": 0, "partial": 0, "missing": 0,
+            "input": 0, "output": 0, "total": 0,
+            "has_input": False, "has_output": False, "has_total": False,
+            "complete_all": True,
+        })
+        bucket["calls"] += 1
+        tokens = _tokens_of(record)
+        source = record.get("usage_source")
+        if source == "gateway" and _is_complete(tokens):
+            bucket["gateway"] += 1
+        elif source == "partial":
+            bucket["partial"] += 1
+            bucket["complete_all"] = False
+        else:
+            bucket["missing"] += 1
+            bucket["complete_all"] = False
+        for field in ("input", "output", "total"):
+            if isinstance(tokens[field], int):
+                bucket[field] += tokens[field]
+                bucket["has_" + field] = True
+        if not _is_complete(tokens):
+            bucket["complete_all"] = False
+    missing = groups.pop("<missing request_id>", None)
+    ordered = [dict(groups[k], request_id=k) for k in sorted(groups)]
+    if missing is not None:
+        ordered.append(dict(missing, request_id="<missing request_id>"))
+    return ordered
+
+
+def _request_source_summary(bucket):
+    """Render the group's usage_source counts as 'gateway xN, partial xN, missing xN'."""
+    parts = []
+    for name in ("gateway", "partial", "missing"):
+        if bucket[name]:
+            parts.append("%s x%d" % (name, bucket[name]))
+    return ", ".join(parts)
+
+
 def _print_table(headers, rows):
     widths = [len(h) for h in headers]
     for row in rows:
@@ -158,6 +216,33 @@ def report(records) -> None:
     if incomplete_notes:
         print()
         print("  * " + "* ".join(incomplete_notes))
+
+    # (B2) per request (grouped by request_id)
+    print()
+    print("== Per request (grouped by request_id) ==")
+    request_rows = []
+    request_notes = []
+    for bucket in _request_groups(records):
+        status = "complete" if bucket["complete_all"] else "incomplete*"
+        cells = [
+            bucket["request_id"],
+            bucket["calls"],
+            str(bucket["input"]) if bucket["has_input"] else MISSING,
+            str(bucket["output"]) if bucket["has_output"] else MISSING,
+            str(bucket["total"]) if bucket["has_total"] else MISSING,
+            _request_source_summary(bucket),
+            status,
+        ]
+        if not bucket["complete_all"]:
+            gaps = bucket["partial"] + bucket["missing"]
+            request_notes.append("%s: incomplete: %d call(s) without full usage"
+                                 % (bucket["request_id"], gaps))
+        request_rows.append(cells)
+    _print_table(["request_id", "calls", "input", "output", "total",
+                  "usage_source", "status"], request_rows)
+    if request_notes:
+        print()
+        print("  * " + "* ".join(request_notes))
 
     # (C) global counters
     print()
