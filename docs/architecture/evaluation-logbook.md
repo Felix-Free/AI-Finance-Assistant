@@ -6,9 +6,10 @@
 > NFR moves from "pending" to a measured result; a threshold without an observed result is
 > marked **pending**, never assumed to pass.
 >
-> Status: **Phase 2 documentation (transcript 60339160).** C defines the metric,
-> threshold and evidence contract; E runs the measurement; D implements the pipeline. No
-> measurement result is recorded here until it has actually been run.
+> Status: **Phase 2 documentation (transcript 60339160).** Main supplies the NFR
+> registry and threshold fields; C records the policy and evidence contract, E runs the
+> measurement, and D implements the pipeline. No measurement result is recorded here
+> until it has actually been run.
 
 ---
 
@@ -20,28 +21,34 @@
   NFR is **not** a pass.
 - **No invented results.** The observed result is copied from a run whose output is
   attached (evidence file or command output). If it was not run, it says so.
-- **Ids.** The repository convention is `REQ-NFR-###`
-  (`docs/code-governance/structural-constraints.md §3`); this logbook keeps the short form
-  `NFR-###` used in the requirements conversation and maps it 1:1.
+- **IDs and source.** The current [`main` requirements registry](https://github.com/Felix-Free/AI-Finance-Assistant/blob/main/docs/req/requirements.yaml)
+  uses `NFR-001` through `NFR-007`; those IDs and descriptions govern this logbook.
+  `docs/code-governance/structural-constraints.md §3` separately specifies a
+  `REQ-NFR-###` document convention. A formal mapping between the two namespaces has
+  not been recorded; the extra prefix is not assumed here.
 
 ---
 
 ## 2. Logbook entries
 
-### NFR-001 — Input parsing reliability
+### NFR-001 — Model API response time
 
 | Field | Value |
 |---|---|
-| NFR | Input parsing reliability: a well-formed spending sentence yields the correct structured record. |
-| Canonical requirement ID | **Unconfirmed — pending confirmation.** The repository has no requirements file that maps this behaviour to a canonical `REQ-NFR-###`. D's measurement scripts label **latency** and **token usage** as "NFR-002"; that is not evidence for renumbering input parsing. This entry keeps the working label `NFR-001` until role B confirms the canonical id. |
-| Metric | Share of fixture inputs whose parsed `(amount, category)` equals the expected record. |
-| Threshold | Defined by the requirements source; recorded here once confirmed. Until then the threshold is **not** asserted. No numeric threshold is stated in the repository, so no value is attributed to it. |
-| Input / data source | Fixed offline fixture set under `data/` (deterministic inputs with expected outputs); no network. |
-| Measurement command / procedure | Run the offline extraction over the fixtures and tally matches against expected records. Exact command is fixed when the harness lands; until then: procedure only. |
-| Expected evidence files | `docs/measurements/` report for input parsing; the fixture file under `data/`. |
-| Owner | E (measurement), D (pipeline). |
+| NFR | Model API response time for an `extract` round trip. |
+| Metric | Wall-clock latency per round trip; D's report also shows `attempted`, `ok`, `failed`, `failure_rate`, and successful-call p50/p95/max in ms. |
+| Threshold | `null` in main; no approved latency budget. |
+| Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `src/measure_latency.py` with a fixed probe sentence. |
+| Measurement command / procedure | `python -m src.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
+| Expected evidence files | `logs/latency.jsonl` and a run report under `docs/measurements/`. |
+| Owner | B (requirement), D (script), E (measurement). |
 | Status | pending |
 | Observed result | Not measured. |
+
+> **Reported by D; not verified by committed run evidence.** D's debt ledger reports
+> `n=20: p50 2356.7 ms / p95 4759.5 ms / max 5771.2 ms`. This does not count as a
+> measured result here. D's latency script header calls this "NFR-002"; that script label
+> conflicts with the main registry and needs correction by its owner.
 
 ### NFR-002 — Token Usage statistics
 
@@ -50,7 +57,7 @@
 | NFR | Token usage per request and per session. |
 | Metric | Per-request aggregation, per-session aggregation, attempted API-call count, usage-source distribution, missing-usage count, and `usage_source`↔`tokens` consistency. |
 | Session grouping | D generates `session_id` once when `src/call_llm.py` is loaded and shares it across calls in that process. A `session_id` group therefore represents a process run, not necessarily one user's session if the process serves multiple users. |
-| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, attempted API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. No numeric threshold is stated in the repository. |
+| Threshold | `null` in main; no approved token budget. Per-request, per-session, attempted API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. |
 | Input / data source | `logs/llm_calls.jsonl` records produced by the measurement run, including `session_id`, `request_id`, `call_id`, `tokens`, `usage_source` and `request_made`. |
 | Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` value. Three recorded integers → `gateway`; at least one recorded integer and one `null` → `partial`; `tokens: null` or three `null` counts → `missing`. Non-integer counts in a processed usage object normalize to `null`. Check `usage_source` agrees with recorded `tokens` and missing counts are never replaced with `0` or estimates. `tokens` is always present: it is `null` when usage was not recorded (including model-content JSON parse failure), or an object with `input`, `output` and `total` when usage was processed (missing counts `null`). These are descriptive statistics, with no pass/fail judgment. |
 | Meaning of `api_call_count` | `request_made: true` counts attempted HTTP calls, including DNS, connection and timeout failures. It does not count only requests known to have reached the gateway. |
@@ -67,45 +74,88 @@
 > repository (`logs/` and `data/` are gitignored), so these are **not** recorded as a
 > measured result and the status stays `pending`.
 
-### Latency — model-call wall-clock time (requirement ID unconfirmed)
+### NFR-003 — API call failure handling
 
 | Field | Value |
 |---|---|
-| NFR | Wall-clock latency of actual LLM calls. |
-| Canonical requirement ID | **Unconfirmed.** D's `src/measure_latency.py` labels this "NFR-002", the same label its token script uses; the repository maps no canonical `REQ-NFR-###` to latency. This entry deliberately does **not** claim NFR-001 or NFR-002; the id awaits role B's confirmation. |
-| Metric | `attempted`, `ok`, `failed`, `failure_rate`; `p50` and `p95` in ms each printed with `(n=ok)`, plus `max_ms` without an inline sample count. All three use the `ok` successful samples. |
-| Threshold | No numeric latency threshold is stated in the repository. A pass/fail threshold is **pending confirmation**; none is invented. |
-| Input / data source | `logs/latency.jsonl` samples produced by `src/measure_latency.py`, measured against a fixed probe sentence (`"hotpot last night cost 350"`). Successful attempts only feed the percentiles. |
-| Measurement command / procedure | `python -m src.measure_latency` (module invocation; see the manifest EP-005). Attempts `n` real calls; `LlmTransportError` and model-content `JSONDecodeError` are counted without ending the run. Other failures, including inability to append a successful sample to `logs/latency.jsonl`, are not caught and can stop it early. Successful samples produce nearest-rank p50/p95 with `(n=ok)`; `max_ms` is printed separately. |
-| Expected evidence files | `logs/latency.jsonl` (gitignored, runtime); any `docs/measurements/` latency report, if produced. |
-| Owner | C (contract), D (measurement script), E (run/verification). |
+| NFR | Behaviour when a model API call fails at the transport or HTTP layer. |
+| Metric | Failure classification, surfaced error, and retry behaviour for transport/HTTP failures. |
+| Threshold | `null` in main; retry policy awaits C confirmation. |
+| Input / data source | Offline transport/HTTP failure fixtures and `logs/llm_calls.jsonl`. |
+| Measurement command / procedure | Inject transport and HTTP failures; compare the raised error and recorded failure code with RP-002. Check retries against the policy once approved. |
+| Expected evidence files | Offline test output and failure log excerpts under `docs/measurements/`. |
+| Owner | C (policy), D (implementation), E (verification). |
 | Status | pending |
-| Observed result | Not measured. |
+| Observed result | Not measured; retry policy remains unapproved. |
 
-> **Reported by D; not verified by committed run evidence.** D's debt ledger reports
-> `n=20: p50 2356.7 ms / p95 4759.5 ms / max 5771.2 ms`. No committed latency evidence
-> exists in the repository, so this is **not** recorded as a measured result.
-
-### NFR-006 — Evidence join by `call_id`
+### NFR-004 — Data security (secrets)
 
 | Field | Value |
 |---|---|
-| NFR | Evidence records belonging to one decision carry the same `call_id` (see the `Evidence linkage by call_id` section in `runtime-policy-catalog.md`). |
-| Metric | Share of decisions whose path-specific evidence records carry the same `call_id`. |
-| Threshold | Accepted decision: `llm_calls.call_id` equals the accepted record's `data/records.jsonl` `call_id`. Rejected decision: `llm_calls.call_id` equals the rejection's `logs/review.jsonl` `call_id`. A decision is not required to produce all three records. |
-| Threshold mapping | Confirmed as two possible evidence shapes: accepted → `llm_calls` + storage; rejected → `llm_calls` + review. The three possible evidence locations are the two logs plus `data/records.jsonl`; the applicable pair depends on the decision outcome. |
-| Conditional evidence shape | The path-specific rule is also the evidence shape. Accepted decision → `llm_calls` + normal storage evidence. Rejected decision → `llm_calls` + review evidence. A rejected decision must not create a normal storage record. |
+| NFR | No secrets committed to tracked repository files. |
+| Metric | Count of committed secret occurrences. |
+| Threshold | **0**, approved in main. |
+| Input / data source | Tracked repository files; `.env` is gitignored. |
+| Measurement command / procedure | Run a secret scan over tracked files and review findings. |
+| Expected evidence files | Scan command, scope, findings and review result under `docs/measurements/`. |
+| Owner | B (requirement), E (verification). |
+| Status | pending |
+| Observed result | No scan result recorded here. |
+
+### NFR-005 — Input/output reliability
+
+| Field | Value |
+|---|---|
+| NFR | Records accepted by the pipeline satisfy the deterministic invariants. |
+| Metric | Rate of accepted records that later fail deterministic checks. |
+| Threshold | `null` in main; no approved numeric rate. |
+| Input / data source | Accepted records, negative/property test fixtures and architecture review. |
+| Measurement command / procedure | Test valid and invalid inputs; recheck accepted records against the policy invariants and verify validation precedes state change. Include the direct-storage and caller-supplied-`spent` gaps documented below. |
+| Expected evidence files | Offline test output and reviewed records under `docs/measurements/`. |
+| Owner | B (requirement), C (policy), E (verification). |
+| Status | pending |
+| Observed result | Not measured; storage boundary gaps remain open. |
+
+### NFR-006 — Log traceability
+
+| Field | Value |
+|---|---|
+| NFR | Model calls and policy rejections have corresponding log lines; Phase 2 additionally requires the applicable evidence pair to share `call_id`. |
+| Metric | Percentage of model calls with an `llm_calls.jsonl` line and policy rejections with a `review.jsonl` line; separately, share of decisions whose applicable evidence pair joins on `call_id`. |
+| Threshold | Numeric log-coverage threshold is `null` in main and awaits C confirmation. Phase 2's structural contract requires matching `call_id` in each applicable pair; it does not supply a numeric coverage threshold. |
+| Phase 2 evidence shape | Accepted → `llm_calls` + storage; rejected → `llm_calls` + review. A decision is not required to produce all three records. |
+| Rejection invariant | A rejected decision must not create a normal storage record. |
 | Input / data source | The logs produced by a measurement run: `logs/llm_calls.jsonl` plus `logs/review.jsonl`, and the stored records for accepted decisions. |
-| Measurement command / procedure | For each accepted decision, join `logs/llm_calls.jsonl` to `data/records.jsonl` and compare `call_id`. For each rejected decision, join `logs/llm_calls.jsonl` to `logs/review.jsonl` and compare `call_id`. Any decision with a storage record *and* a review line, or with mismatched ids, is a failure. |
+| Measurement command / procedure | Count attempted model calls versus `llm_calls.jsonl` lines and policy rejections versus `review.jsonl` lines, distinguishing evidence-write failures from ordinary calls/rejections. For accepted decisions join `llm_calls` to storage on `call_id`; for rejected decisions join `llm_calls` to review. Mismatched ids or both a normal record and review line for one decision violate the Phase 2 contract. |
 | Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl`, `logs/review.jsonl` and `data/records.jsonl` excerpts used for the check. |
 | Owner | E (measurement), D (pipeline: `call_id` generation and carriage), C (contract). |
 | Status | pending |
 | Observed result | Not measured. The call-id and logging pipeline is available; E still needs to run the measurement. |
 
-> **Why NFR-006 is pending.** The evidence-join tests in `test/offline/test_evidence_join.py`
-> are currently all `pytest.skip(...)` (a skeleton for role E to fill in), so the join has
-> **not been verified by tests**, and the procedure has not been run by E. No observed
-> result is claimed.
+> **Why NFR-006 is pending.** The main registry has no numeric coverage target. The
+> evidence-join tests in `test/offline/test_evidence_join.py` are all `pytest.skip(...)`;
+> neither log coverage nor the Phase 2 join has a recorded measurement here.
+
+### NFR-007 — Testability
+
+| Field | Value |
+|---|---|
+| NFR | Approved invariants have offline negative tests that fail when the guard is removed. |
+| Metric | Fraction of approved invariants with such tests. |
+| Threshold | **1.0** in main, with requirement status still `pending_confirmation`. |
+| Input / data source | Approved invariant list and offline negative tests. |
+| Measurement command / procedure | Map each approved invariant to a negative test and verify the test fails when its guard is removed. |
+| Expected evidence files | Invariant-to-test mapping and run output under `docs/measurements/`. |
+| Owner | E. |
+| Status | pending |
+| Observed result | Not measured; `test_evidence_join.py` remains skipped. |
+
+### Additional proposal — Input parsing reliability (not a main NFR)
+
+Fixture parse-match rate can be evaluated with fixed offline inputs and expected
+`(amount, category)` records. Main has no registered NFR ID or approved numeric
+threshold for this metric. A fixture report can be added if B registers it as a
+separate requirement.
 
 ### C-side storage security review
 
@@ -140,10 +190,13 @@ tests are skipped, so the join remains unverified.
 
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
-| NFR-001 (canonical id unconfirmed) | fixture parse-match rate | not asserted; no numeric threshold in repo | E / D | pending | not measured |
-| NFR-002 | per-session/per-request token aggregation, `api_call_count`, usage-source/missing-usage counts, `usage_source`↔`tokens` consistency (per-request not yet in `report_tokens`) | statistics only; no numeric threshold in repo | B / E / D | pending | not measured |
-| Latency (requirement id unconfirmed) | attempted/ok/failed/failure_rate, p50/p95/max ms | not asserted; no numeric threshold in repo | C / D / E | pending | not measured |
-| NFR-006 | decisions whose applicable evidence pair shares one `call_id` | accepted: `llm_calls`↔storage; rejected: `llm_calls`↔review | E / D / C | pending | not measured |
+| NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | pending | not measured |
+| NFR-002 | per-request/per-session token totals and logging statistics (per-request aggregate absent from D's report) | `null`; descriptive statistics only | B / D / E | pending | not measured |
+| NFR-003 | transport/HTTP failure handling and retry behaviour | `null`; retry policy pending C | C / D / E | pending | not measured |
+| NFR-004 | committed secret occurrences | **0**, approved | B / E | pending | no scan recorded |
+| NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | pending | not measured |
+| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` coverage target; structural join required | C / D / E | pending | not measured |
+| NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | pending | not measured |
 
 ---
 
@@ -156,11 +209,11 @@ tests are skipped, so the join remains unverified.
 - Thresholds are owned by role B's requirements; C records them here from the requirements
   source and does not invent them. If the requirements source does not state a threshold,
   the cell says so rather than guessing.
-  - **Threshold sources.** `docs/code-governance/structural-constraints.md` allocates
-    threshold decisions to role C but states **no numeric threshold**; it is therefore not
-    cited as the source of any value here. No numeric threshold for input parsing, token
-    usage, latency or evidence join appears in a committed requirements file, so each is
-    marked **pending confirmation** rather than assigned a number.
+  - **Threshold sources.** The current main `docs/req/requirements.yaml` is the
+    source for the NFR IDs, metrics and threshold fields. It gives **0** for NFR-004
+    (approved) and **1.0** for NFR-007 (still pending confirmation). NFR-001/002/003/005/006
+    have `null` thresholds. `docs/code-governance/structural-constraints.md` states no
+    numeric threshold, so no value is attributed to it.
 - NFR-002's logging-metadata aggregates (`session_id`, `request_id`, `request_made`,
   `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
   `gateway` usage is never treated as zero when usage is `missing`. The token aggregates are

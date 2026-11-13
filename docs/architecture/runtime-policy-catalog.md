@@ -182,11 +182,13 @@ written after classification of model-client outcomes, including failure paths.
 
 > **Scope.** Phase 2 introduces a `call_id` that joins a model call to its downstream
 > evidence, optional token accounting, an independent storage-failure error, and the
-> NFR-006 evidence-join rule. This section records the agreed contracts. It **does not
-> renumber** RP-001..RP-006. RP-001/002 are clarified in §2 to match D's implemented
+> Phase 2 evidence-join contract supplementing NFR-006 log traceability. This section
+> records the agreed contracts. It does not renumber RP-001..RP-006. RP-001/002 are
+> clarified in §2 to match D's implemented
 > distinction between invalid model-content JSON, malformed HTTP response envelopes and
-> pre-HTTP configuration failure. The pipeline behavior that implements the call-id, logging and storage contracts is D's; the NFR-006
-> measurement is E's. C defines the contracts only.
+> pre-HTTP configuration failure. The pipeline behavior that implements the call-id,
+> logging and storage contracts is D's; the NFR-006 log-coverage and Phase 2 join
+> measurements are E's. C defines the contracts only.
 
 ### Call identifiers
 
@@ -322,8 +324,14 @@ configuration stops before the HTTP attempt. Any path that attempts the call rec
 
 ### Evidence linkage by `call_id`
 
-**NFR-006 evidence-join rule.** There are three possible evidence locations — the two log
-files (`llm_calls` and `review`) plus the storage record in `data/records.jsonl` — but a
+Main's NFR-006 measures **log coverage**: the percentage of model calls with a
+`llm_calls.jsonl` line and policy rejections with a `review.jsonl` line. Its numeric
+coverage threshold remains `null` in main, pending C confirmation. The Phase 2
+`call_id` join below is an **additional structural traceability check**, not a
+replacement definition or a numeric coverage threshold.
+
+There are three possible evidence locations — the two log files (`llm_calls` and
+`review`) plus the storage record in `data/records.jsonl` — but a
 decision produces **one applicable pair**, not all three records at once. The check is
 path-specific:
 
@@ -338,8 +346,9 @@ path-specific:
 - **Conditional, one shape per decision.** A decision has exactly one of the two shapes; it
   never has both a storage record and a review line for the same decision.
 
-A decision is **not** required to produce all three records, and the acceptance threshold is
-**not** phrased as "three relevant `call_id` locations must exist".
+A decision is **not** required to produce all three records. The join rule does not require
+"three relevant `call_id` locations" and does not set NFR-006's numeric log-coverage
+threshold.
 
 ### 5.5 Approved D decisions (recorded here for the shared boundary)
 

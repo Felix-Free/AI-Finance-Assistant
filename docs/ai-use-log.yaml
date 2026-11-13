@@ -225,18 +225,21 @@
     - docs/.DS_Store
   summary: >
     Documented the agreed Phase 2 contracts on the C side. Added a §5 addendum to the
-    runtime policy catalog: C2 call_id (uuid4().hex[:12], returned via __call_id__, removed
-    before policy_core), C3 llm_calls contract (input/raw/parsed/error preserved; call_id
-    and tokens may be added; tokens only when the gateway supplies them; one line per call),
-    C4 StorageError independent of policy:* with no partial state, C6 NFR-006 conditional
-    evidence (accepted -> llm_calls + storage; rejected -> llm_calls + review; rejected
-    decisions create no storage record; three relevant records share the call_id where
-    applicable), plus the approved D decisions (call_id format; _append_review preserves the
-    original rejection code). RP-001..RP-006 were preserved. Created evaluation-logbook.md
-    with NFR-001, NFR-002 and NFR-006 as pending/blocked and no invented results. The MCP
-    manifest was not modified because no new MCP tool or entry point exists.
+    runtime policy catalog: C2 uses 32-character uuid4().hex for call_id, returned
+    via __call_id__ and removed before policy_core. C3 preserves input/raw/parsed/error and adds
+    call_id and gateway-derived tokens. D now writes one call-log line per extract attempt
+    when logging succeeds, with tokens=null if usage is not recorded. C4 required an
+    independent StorageError and no partial state; the latter remains unverified in D's
+    append-mode writer. C6 added a call_id join to main's NFR-006 log-traceability
+    requirement. It uses the applicable evidence pair: accepted -> llm_calls +
+    storage, rejected -> llm_calls + review, with no storage record for a rejection. The
+    rejection writer is _append_rejection (not _append_review) and preserves the original
+    PolicyError.code. Evaluation-logbook.md follows main's NFR-001 model response time,
+    NFR-002 token usage and NFR-006 log traceability; observed results remain pending.
+    Input parsing is an unnumbered proposal. The MCP manifest distinguishes application
+    and measurement entry points from MCP tools.
   human_review:
-    - required call_id to stay uuid4().hex[:12] with no caller-synthesized ids
+    - required generated call_id values with no caller-synthesized ids
     - required tokens to be recorded only from gateway usage, never fabricated
     - required storage failure to be an independent StorageError, not a policy:* code
     - required NFR-006 conditional evidence for accepted versus rejected decisions
@@ -253,7 +256,7 @@
   student_id: "60339160"
   phase: 2
   session: 8
-  topic: tighten NFR-006 threshold and fix logbook table format
+  topic: NFR-006 traceability and logbook table format
   tool: opencode
   files_created: []
   files_modified:
@@ -270,23 +273,16 @@
     - .DS_Store
     - docs/.DS_Store
   summary: >
-    Documentation-only correction to the Phase 2 C artefacts. In runtime-policy-catalog.md
-    §5.4 the NFR-006 threshold now stands alone as the strict rule "three relevant call_id
-    locations/evidence records for the same decision must carry the same call_id", with the
-    "where applicable" and "whatever records exist" wording removed; the conditional evidence
-    shape is documented as a separate rule (accepted -> llm_calls + storage; rejected ->
-    llm_calls + review; rejected creates no storage record). The exact three call_id
-    locations are not named in the repository, so the precise measurement mapping is marked
-    pending clarification rather than replaced with a weaker rule. The evaluation logbook
-    NFR-006 rows are split into Threshold, Threshold mapping (pending) and Conditional
-    evidence shape, and the Observed result row is moved inside the NFR-006 table. RP-001
-    through RP-006 and NFR-001/NFR-002 were not changed.
+    Main defines NFR-006 as log traceability. Its numeric coverage threshold is null;
+    measurement remains pending. Phase 2 adds path-specific call-id joins: accepted ->
+    llm_calls + storage; rejected -> llm_calls + review, with no storage record for a
+    rejection. The logbook records these evidence shapes and its Observed result inside
+    the NFR-006 table.
   human_review:
-    - required the strict three-record threshold to replace the hedged wording
+    - required path-specific accepted and rejected evidence pairs
     - required the conditional evidence shape to stay a separate rule
-    - required the unnamed three locations to be marked pending, not weakened to two records
     - required the NFR-006 Observed result row to move inside its table
-    - required RP-001..RP-006 and NFR-001/NFR-002 to stay unchanged
+    - required RP-001..RP-006 to stay unchanged
   validation:
     yaml_parse: pass
     git_diff_check: pass
@@ -316,24 +312,24 @@
     - docs/.DS_Store
   summary: >
     Documentation-only. Extended the C3 llm_calls contract with the four user-approved
-    fields: session_id (stable user/session context for per-session aggregation), request_id
-    (one user request, which may span multiple actual API calls), usage_source (enum gateway,
-    partial, missing) and request_made (boolean, true only when an HTTP request was actually
-    sent). call_id stays the unique id for one actual call; the new ids group calls and do
-    not replace it. Preserved input/raw/parsed/error, gateway-only tokens, no fabricated or
-    zeroed token usage, policy:* reservation and one llm_calls record per actual call.
-    request_made is a structured boolean, not derived from error text; the pre-HTTP local
-    failure lifecycle is marked pending clarification. Extended the NFR-002 logbook entry
-    with per-session and per-request aggregation, request_made request counts, usage-source
-    and missing-usage counts, and usage_source/tokens consistency; thresholds are pending and
-    gateway usage is never treated as zero when usage is missing. NFR-006 is unchanged in
-    meaning.
+    fields: session_id, request_id, usage_source (enum gateway, partial, missing) and
+    request_made. D's session_id is generated once per call_llm module load and groups a
+    process run, not necessarily a user session. D generates call_id per extract attempt,
+    including pre-HTTP failures; request_made=true means HTTP was attempted, not proven sent
+    to the gateway. The ids do not replace call_id as the evidence join key. Preserved
+    input/raw/parsed/error, no fabricated or zeroed token usage, and policy:* reservation.
+    The pre-HTTP lifecycle was pending at this session and was confirmed later. Extended
+    the NFR-002 logbook entry with per-session and per-request aggregation, attempted
+    HTTP-call counts, usage-source and missing-usage counts, and usage_source/tokens
+    consistency; thresholds are pending and
+    gateway usage is never treated as zero when usage is missing. NFR-006 later gained the
+    path-specific accepted/rejected evidence mapping.
   human_review:
     - approved the four additional fields (session_id, request_id, usage_source, request_made)
     - required request_made to be a structured boolean, not inferred from error text
-    - required the pre-HTTP local failure behavior to be marked pending, not invented
+    - required the pre-HTTP local failure behavior to be marked pending at the time; later confirmed against D's code
     - required the NFR-002 aggregates to have no invented thresholds
-    - required NFR-006 to keep the strict three-call_id threshold and conditional evidence
+    - required the then-current strict three-call_id proposal and conditional evidence; later superseded by the approved path-specific pair
   validation:
     yaml_parse: pass
     git_diff_check: pass
@@ -370,10 +366,12 @@
     input text. RP-003/RP-005/RP-006 Evidence now state the review line includes the relevant
     call_id, with policy:amount / policy:category / policy:budget unchanged. Added a formal
     RP-007 Storage write failure entry (independent StorageError, policy:* reserved, never
-    rewritten as policy:*, no partial state, no policy review line) and a precedence step;
-    the storage-failure evidence record is marked pending rather than invented. The four
-    newly approved metadata fields, the C2 generation/carriage contract and the pending
-    NFR-006 three-location mapping were not changed. No source, test or measurement was run.
+    rewritten as policy:*, no partial state required but not yet verified, no policy review
+    line) and a precedence step; RP-007 later expanded to cover storage read/validation
+    failures as well. The storage-failure evidence record was marked pending rather than
+    invented. The four newly approved metadata fields and C2 generation/carriage contract
+    were not changed. The then-pending NFR-006 three-location proposal was later replaced
+    by path-specific evidence pairs. No source, test or measurement was run.
   human_review:
     - required the stale "review line has no call_id" statement to be removed, not kept
     - required the rejection line to share call_id with its llm_calls record
@@ -412,15 +410,17 @@
     - docs/.DS_Store
   summary: >
     Documentation-only alignment with the latest D clarification and the approved NFR-002
-    definition. Actual request count is api_call_count (request_made=true rows); no separate
-    user_request_count requirement was added. NFR-002 token aggregates are descriptive
-    statistics only, with no pass/fail threshold. Reports may show gateway, partial, missing
-    and derived not_called, while the stored usage_source enum remains gateway/partial/missing.
-    NFR-006 now uses path-specific joins: accepted llm_calls↔storage and rejected
+    definition. api_call_count counts attempted HTTP calls (request_made=true rows), not
+    distinct user requests; no separate user_request_count requirement was added. NFR-002
+    token aggregates are descriptive statistics only, with no pass/fail threshold. Reports
+    may show gateway, partial, missing and derived not_called, while the stored
+    usage_source enum remains gateway/partial/missing.
+    NFR-006's Phase 2 call-id supplement uses path-specific joins: accepted llm_calls↔storage and rejected
     llm_calls↔review; a decision does not need all three evidence records. call_id is recorded
-    as uuid4().hex (32 hex characters). The approved storage boundary is
-    append_validated(record, expected_spent=None), requiring total == expected_spent + amount
-    and expected_spent not below persisted cumulative spend. D's unrelated test-count
+    as uuid4().hex (32 hex characters). The approved storage design, not implemented in D's
+    current code, is append_validated(record, expected_spent=None), requiring total ==
+    expected_spent + amount and expected_spent not below persisted cumulative spend. D's
+    actual signature is append_validated(record). D's unrelated test-count
     discrepancy was not changed.
   human_review:
     - confirmed that user_request_count is optional and is not required for C's contract
@@ -458,29 +458,28 @@
   summary: >
     Documentation-only. Aligned C's contracts with the confirmed D behavior. The pre-HTTP
     local-failure lifecycle is no longer pending: it writes exactly one llm_calls.jsonl line
-    with all ten schema keys present (nulls written, never omitted), 32-character uuid4().hex
-    call_id/session_id/request_id, usage_source=missing, tokens as an input/output/total
-    object with nulls, raw/parsed null, and request_made=false, the only such path. Token
-    semantics now state the classification: three integers -> gateway, some integer and some
-    null -> partial, all null -> missing, non-integer values normalize to null, and zero is
+    with all ten schema keys present, 32-character uuid4().hex call_id/session_id/request_id,
+    usage_source=missing, tokens=null, raw/parsed=null, and request_made=false, the only
+    such path in D's current code. When usage is processed, tokens is an input/output/total
+    object with missing or non-integer counts normalized to null. Three integers -> gateway,
+    some integer and some null -> partial, tokens=null or all counts null -> missing; zero is
     never substituted. not_called is documented as a derived reporting category from
     request_made=false, not a fourth usage_source enum; request_made=false rows are excluded
     from the usage-source distribution and missing-usage count, and api_call_count is the
     count of request_made=true rows. RP-004 gained an explicit appended-fields statement
     preserving input/raw/parsed/error and listing the additive Phase 2 fields. The approved
-    append_validated(record, expected_spent=None) boundary is documented (total ==
-    expected_spent + amount; expected_spent >= persisted cumulative spend; expected_spent is a
-    validation parameter, not a persisted field). Historical sessions that recorded the
-    former 12-character proposal were not rewritten.
+    append_validated(record, expected_spent=None) design is documented but not implemented
+    (total == expected_spent + amount; expected_spent >= persisted cumulative spend;
+    expected_spent is a validation parameter, not a persisted field).
   human_review:
     - required the pre-HTTP lifecycle to be confirmed, not left pending
-    - required all ten keys present with nulls rather than omitted token keys
+    - required all ten schema keys to be present; D uses tokens=null on pre-HTTP failure, while a processed usage object retains null values for missing counts
     - required the exact token classification and that zero is never substituted
     - required not_called to stay a derived category excluded from usage statistics
     - required api_call_count to remain request_made=true rows with no user_request_count metric
     - required RP-004 to state the additive fields while preserving the original four
-    - required the append_validated expected_spent boundary as validation input only
-    - required historical 12-character sessions to be left untouched
+    - required the approved but unimplemented append_validated expected_spent design to use a validation input only
+    - required the historical 12-character proposal to remain identifiable as an earlier decision
   validation:
     yaml_parse: pass
     git_diff_check: pass
