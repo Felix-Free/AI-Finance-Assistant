@@ -6,7 +6,7 @@
 > `.opencode/permissions.jsonc` and `docs/architecture/permission-model.md` remain
 > authoritative. Anything not listed here is denied.
 >
-> Status: **Phase 1 · D3 coding governance (transcript 60339160).**
+> Status: **Phase 2 · D3 coding governance (transcript 60339160).**
 
 ---
 
@@ -32,12 +32,23 @@ MCP tools; it may read or write them under the normal path permissions.
 | ID | Entry point | Purpose | Network | Owner |
 |---|---|---|---|---|
 | EP-001 | `src/call_llm.py::extract` | the only path that calls the model | gateway only | D |
-| EP-002 | `src/policy_core.py::enforce_*` | deterministic guard functions (to be built by D) | none | D/E |
+| EP-002 | `src/policy_core.py::enforce_*` | deterministic guard functions | none | D/E |
+| EP-003 | `src/storage.py::append_validated(record)` | validated storage write at the persistence boundary (single `record` argument; no `expected_spent`) | none | D |
+| EP-004 | `src/measure_tokens.py` — `python -m src.measure_tokens` | token-usage measurement entry point | gateway | D/E |
+| EP-005 | `src/measure_latency.py` — `python -m src.measure_latency` | model-call latency measurement entry point | gateway | D/E |
+| EP-006 | `src/report_tokens.py` — `python -m src.report_tokens` | read-only token-usage report (reads `logs/llm_calls.jsonl`, writes nothing) | none | D/E |
 
 - EP-001 must append exactly one `logs/llm_calls.jsonl` line per call and is fail-closed
   (`runtime-policy-catalog.md RP-004`).
 - EP-002 is the only place that decides an outcome from model output; it must never be
   bypassed (`AGENTS.md §3`).
+- EP-003 is the sole validated storage entry point; it re-validates its `record` and must
+  not be used to bypass `policy_core` validation (`runtime-policy-catalog.md` RP-007). It
+  does **not** take an `expected_spent` parameter (that boundary is approved but not yet
+  implemented).
+- EP-004 and EP-005 are measurement entry points, not MCP tools. EP-006 is a read-only
+  report entry point (uses a relative default `logs/llm_calls.jsonl`, overridable by an
+  argument).
 
 ---
 
@@ -62,6 +73,10 @@ approval, **D** = denied.
 |---|---|---|---|---|---|---|
 | EP-001 `call_llm.extract` | entry point | A | A | A | A | A |
 | EP-002 `policy_core.enforce_*` | entry point | A | A | A | A | A |
+| EP-003 `storage.append_validated` | entry point | A | A | A | A | A |
+| EP-004 `measure_tokens` | measurement entry point | A | A | A | A | A |
+| EP-005 `measure_latency` | measurement entry point | A | A | A | A | A |
+| EP-006 `report_tokens` | report entry point | A | A | A | A | A |
 | TC-001 `pytest test/offline` | test cmd | A | A | A | A | A |
 | TC-002 `pytest test/live` | test cmd | D | D | P | P | A |
 | Any MCP server | MCP tool | D | D | D | D | D |
