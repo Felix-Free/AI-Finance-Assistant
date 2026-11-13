@@ -174,9 +174,15 @@ If an invariant cannot be written this way, it is not an invariant yet.
 
 ## 7. Environment
 
-- Python **3.9+**. The reference environment is the team venv `SoftEngineering`, which
-  runs **3.9.7**, so code must not use 3.10-only syntax: `match`, `X | Y` in runtime
-  annotations, `except*`, or parenthesised context managers.
+- Minimum supported version: **Python 3.9**. Code must stay 3.9-compatible even though the
+  local venv is newer, because CI pins its own interpreter and the grader may use another one.
+  Forbidden syntax: `match`, `X | Y` in runtime annotations, `except*`, parenthesised context
+  managers.
+- Versions actually observed so far: local venv `SoftEngineering` = **3.14.4**; the machine's
+  system interpreter used for `py_compile` = **3.9.7**. Any claim about "the reference
+  interpreter" must name one of these, not a guess.
+- CI must pin `python-version` explicitly (owner: role E) and that value is the one the code is
+  verified against.
 - Use `from __future__ import annotations` when PEP 604 style annotations are wanted.
 - Dependencies are declared in `requirements.txt`; no ad-hoc `pip install` without
   updating it.

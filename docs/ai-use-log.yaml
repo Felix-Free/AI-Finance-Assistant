@@ -1,7 +1,73 @@
 # AI Use Log
-#
 # One entry per working session. Append; do not rewrite earlier entries.
 
+- date: "2026-11-06"
+  role: A
+  student_id: "60528523"
+  phase: 1
+  session: 1
+  topic: Repository initialization and manual rectification
+  tool: Human Review (Manual)
+  files_created:
+    - .github/workflows/.gitkeep
+    - .opencode/.gitkeep
+    - .agent/.gitkeep
+    - Report.md
+    - Prompt.md
+    - docs/ai-use-log.yaml
+  files_modified:
+    - README.md
+  files_not_modified:
+    - src/**
+  summary: >
+    Reviewed PR #6 (Initial project skeleton). Identified that the AI agent 
+    missed critical governance directories (.github/workflows, .opencode, .agent). 
+    Manually added the missing directories to enforce architectural constraints 
+    and CI governance.
+  human_review:
+    - rejected the incomplete AI-generated structure.
+    - manually supplemented hidden directories to ensure compliance with PDF requirements.
+  validation:
+    structure_check: pass (aligned with PDF page 24)
+    
+- date: "2026-11-06"
+  role: D
+  student_id: "60915652"
+  phase: 1
+  session: 1
+  topic: agent-governance draft, conventions draft, requirements for the model entry point, transcript 1
+  tool: "human authoring (documents and configuration only; no source code in this session)"
+  files_created:
+    - AGENTS.md
+    - docs/code-governance/structural-constraints.md
+    - transcripts/60915652-LiuWanyang.md
+    - requirements.txt
+    - .gitignore
+    - .gitattributes
+    - .env.example
+  files_modified:
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - docs/req/**
+    - docs/architecture/**
+    - test/**
+  summary: >
+    Authored the agent-governance file and the code-governance conventions, fixed the
+    requirements for the model entry point (one module, one log line per call, fail-closed),
+    and recorded the first transcript entry. No source code was authored in this session: the
+    model client in the repository is the version written through OpenCode in session 2, which
+    is where it is listed.
+  human_review:
+    - required all model calls to be confined to one module, with no second requests.post
+    - required .env and logs/ to stay out of the repository, verified with git check-ignore
+    - required the category vocabulary to be enforced by code, not by prompt text
+    - required the recorded Python version to be the observed one (3.14.4), not a placeholder
+  validation:
+    py_compile: pass (Python 3.9.7 system interpreter)
+    live_call: pass (parsed amount=350, category=food; one JSONL line appended)
+    pytest: no tests existed at this point (suite created in session 2)
+    
 - date: "2026-11-09"
   role: C
   student_id: "60339160"
@@ -93,6 +159,97 @@
     opencode_mcp_schema: unavailable (no validator in repo)
 
 - date: "2026-11-09"
+  role: D
+  student_id: "60915652"
+  phase: 1
+  session: 2
+  topic: deterministic guards INV-001..003, transport seam, pipeline with review logging
+  tool: opencode
+  files_created:
+    - src/call_llm.py
+    - src/__init__.py
+    - src/policy_core.py
+    - src/pipeline.py
+    - test/offline/test_policy_core_smoke.py
+    - test/offline/test_pipeline_seam.py
+  files_modified:
+    - docs/code-governance/structural-constraints.md
+    - transcripts/60915652-LiuWanyang.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - docs/req/**
+    - docs/architecture/**
+    - .opencode/**
+    - requirements.txt
+  summary: >
+    Implemented role C's three invariants as deterministic guards with a single
+    PolicyError carrying a log code and a review flag; extracted the HTTP call of
+    call_llm into a module-level _post so tests can stub the transport; added
+    pipeline.process with the runtime-policy precedence (parse and log before
+    invariants) and exactly one line to logs/review.jsonl for rejections that need
+    human inspection. No rule is enforced by prompt text. Two smoke test files were
+    added; the exhaustive boundary suite remains with role E (test_invariants.py).
+  human_review:
+    - rejected the agent's envelope handling, because a malformed HTTP 200 would escape as KeyError; required LlmTransportError for every protocol failure
+    - rejected the agent's test filename test_invariants.py, which is reserved for role E; required *_smoke and *_seam names plus a note in CHANGED FILES
+    - required validate_record to reject non-dict input instead of raising AttributeError
+    - required the running total to be returned so the review line can record it
+    - required exactly one log line on the missing-credentials path
+    - rejected the agent's offer to guess the three fixes; required the FIX text to be pasted verbatim (AGENTS.md 1.5, "do not guess")
+    - corrected my own instruction "commit A and B separately", which named an action but not an actor; the agent executed it and I kept both commits rather than rewriting history
+  validation:
+    py_compile: pass
+    pytest_offline: 36 passed
+    live_call: pass after provisioning .env (parsed amount=350, category=food)
+    guard_boundaries: pass (-1, 0, 0.005, 100.001, "350", None, True, nan, inf rejected; equality at the budget accepted; over-budget and out-of-vocabulary rejected with review=true)
+    review_log: pass (one line written to logs/review.jsonl for an out-of-vocabulary category)
+
+- date: "2026-11-09"
+  role: D
+  student_id: "60915652"
+  phase: 1
+  session: 3
+  topic: conformance check against invariants.md, and the rejection-evidence fix (option B)
+  tool: opencode
+  files_modified:
+    - src/pipeline.py
+    - test/offline/test_pipeline_seam.py
+    - transcripts/60915652-LiuWanyang.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/policy_core.py
+    - src/call_llm.py
+    - docs/**
+    - AGENTS.md
+    - requirements.txt
+  summary: >
+    Compared the implementation against every field of role C's guard specification (Condition,
+    Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and
+    Boundary conformed for all three invariants; Evidence did not. The call line in
+    logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry
+    a policy outcome, and RP-004 forbids a second line there. The specification owner chose
+    option B: every policy rejection now appends exactly one line to logs/review.jsonl with
+    error = policy:amount / policy:category / policy:budget and review = false / true / true,
+    while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no
+    trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields)
+    and runtime-policy-catalog.md (RP-003/005/006 point at the file).
+  human_review:
+    - found the Evidence gap by comparing field by field, not by trusting 36 passing tests
+    - refused to resolve the conflict myself because it is between two documents owned by role C; put options A/B/C to the owner instead
+    - refused to edit invariants.md, because the specification is C's artefact
+    - required the field rename code to error rather than adding a second field
+    - required review to be taken from exc.review instead of hard-coded true
+    - required the llm_calls.jsonl behaviour to stay untouched (RP-004)
+    - recorded two test weaknesses instead of hiding them: a near-vacuous captured_log assertion, and the now-misleading _append_review / review.jsonl names
+  validation:
+    py_compile: pass
+    pytest_offline: 39 passed (36 existing + 3 new parametrised cases, one per invariant)
+    rejection_evidence: pass (exactly one line per rejection; field set error/amount/category/spent/total/review; review false/true/true)
+    requests_in_pipeline: absent
+    llm_calls_untouched_by_pipeline: pass (RP-004 preserved)
+    spec_conformance: Evidence now conforms to option B; role C's document edit still pending
+
+- date: "2026-11-09"
   role: C
   student_id: "60339160"
   phase: 1
@@ -122,6 +279,229 @@
   validation:
     git_diff_check: pass
     yaml_parse: pass
+
+- date: "2026-11-09"
+  role: A
+  student_id: "60528523"
+  phase: 1
+  session: 2
+  topic: Cross-review of PR #8 and PR #9
+  tool: opencode
+  files_modified:
+    - docs/ai-use-log.yaml
+    - transcripts/60528523-TANJingling.md
+  files_created: []
+  files_not_modified:
+    - src/**
+    - test/**
+  summary: >
+    Conducted cross-review of PR #8 (security specs) and PR #9 (core logic). 
+    Used OpenCode to semantically compare C's updated invariants.md against the logging 
+    requirements, and ran boundary-value harness tests on D's policy_core.py.
+  human_review:
+    - verified PR #8 Evidence fields were correctly updated to logs/review.jsonl.
+    - confirmed PR #9 explicitly rejects boolean types before int/float checks.
+    - manually resolved a Git merge conflict in ai-use-log.yaml between PR #8 and PR #9.
+  validation:
+    pytest: 39 passed (verified via local OpenCode review)
+    merge_conflict: resolved
+
+# Role E entries to append to docs/ai-use-log.yaml
+# Role E tool use: OpenCode with DeepSeek V4 Flash generated the workflow, pytest
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 1
+  topic: repository startup and working directory
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Fixed the working directory by passing the project path on the next attempt.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 2
+  topic: initial PR CI workflow
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/workflows/ci.yml
+  summary: Added a PR workflow to run offline tests on Python 3.9.
+  human_review:
+    - Approved the workflow write exception.
+  validation:
+    local_pytest: No tests collected (exit 5).
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 3
+  topic: offline and live pytest markers
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - pytest.ini
+  summary: Registered the offline and live pytest markers.
+  human_review:
+    - Approved the pytest.ini write exception. The completion summary omitted the exception label.
+  validation:
+    markers: Both markers recognized.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 4
+  topic: CI workflow and marker review
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Reviewed the existing workflow and marker configuration.
+  human_review:
+    - Requested a shorter prompt for the rerun.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 5
+  topic: amount boundary test planning
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Listed possible amount boundary cases before the guard interface was available.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 6
+  topic: initial amount test scope
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Scoped the first tests to one negative amount and one valid control.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 7
+  topic: Phase 1 QA handoff draft
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Drafted a QA handoff that distinguishes local checks from GitHub results.
+  human_review:
+    - Corrected wording that implied an empty test file already existed.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 8
+  topic: CI workflow rerun plan
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Reviewed the workflow rerun plan and kept the offline directory and marker filter.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 9
+  topic: pytest configuration rerun plan
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Reviewed the existing marker configuration before recreating it in a later session.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 10
+  topic: CI workflow recreation
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/workflows/ci.yml
+  summary: Recreated the PR workflow after backing up the first version.
+  human_review:
+    - Approved the workflow recreation and write exception.
+  validation:
+    ci_config: PR trigger and pytest command checked locally.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 11
+  topic: pytest configuration recreation
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - pytest.ini
+  summary: Recreated the pytest configuration with both markers.
+  human_review:
+    - Approved the pytest.ini recreation and write exception.
+  validation:
+    markers: Both markers recognized.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 12
+  topic: initial test plan against D's interface
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Requested a plan against D's interface. The session ended before a plan was produced.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 13
+  topic: INV-001 offline tests
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - test/offline/test_invariants.py
+  summary: Added a negative-amount test and a valid-amount control for INV-001.
+  human_review:
+    - Approved the two cases and requested INV-001 in the test names.
+  validation:
+    negative_guard_check: The negative test failed when the guard accepted negative amounts.
+
+- date: "2026-11-09"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 14
+  topic: CI offline test selection review
+  tool: opencode (DeepSeek V4 Flash)
+  summary: Planned a CI change to include D's unmarked offline tests. The workflow was not changed.
+  validation:
+    pytest_offline: 41 passed locally against main at 0dda36b.
+    github_ci_followup: PR #11 passed with 2 tests selected by the marker filter; 39 unmarked tests were deselected locally.
+
+- date: "2026-11-10"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 15
+  topic: CI check dependencies
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - requirements.txt
+  summary: Added jsonschema and Ruff for the new CI checks.
+  human_review:
+    - Approved the dependency changes and selected versions verified to support Python 3.9.
+
+- date: "2026-11-10"
+  role: E
+  student_id: "61049313"
+  phase: 1
+  session: 16
+  topic: Phase 1 CI review follow-up
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+  summary: Ran the full offline suite and added Ruff, requirements schema and AI-use log checks.
+  human_review:
+    - Approved the workflow scope. Review caught invalid YAML indentation, a repeated dependency install and overly broad log parsing.
+  validation:
+    offline_tests: 41 passed locally with network connections disabled.
+    lint: Selected Ruff rules passed.
+    ai_use_log: A new session passed. An unchanged, malformed or duplicate log failed.
+    schema: B's PR files passed. Missing files and a missing required field failed.
 
 - date: "2026-11-12"
   role: C
