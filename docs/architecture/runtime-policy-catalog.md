@@ -111,10 +111,11 @@ write (`structural-constraints.md §4`).
 
 ### RP-007 — Storage boundary failure
 
-- **Trigger:** storage rejects a record's shape or duplicate `call_id`, cannot read existing
-  records (including malformed JSON, an invalid stored `call_id`, or a nonnumeric stored
-  amount), or cannot write a validated record (I/O error, unwritable path, persistence or
-  JSON serialization error).
+- **Trigger:** storage rejects a new record's shape or duplicate `call_id`, cannot read
+  existing records (including malformed JSON or a nonnumeric stored amount when computing
+  the current total), or cannot write a validated record (I/O error or unwritable path).
+  The uncaught type/serialization cases below are required to follow RP-007 but do not
+  currently raise `StorageError`.
 - **Action:** raise an **independent `StorageError`**. It is an infrastructure failure, not
   a rule decision.
 - **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
@@ -136,7 +137,9 @@ write (`structural-constraints.md §4`).
 **Unresolved D exception paths (code review, not test-verified).** In
 `src/storage.py::_existing_call_ids`, a persisted JSON object with an unhashable
 `call_id` (for example a list) reaches `ids.add(...)` and raises `TypeError`; the read
-path does not convert it to `StorageError`. In `append_validated(record)`, structural
+path does not convert it to `StorageError`. Missing stored `call_id` values are skipped,
+and empty strings are added without validation; neither is reported as an invalid
+stored ID. In `append_validated(record)`, structural
 checks do not validate `decided_at` for JSON serializability. A direct caller can pass a
 nonserializable value (for example a date/time object); `json.dumps(record)` then raises
 `TypeError`, while the write handler catches only `OSError`. Both failures must stop the

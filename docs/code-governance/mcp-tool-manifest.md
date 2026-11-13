@@ -72,8 +72,12 @@ These are shell commands run by contributors and CI. They are not MCP tools.
 ## 4. Role matrix
 
 Roles: A (evidence/transcripts), B (requirements/AGENTS.md), C (security/governance),
-D (development), E (tests/CI). Cells: **A** = allowed, **P** = allowed with human
-approval, **D** = denied.
+D (development), E (tests/CI). Cells: **A** = may use or inspect within the role's
+assigned work, **P** = requires human approval, **D** = denied. This matrix does not
+authorize a production call that bypasses the application workflow or override path,
+network, or test permissions. In particular, production writes to EP-003 must come
+through EP-007 and EP-002; direct EP-003 calls are for D/E boundary tests only. Live
+gateway measurements (EP-004/005) remain subject to the live-call approval rules.
 
 | Item | Kind | A | B | C | D | E |
 |---|---|---|---|---|---|---|

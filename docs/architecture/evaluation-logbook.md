@@ -150,7 +150,7 @@
 | Expected evidence files | Invariant-to-test mapping and run output under `docs/measurements/`. |
 | Owner | E. |
 | Status | pending |
-| Observed result | Not measured; `test_evidence_join.py` remains skipped. |
+| Observed result | Not measured; no invariant-to-negative-test mapping or guard-removal run is recorded here. |
 
 ### Additional proposal — Input parsing reliability (not a main NFR)
 
