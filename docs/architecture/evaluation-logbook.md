@@ -6,7 +6,7 @@
 > NFR moves from "pending" to a measured result; a threshold without an observed result is
 > marked **pending**, never assumed to pass.
 >
-> Status: **Phase 2 · C-side documentation (transcript 60339160).** C defines the metric,
+> Status: **Phase 2 documentation (transcript 60339160).** C defines the metric,
 > threshold and evidence contract; E runs the measurement; D implements the pipeline. No
 > measurement result is recorded here until it has actually been run.
 
@@ -42,17 +42,17 @@
 | Status | pending |
 | Observed result | Not measured. |
 
-### NFR-002 — Deterministic safety boundary
+### NFR-002 — Token Usage statistics
 
 | Field | Value |
 |---|---|
-| NFR | Deterministic safety boundary: no model output that violates `C-INV-001..003` ever affects stored data. |
-| Metric | Number of invariant-violating inputs that slip past `policy_core` into storage (must be zero), reported together with the logging-metadata aggregates below. |
-| Threshold | Zero violations. Every violating fixture is rejected with the documented `policy:*` code. The associated aggregation/consistency thresholds (below) are **pending clarification** — the requirements source does not state them here. |
-| Input / data source | Adversarial fixtures under `data/` covering the boundary values in `invariants.md §2` (amount, category, budget), plus the resulting `logs/llm_calls.jsonl` with the approved metadata fields (`session_id`, `request_id`, `usage_source`, `request_made`). |
-| Measurement command / procedure | Feed each violating fixture through the pipeline; assert rejection and absence of a storage record. This is the negative-test property from `invariants.md §3` applied across the fixture set. Then, over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **actual request count** = records with `request_made: true`; (d) **usage-source counts** for `gateway`, `partial`, `missing`; (e) **missing-usage count** = records with `usage_source: missing`. Consistency checks: `usage_source` must agree with `tokens` — `gateway`/`partial` imply token data present, `missing` implies token data absent; and **gateway usage must not be treated as zero when usage is missing** (a `missing` record is not `0` tokens). |
-| Expected evidence files | `docs/measurements/` report for NFR-002; `logs/review.jsonl` rejection lines for the rejected cases; the `llm_calls` excerpts used for the aggregation and consistency checks. |
-| Owner | E (measurement), D (guards and logging fields). |
+| NFR | Token usage per request and per session. |
+| Metric | Per-request aggregation, per-session aggregation, actual API-call count, usage-source distribution, missing-usage count, and `usage_source`↔`tokens` consistency. |
+| Threshold | No approved numeric pass/fail threshold. Per-request, per-session, actual API-call count, usage-source distribution and missing-usage count are reported as statistics only. The consistency rule is checked structurally: `usage_source` must agree with `tokens`; it has no separately approved numeric threshold. |
+| Input / data source | `logs/llm_calls.jsonl` records produced by the measurement run, including `session_id`, `request_id`, `call_id`, `tokens`, `usage_source` and `request_made`. |
+| Measurement command / procedure | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true` (the actual API-call count); no separate user-request-count metric is required; (d) the **usage-source distribution** over rows that participated in a request (`request_made: true`) across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and are **excluded** from the usage-source distribution and the missing-usage count; `not_called` is a derived operational category, not a fourth `usage_source` enum value. Token classification: three integers → `gateway`; at least one integer and at least one `null` → `partial`; all `null` → `missing`; non-integer values normalize to `null`. Check that `usage_source` agrees with `tokens`, that missing usage is never replaced with `0` or an estimate, and that `tokens` is always an object with `input`, `output` and `total` (missing values `null`). All values are reported only; no pass/fail judgment is made. |
+| Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
+| Owner | B (definition), E (measurement), D (logging fields). |
 | Status | pending |
 | Observed result | Not measured. |
 
@@ -60,22 +60,20 @@
 
 | Field | Value |
 |---|---|
-| NFR | Evidence records belonging to one decision carry the same `call_id` (`runtime-policy-catalog.md §5.4`). |
-| Metric | Share of decisions whose three relevant `call_id` locations/evidence records carry the same `call_id`. |
-| Threshold | Three relevant `call_id` locations/evidence records for the same decision must carry the same `call_id`. Strict; not weakened to a two-record join, no "where applicable", not redefined from whatever records happen to exist. |
-| Threshold mapping | **Pending clarification.** The exact names of the three required `call_id` locations are not available in this repository yet; the measurement mapping is pending and is not replaced with a weaker rule. |
-| Conditional evidence shape | Separate rule, not the threshold. Accepted decision → `llm_calls` + normal storage evidence. Rejected decision → `llm_calls` + review evidence. A rejected decision must not create a normal storage record. |
+| NFR | Evidence records belonging to one decision carry the same `call_id` (see the `Evidence linkage by call_id` section in `runtime-policy-catalog.md`). |
+| Metric | Share of decisions whose path-specific evidence records carry the same `call_id`. |
+| Threshold | Accepted decision: `llm_calls.call_id` equals the accepted record's `data/records.jsonl` `call_id`. Rejected decision: `llm_calls.call_id` equals the rejection's `logs/review.jsonl` `call_id`. A decision is not required to produce all three records. |
+| Threshold mapping | Confirmed as two possible evidence shapes: accepted → `llm_calls` + storage; rejected → `llm_calls` + review. The three possible evidence locations are the two logs plus `data/records.jsonl`; the applicable pair depends on the decision outcome. |
+| Conditional evidence shape | The path-specific rule is also the evidence shape. Accepted decision → `llm_calls` + normal storage evidence. Rejected decision → `llm_calls` + review evidence. A rejected decision must not create a normal storage record. |
 | Input / data source | The logs produced by a measurement run: `logs/llm_calls.jsonl` plus `logs/review.jsonl`, and the stored records for accepted decisions. |
-| Measurement command / procedure | For each decision, check that the three relevant `call_id` locations/evidence records carry the same `call_id` (threshold), and assert the conditional shape — accepted → llm_calls + storage, rejected → llm_calls + review. Any decision with a storage record *and* a review line, or with mismatched ids, is a failure. |
-| Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl` and `logs/review.jsonl` excerpts used for the check. |
+| Measurement command / procedure | For each accepted decision, join `logs/llm_calls.jsonl` to `data/records.jsonl` and compare `call_id`. For each rejected decision, join `logs/llm_calls.jsonl` to `logs/review.jsonl` and compare `call_id`. Any decision with a storage record *and* a review line, or with mismatched ids, is a failure. |
+| Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl`, `logs/review.jsonl` and `data/records.jsonl` excerpts used for the check. |
 | Owner | E (measurement), D (pipeline: `call_id` generation and carriage), C (contract). |
-| Status | blocked |
-| Observed result | Not measured — blocked on the `call_id` pipeline (C2/C3). |
+| Status | pending |
+| Observed result | Not measured. The call-id and logging pipeline is available; E still needs to run the measurement. |
 
-> **Why NFR-006 is blocked, not pending.** The join depends on the C2/C3/C4 pipeline
-> actually emitting `call_id` into both log files and removing `__call_id__` before
-> `policy_core`. Until that pipeline exists and produces real log lines, the procedure has
-> nothing to measure; recording "pending" with a numeric result would be misleading.
+> **Why NFR-006 is pending.** D's implementation now emits the call-id and the applicable
+> evidence records. The procedure has not yet been run by E, so no observed result is claimed.
 
 ---
 
@@ -84,8 +82,8 @@
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
 | NFR-001 | fixture parse-match rate | as per requirements (not asserted yet) | E / D | pending | not measured |
-| NFR-002 | invariant violations reaching storage; plus per-session (`session_id`) and per-request (`request_id`) aggregation, `request_made` request count, and usage-source/missing-usage counts with `usage_source`↔`tokens` consistency | zero violations; aggregation/consistency thresholds pending clarification | E / D | pending | not measured |
-| NFR-006 | decisions whose three relevant call_id locations share one call_id | three relevant call_id locations/evidence records share the same call_id | E / D / C | blocked | not measured |
+| NFR-002 | per-request/per-session token aggregation, `api_call_count`, usage-source/missing-usage counts, and `usage_source`↔`tokens` consistency | statistics only; no approved numeric pass/fail threshold | B / E / D | pending | not measured |
+| NFR-006 | decisions whose applicable evidence pair shares one `call_id` | accepted: `llm_calls`↔storage; rejected: `llm_calls`↔review | E / D / C | pending | not measured |
 
 ---
 
@@ -100,5 +98,5 @@
   the cell says so rather than guessing.
 - NFR-002's logging-metadata aggregates (`session_id`, `request_id`, `request_made`,
   `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
-  `gateway` usage is never treated as zero when usage is `missing`. Their numeric thresholds
-  are pending clarification until the requirements source states them.
+  `gateway` usage is never treated as zero when usage is `missing`. The token aggregates are
+  descriptive statistics only and do not receive a pass/fail threshold.

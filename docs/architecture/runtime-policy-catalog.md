@@ -69,6 +69,11 @@ write (`structural-constraints.md §4`).
 > (`AGENTS.md §3`, `structural-constraints.md §5`). RP-004 records it as a policy and
 > tells D/E what must stay true when the module is extended.
 
+> **Appended fields (Phase 2).** The original four fields — `input`, `raw`, `parsed`,
+> `error` — are never renamed or removed. The Phase 2 fields are **additive**:
+> `call_id`, `tokens`, `session_id`, `request_id`, `usage_source`, `request_made`. A
+> reader that ignores them still sees the four original fields unchanged.
+
 ### RP-005 — Budget exceeded (guard for C-INV-003)
 
 - **Trigger:** accepted total + new amount > `budget_limit`.
@@ -127,19 +132,19 @@ Later stages never run when an earlier stage rejects.
 
 ---
 
-## 5. Phase 2 addendum (C2–C6)
+## 5. Phase 2 additions
 
 > **Scope.** Phase 2 introduces a `call_id` that joins a model call to its downstream
 > evidence, optional token accounting, an independent storage-failure error, and the
 > NFR-006 evidence-join rule. This section records the agreed contracts. It **does not
 > change** RP-001..RP-006: their triggers, actions and evidence codes stay exactly as
-> written in §2. The pipeline behavior that implements C2/C3/C4 is D's; the NFR-006
+> written in §2. The pipeline behavior that implements the call-id, logging and storage contracts is D's; the NFR-006
 > measurement is E's. C defines the contracts only.
 
-### 5.1 C2 — `call_id` generation and carriage
+### Call identifiers
 
 - **Generation.** `call_id` is generated **inside `src/call_llm.py`** as
-  `uuid4().hex[:12]` — a 12-hex-character string. No other format is valid; no caller
+  `uuid4().hex` — a 32-hex-character string. No other format is valid; no caller
   may synthesize or override one.
 - **Return channel.** `call_llm` returns the value to its caller through the private
   dictionary key **`__call_id__`** on the returned object.
@@ -152,18 +157,25 @@ Later stages never run when an earlier stage rejects.
   the audit line (RP-004), a call that cannot be logged keeps producing no usable result;
   `call_id` never rescues an unlogged call.
 
-### 5.2 C3 — `llm_calls.jsonl` logging contract
+### LLM call logging
 
 - **Required fields, unchanged.** `input`, `raw`, `parsed` and `error` keep their names and
   meaning (RP-004). They are never renamed, dropped or reinterpreted.
 - **Extra fields.** `call_id` and `tokens` **may** be added as extra fields. They are
   additive: a reader that ignores them still sees the four required fields as before.
-- **Token semantics.** `tokens` records model-token accounting supplied by the gateway
-  (for example prompt/completion token counts from the response usage object). Its meaning
-  is "tokens the gateway reported for this call"; it is **not** a derived estimate.
-- **Never fabricate.** `tokens` is recorded **only when the gateway supplies it**. If the
-  gateway omits usage data, the field is absent (or `null`); it is never estimated,
-  back-filled, or computed from the raw text.
+- **Token semantics.** `tokens` is **always an object** with exactly the keys `input`,
+  `output` and `total`; a missing value is written as `null`, never omitted. Its meaning is
+  "tokens the gateway reported for this call"; it is **not** a derived estimate. The
+  `usage_source` is derived from the three token values:
+  - **three integer values** → `usage_source = gateway`;
+  - **at least one integer and at least one `null`** → `usage_source = partial`;
+  - **all three values `null`** → `usage_source = missing`.
+  Non-integer values (for example strings or booleans) normalize to `null` before this
+  classification.
+- **Never fabricate.** Zero is **never** written as a substitute for a missing token value,
+  and token usage is **never** estimated. When all values are missing the object is
+  `{"input": null, "output": null, "total": null}` with `usage_source = missing`; it is never
+  `0`. The stored `usage_source` values remain exactly `gateway`, `partial` and `missing`.
 - **One line per call.** Exactly **one** `logs/llm_calls.jsonl` record per actual model
   call is preserved. Adding `call_id` / `tokens` / the approved metadata fields does not add
   a second line, and policy outcomes still go to `logs/review.jsonl`
@@ -172,7 +184,7 @@ Later stages never run when an earlier stage rejects.
 #### 5.2.1 Approved additional metadata fields
 
 The user approved four further logging fields for Phase 2. They are **additive** next to
-the required four (`input`, `raw`, `parsed`, `error`) and the C2/C3 extras (`call_id`,
+the required four (`input`, `raw`, `parsed`, `error`) and the additional fields (`call_id`,
 `tokens`); nothing above is renamed or removed.
 
 - **`session_id`** — a stable identifier for the user/session context, used for
@@ -190,27 +202,46 @@ the required four (`input`, `raw`, `parsed`, `error`) and the C2/C3 extras (`cal
   preflight rejection, and any other failure that never reached the network). It is a
   structured boolean, not inferred from `error` text: error-message wording must not be the
   only machine-readable definition of `request_made`.
+- **Derived `not_called` category** — reporting may count `request_made: false` rows as
+  `not_called`. This is an operational reporting category, not a fourth `usage_source` value;
+  the stored `usage_source` enum remains exactly `gateway`, `partial`, or `missing`.
 
 Preserved requirements (unchanged by these fields):
 
 - `input`, `raw`, `parsed` and `error` keep their names and meaning (RP-004).
 - `call_id` remains the unique identifier for one actual LLM API call.
-- `tokens` remains additive and is recorded **only when supplied by the gateway**.
-- Missing token usage is **never** written as zero and is **never** fabricated; when usage
-  is absent, `usage_source` is `missing` and `tokens` is absent (or `null`), not `0`.
+- `tokens` remains additive and is always an object with `input`, `output` and `total`;
+  missing values are `null`, never omitted.
+- Missing token usage is **never** written as zero and is **never** fabricated; when all
+  three values are `null`, `usage_source` is `missing` and `tokens` is
+  `{"input": null, "output": null, "total": null}`, not `0`.
 - `policy:*` remains reserved for deterministic rule rejection (RP-003/005/006).
 - Exactly one `llm_calls` record per actual model call remains the contract.
 - `usage_source` must stay consistent with `tokens`: `gateway`/`partial` imply token data
   exists, `missing` implies it does not.
 
-> **Pending clarification.** The exact lifecycle behavior for a **local failure before any
-> HTTP call is sent** (for example, which fields are present on the single `llm_calls` line,
-> and whether such a failure is logged at all) is **not** defined elsewhere in this
-> repository. This section requires only that `request_made` be `false` in that case and
-> does **not** invent a new lifecycle rule; the precise record shape is pending
-> clarification until the pipeline/spec fixes it.
+#### 5.2.2 Pre-HTTP local failures (confirmed)
 
-### 5.3 C4 — storage failure is not a policy rejection
+A local/configuration/preflight failure — for example a missing config, a missing API key,
+or a rejection before any network call — **still writes exactly one `llm_calls.jsonl`
+line**. The record uses the same ten-key schema as a normal call; missing values are written
+as `null` and **never omitted**:
+
+- **All ten schema keys are present** (`input`, `raw`, `parsed`, `error`, `call_id`,
+  `tokens`, `session_id`, `request_id`, `usage_source`, `request_made`); a missing value is
+  `null`, never an absent key.
+- **Identifiers:** `call_id`, `session_id` and `request_id` are 32-character `uuid4().hex`.
+- **`usage_source`** is `missing`.
+- **`tokens`** is always an object with `input`, `output` and `total`; missing values are
+  `null`.
+- **`raw`** and **`parsed`** are `null`.
+- **`request_made`** is `false`.
+
+This is the **only** `request_made = false` path: any failure that occurs before an HTTP
+request is actually sent is logged this way, and every path that sends a request has
+`request_made = true`. This lifecycle is confirmed by D and is no longer pending.
+
+### Storage failure is not a policy rejection
 
 > This section is the contract rationale; the formal policy entry is **RP-007** (§2).
 
@@ -227,41 +258,44 @@ Preserved requirements (unchanged by these fields):
 - **Evidence:** the failure surfaces as `StorageError` to the caller; it never produces a
   `review.jsonl` policy line.
 
-### 5.4 C6 — NFR-006 evidence join (threshold and conditional evidence shape)
+### Evidence linkage by `call_id`
 
-**NFR-006 threshold (strict).** Three relevant `call_id` locations/evidence records for
-the same decision must carry the same `call_id`. This is the agreed threshold in full; it
-is not weakened to a two-record join, it has no "where applicable" escape, and it is not
-redefined from whatever records happen to exist.
+**NFR-006 evidence-join rule.** There are three possible evidence locations — the two log
+files (`llm_calls` and `review`) plus the storage record in `data/records.jsonl` — but a
+decision produces **one applicable pair**, not all three records at once. The check is
+path-specific:
 
-> **Pending clarification.** The exact names of the three required `call_id` locations are
-> not available in this repository yet. Until they are fixed by the pipeline/spec, the
-> threshold keeps the agreed wording — three relevant `call_id` locations/evidence records
-> for the same decision carry the same `call_id` — and the precise measurement mapping is
-> marked pending. It is not replaced with a weaker rule.
-
-**Conditional evidence shape (a separate rule, not the threshold).** This rule describes
-*which evidence records a decision has*. It is distinct from the threshold above, which
-governs *how many of those records must share the `call_id`*.
-
-- **Accepted decision.** Evidence shape = the `llm_calls` record **plus** the normal
-  storage evidence. The storage record for the decision carries the same `call_id` as its
-  call line.
-- **Rejected decision.** Evidence shape = the `llm_calls` record **plus** the review
-  evidence (`logs/review.jsonl`). The review line for that rejection carries the same
-  `call_id`.
+- **Accepted decision:** `llm_calls.call_id` equals the accepted record's
+  `data/records.jsonl` `call_id`. Evidence shape = the `llm_calls` record **plus** the
+  normal storage evidence.
+- **Rejected decision:** `llm_calls.call_id` equals the `review.jsonl` line's `call_id`.
+  Evidence shape = the `llm_calls` record **plus** the review evidence.
 - **A rejected decision must not create a normal storage record.** Rejection means the
   stored data is unchanged (RP-003/005/006); the review line is the second evidence record
   instead, and no normal storage record exists to join.
 - **Conditional, one shape per decision.** A decision has exactly one of the two shapes; it
   never has both a storage record and a review line for the same decision.
 
+A decision is **not** required to produce all three records, and the acceptance threshold is
+**not** phrased as "three relevant `call_id` locations must exist".
+
 ### 5.5 Approved D decisions (recorded here for the shared boundary)
 
-- **`call_id` format:** `uuid4().hex[:12]`. Fixed; see §5.1.
+- **`call_id` format:** `uuid4().hex`. Fixed 32-hex-character form; see the Call identifiers section.
 - **`_append_review` preserves the original rejection code.** When review evidence is
   written, `_append_review` keeps the **original** `error` code (for example
   `policy:category`) rather than replacing or re-coding it. The code that caused the
   rejection is the one recorded, so the review line and the routing decision agree.
+- **Validated storage spend.** The sole storage entry point is
+  `append_validated(record, expected_spent=None)`. Its approved boundary is:
+  - `total == expected_spent + amount` (the running total must equal the caller's expected
+    prior spend plus this record's amount);
+  - `expected_spent >= already persisted cumulative spend` — the caller may not claim a
+    smaller prior spend than what is already stored.
+
+  `expected_spent` is a **numeric validation parameter, not a persisted record field**. Its
+  purpose is to prevent **under-reporting prior spending**, which would otherwise let a
+  record slip past the budget guard (`C-INV-003`/`RP-005`). C specifies the boundary only;
+  D owns the implementation in `src/`.
 
 ---

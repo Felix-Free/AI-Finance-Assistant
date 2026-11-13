@@ -5,7 +5,7 @@
 > boundaries between roles sit. This document and the config must never disagree; if they
 > do, the config is wrong and must be corrected.
 >
-> Status: **Phase 1 · C-Security (transcript 60339160)**; amended in **Phase 2 · C1** for
+> Status: **Phase 1 · C-Security (transcript 60339160)**; amended in **Phase 2** for
 > measurement permissions (§3.1).
 
 ---
@@ -62,9 +62,9 @@
 The mapping from §2 to the config is direct: every ✅ write becomes an `allow`, every ❌
 becomes a `deny`, and every ⚠️ becomes `ask` (human confirmation per use).
 
-### 3.1 Phase 2 · C1 measurement expansion
+### 3.1 Measurement permissions
 
-Phase 2 measurement work needs the agent to read and write measurement material. C1 adds
+Phase 2 measurement work needs the agent to read and write measurement material. The measurement permissions add
 exactly three path trees and three command patterns to the config:
 
 | Scope | Kind | Permission |

@@ -39,7 +39,7 @@ owns the specification. Consequences:
 
 ## 2. Guard specification blocks (handoff format, `structural-constraints.md §2.2`)
 
-> **Rejection evidence (decision 2026-11-09, option B; aligned in Phase 2 C2).** Every policy
+> **Rejection evidence (decision 2026-11-09, option B; aligned in Phase 2 with the call-id contract).** Every policy
 > rejection — for all three invariants, including `C-INV-001` — appends exactly one line to
 > `logs/review.jsonl` with the fields `error`, `amount`, `category`, `spent`, `total`, `review`,
 > and `call_id`. `logs/llm_calls.jsonl` keeps exactly one line per model call

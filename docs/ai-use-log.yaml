@@ -385,3 +385,103 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: 2026-11-13
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 11
+  topic: align C contracts with confirmed D implementation and approved storage validation
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - .opencode/permissions.jsonc
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/code-governance/**
+    - logs/**
+    - data/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only alignment with the latest D clarification and the approved NFR-002
+    definition. Actual request count is api_call_count (request_made=true rows); no separate
+    user_request_count requirement was added. NFR-002 token aggregates are descriptive
+    statistics only, with no pass/fail threshold. Reports may show gateway, partial, missing
+    and derived not_called, while the stored usage_source enum remains gateway/partial/missing.
+    NFR-006 now uses path-specific joins: accepted llm_calls↔storage and rejected
+    llm_calls↔review; a decision does not need all three evidence records. call_id is recorded
+    as uuid4().hex (32 hex characters). The approved storage boundary is
+    append_validated(record, expected_spent=None), requiring total == expected_spent + amount
+    and expected_spent not below persisted cumulative spend. D's unrelated test-count
+    discrepancy was not changed.
+  human_review:
+    - confirmed that user_request_count is optional and is not required for C's contract
+    - confirmed the NFR-002 image's statistics-only treatment for token aggregates
+    - required D's four reporting categories without making not_called a fourth usage_source enum
+    - approved path-specific NFR-006 evidence joins
+    - approved the numeric expected_spent storage validation rule
+    - approved the 32-hex call_id format
+    - required no source, test, measurement, or unrelated test-count changes
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
+
+- date: 2026-11-13
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 12
+  topic: match confirmed D logging, token and storage clarifications
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - transcripts/60339160-QiangWanyun.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - logs/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only. Aligned C's contracts with the confirmed D behavior. The pre-HTTP
+    local-failure lifecycle is no longer pending: it writes exactly one llm_calls.jsonl line
+    with all ten schema keys present (nulls written, never omitted), 32-character uuid4().hex
+    call_id/session_id/request_id, usage_source=missing, tokens as an input/output/total
+    object with nulls, raw/parsed null, and request_made=false, the only such path. Token
+    semantics now state the classification: three integers -> gateway, some integer and some
+    null -> partial, all null -> missing, non-integer values normalize to null, and zero is
+    never substituted. not_called is documented as a derived reporting category from
+    request_made=false, not a fourth usage_source enum; request_made=false rows are excluded
+    from the usage-source distribution and missing-usage count, and api_call_count is the
+    count of request_made=true rows. RP-004 gained an explicit appended-fields statement
+    preserving input/raw/parsed/error and listing the additive Phase 2 fields. The approved
+    append_validated(record, expected_spent=None) boundary is documented (total ==
+    expected_spent + amount; expected_spent >= persisted cumulative spend; expected_spent is a
+    validation parameter, not a persisted field). Historical sessions that recorded the
+    former 12-character proposal were not rewritten.
+  human_review:
+    - required the pre-HTTP lifecycle to be confirmed, not left pending
+    - required all ten keys present with nulls rather than omitted token keys
+    - required the exact token classification and that zero is never substituted
+    - required not_called to stay a derived category excluded from usage statistics
+    - required api_call_count to remain request_made=true rows with no user_request_count metric
+    - required RP-004 to state the additive fields while preserving the original four
+    - required the append_validated expected_spent boundary as validation input only
+    - required historical 12-character sessions to be left untouched
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no measurement claimed
