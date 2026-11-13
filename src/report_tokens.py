@@ -21,7 +21,8 @@ import json
 import pathlib
 import sys
 
-LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+LOG_PATH = _REPO_ROOT / "logs" / "llm_calls.jsonl"
 
 MISSING = "-"
 

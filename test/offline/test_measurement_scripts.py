@@ -332,7 +332,22 @@ def _evidence_paths():
         "pipeline.REVIEW_PATH": pipeline.REVIEW_PATH,
         "storage.DATA_PATH": storage.DATA_PATH,
         "measure_latency.LATENCY_PATH": measure_latency.LATENCY_PATH,
+        "report_tokens.LOG_PATH": report_tokens.LOG_PATH,
     }
+
+
+def test_evidence_path_constants_point_at_distinct_files():
+    """Distinct owners name distinct files; report_tokens shares llm_calls.jsonl.
+
+    The filter below assumes keys are "<module>.<CONST>"; the premise is
+    asserted so a future key rename cannot silently degrade the scoped count.
+    """
+    paths = _evidence_paths()
+    assert len(paths) == 5 and all("." in k for k in paths)
+    owners = {k: v for k, v in paths.items()
+              if not k.startswith("report_tokens.")}
+    assert len(owners) == 4
+    assert len({str(p) for p in owners.values()}) == 4
 
 
 def test_evidence_paths_are_absolute_and_inside_repo():
@@ -345,9 +360,10 @@ def test_evidence_paths_are_absolute_and_inside_repo():
 def test_evidence_paths_follow_the_module_not_the_cwd(tmp_path):
     repo = pathlib.Path(__file__).resolve().parents[2]
     code = (
-        "from src import call_llm, pipeline, storage, measure_latency;"
+        "from src import call_llm, pipeline, storage, measure_latency, report_tokens;"
         "print(call_llm.LOG_PATH); print(pipeline.REVIEW_PATH);"
-        "print(storage.DATA_PATH); print(measure_latency.LATENCY_PATH)"
+        "print(storage.DATA_PATH); print(measure_latency.LATENCY_PATH);"
+        "print(report_tokens.LOG_PATH)"
     )
     env = dict(os.environ, PYTHONPATH=str(repo))
     out = subprocess.run(
@@ -355,7 +371,39 @@ def test_evidence_paths_follow_the_module_not_the_cwd(tmp_path):
         capture_output=True, text=True, env=env, check=True,
     )
     printed = out.stdout.split()
-    assert len(printed) == 4, out.stdout
+    assert len(printed) == 5, out.stdout
     for line in printed:
         assert line.startswith(str(repo)), "%r does not follow the module" % (line,)
         assert not line.startswith(str(tmp_path)), "%r follows the cwd" % (line,)
+
+
+_RELATIVE_EVIDENCE_LITERALS = tuple(
+    ctor + "(" + quote + prefix
+    for ctor in ("pathlib.Path", "Path")
+    for quote in ('"', "'")
+    for prefix in ("logs", "data")
+)
+
+
+def test_no_relative_evidence_path_literal_in_src():
+    """No src module may build an evidence path from a cwd-relative literal.
+
+    Every owning module is anchored (_REPO_ROOT / ...), so a relative literal is
+    illegal everywhere and there is no allow-list. Scope, honestly: this catches
+    relative literals for "logs"/"data" only; a future Path("prompts/...") would
+    not be caught — adding such a prefix here is a deliberate test change.
+    """
+    src = pathlib.Path(__file__).resolve().parents[2] / "src"
+    offenders = []
+    for path in sorted(src.glob("*.py")):
+        for lineno, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if any(literal in line for literal in _RELATIVE_EVIDENCE_LITERALS):
+                offenders.append("%s:%d: relative evidence path literal"
+                                 % (path.name, lineno))
+    assert not offenders, "\n".join(offenders)
+
+
+def test_report_tokens_log_path_matches_call_llm():
+    assert report_tokens.LOG_PATH == call_llm.LOG_PATH
