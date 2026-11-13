@@ -579,3 +579,52 @@ lives in our governance documents rather than in the measurement problem. The di
 it designed, I supplied the constraints it could not know, and the amendments were the part that
 belongs to the person who owns the project's rules.
 
+
+---
+
+## 2026-11-14 · A guard test that contradicted itself, and an agent that stopped
+
+**Context.** The reviewer's second blocking finding was that `report_tokens.LOG_PATH` was still
+cwd-relative and that the guard test never checked that file. Four guards were specified: a manifest of
+five constants, an absolute-path assertion, a scan for relative path literals, and a drift assertion
+that the duplicated `logs/llm_calls.jsonl` string in two modules stays equal. A fifth guard (call it
+B5) was added at the last moment: "the five constants must point at five distinct files."
+
+**The contradiction.** B5 as written is false by construction. `report_tokens` is a *reader* of the
+call log, so `report_tokens.LOG_PATH == call_llm.LOG_PATH` is the intended state — and the drift
+assertion (B4) says exactly that. B5 demanded the opposite: five distinct files. The suite therefore
+had one red test no matter how the code was written: `assert 4 == 5`.
+
+**What the agent did.** It stopped, quoted the failing assertion, named the two options that were
+actually available, and recommended the one that preserved the intent: scope B5 to the four *owning*
+constants (each owner must own a distinct file) and keep the deliberate sharing of the call log
+asserted by B4. It also pointed out that dropping B4 instead would leave the string-drift case
+unguarded — i.e. it evaluated the consequence of each option rather than listing them.
+
+**Why this is the right failure mode.** A contradictory specification has exactly two honest
+resolutions: stop and fix the specification, or silently pick whichever reading makes the suite green.
+The second is how a guard test becomes decoration: someone "simplifies" the assertion until it passes,
+and the property it was meant to protect is gone while the test count still goes up. The failure here
+was mine — I wrote B5 in one sentence without checking it against the guard I had written two
+paragraphs earlier.
+
+**What I changed in the brief.** B5 now reads: the four owning constants name four distinct files;
+`report_tokens.LOG_PATH` equals `call_llm.LOG_PATH` by design. The guard-removal table was extended so
+the two guards are shown to be independent: pointing `report_tokens` at `logs/latency.jsonl` must fail
+B4 and leave B5 green; pointing `storage.DATA_PATH` at `logs/review.jsonl` must fail B5 and leave B4
+green.
+
+**Reflection.** The most useful thing an agent can do with an inconsistent instruction is refuse to
+satisfy it. That only works if the brief says so explicitly — and ours does: "stop and ask, do not
+guess" (`AGENTS.md §2`), and the task-sheet template forbids writing code that merely makes the suite
+pass. The reviewer will see a test file with one more assertion than the brief originally had; what they
+cannot see is that the alternative was a green suite that proved nothing.
+
+**Addendum (2026-11-14 02:00).** When this guard was implemented, the first version of the
+relative-literal scan was **vacuous**: the pattern was built with `%r`, so the needles looked like
+`pathlib.Path(''logs'` and matched nothing. The test was green and proved nothing. It was caught only
+because the task sheet demanded guard-removal evidence: reverting the anchor still left the scan green,
+which is impossible if the scan works. The pattern was rebuilt by concatenating literal text, and every
+guard-removal row was re-run. Two lessons: a passing test is not evidence until you have seen it fail,
+and the cheapest way to make a test fail on demand is to write down, in advance, the mutation that
+should break it.
