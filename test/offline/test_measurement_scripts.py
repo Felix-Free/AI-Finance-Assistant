@@ -111,3 +111,128 @@ def test_percentile_nearest_rank():
     assert measure_latency._percentile_nearest_rank(values, 95) == 95
     assert measure_latency._percentile_nearest_rank([42], 95) == 42
     assert measure_latency._percentile_nearest_rank([], 50) is None
+
+
+def _stub_extract(monkeypatch, outcomes):
+    """Replace call_llm.extract with a scripted sequence of results."""
+    from src import call_llm
+
+    calls = []
+    sequence = list(outcomes)
+
+    def fake_extract(text, request_id=None):
+        calls.append(text)
+        outcome = sequence.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return {"amount": 1, "category": "food"}
+
+    monkeypatch.setattr(call_llm, "extract", fake_extract)
+    return calls
+
+
+def _run_latency(argv):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = measure_latency.main(argv)
+    return code, buf.getvalue()
+
+
+def test_latency_failures_do_not_end_the_run(tmp_path, monkeypatch):
+    from src import call_llm
+
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    err = call_llm.LlmTransportError("transport: read timed out (read timeout=30)")
+    _stub_extract(monkeypatch, [err, err, {}, {}, {}, {}])
+    code, out = _run_latency(["--n", "6"])
+    assert code == 0
+    assert "attempted=6 ok=4 failed=2 failure_rate=0.33" in out
+    assert "failures: 2 x transport: read timeout (LlmTransportError)" in out
+
+
+def test_latency_counts_json_decode_error_as_failure(tmp_path, monkeypatch):
+    err = json.JSONDecodeError("bad", "not json", 0)
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    _stub_extract(monkeypatch, [err, {}, {}, {}, {}, {}])
+    _, out = _run_latency(["--n", "6"])
+    assert "failed=1" in out
+    assert "failures: 1 x not_json" in out
+
+
+def test_latency_percentiles_use_successes_only(tmp_path, monkeypatch):
+    from src import call_llm
+
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    err = call_llm.LlmTransportError("transport: read timed out")
+    _stub_extract(monkeypatch, [{}, {}, err, {}, err])
+    _, out = _run_latency(["--n", "5"])
+    assert "p50_ms=" in out and "(n=3)" in out
+    assert "p95_ms=" in out and "(n=3)" in out
+    assert "(n=5)" not in out
+
+
+def test_latency_exits_2_when_nothing_succeeded(tmp_path, monkeypatch):
+    from src import call_llm
+
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    err = call_llm.LlmTransportError("transport: read timed out")
+    _stub_extract(monkeypatch, [err, err, err])
+    code, out = _run_latency(["--n", "3"])
+    assert code == 2
+    assert "no successful samples; percentiles not reported" in out
+    assert "p50_ms" not in out
+    assert not (tmp_path / "latency.jsonl").exists()
+
+
+def test_latency_low_confidence_line(tmp_path, monkeypatch):
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    _stub_extract(monkeypatch, [{}, {}, {}])
+    _, out = _run_latency(["--n", "3"])
+    assert "low_confidence: only 3 successful samples" in out
+
+
+def test_latency_no_low_confidence_when_five_or_more(tmp_path, monkeypatch):
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    _stub_extract(monkeypatch, [{}, {}, {}, {}, {}, {}])
+    _, out = _run_latency(["--n", "6"])
+    assert "low_confidence" not in out
+
+
+def test_latency_failure_tally_carries_no_secrets(tmp_path, monkeypatch):
+    from src import call_llm
+
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "latency.jsonl")
+    err = call_llm.LlmTransportError(
+        "transport: read timed out connecting to https://gw.example/v1?key=sk-secret"
+    )
+    _stub_extract(monkeypatch, [err])
+    _, out = _run_latency(["--n", "1"])
+    assert "sk-secret" not in out
+    assert "https://" not in out
+    assert "failures: 1 x transport: read timeout (LlmTransportError)" in out
+
+
+def test_failure_kind_whitelist_shapes():
+    from src import call_llm
+
+    http = call_llm.LlmTransportError("http 503: secret body", status_code=503,
+                                      body="sk-secret and https://host/x")
+    assert measure_latency._failure_kind(http) == "http 503 (LlmTransportError)"
+    refused = call_llm.LlmTransportError("transport: refused https://h/sk-secret")
+    assert measure_latency._failure_kind(refused) == "transport: other (LlmTransportError)"
+    resolved = call_llm.LlmTransportError(
+        "transport: temporary failure in name resolution"
+    )
+    assert measure_latency._failure_kind(resolved) == \
+        "transport: name resolution (LlmTransportError)"
+    not_json = json.JSONDecodeError("x", "sk-secret", 0)
+    assert measure_latency._failure_kind(not_json) == "not_json"
+
+
+def test_latency_dry_run_does_not_call_extract(tmp_path, monkeypatch):
+    monkeypatch.setattr(measure_latency, "LATENCY_PATH", tmp_path / "logs" / "latency.jsonl")
+    called = _stub_extract(monkeypatch, [{} for _ in range(5)])
+    code, out = _run_latency(["--dry-run", "--n", "5"])
+    assert code == 0
+    assert called == []
+    assert not (tmp_path / "logs").exists()

@@ -513,3 +513,69 @@ had actually specified. Two of the three needed an owner's decision, and one nee
 than an `assert` before `replace`. That is the whole job: keep the contract written down, and make
 the agent prove its edits.
 
+
+---
+
+## 2026-11-13 · Two measurement defects, found by running the thing once
+
+**Context.** The first real measurement run produced data for NFR-002 and then died. Both events —
+the data and the death — were more useful than a clean run would have been, because each exposed a
+defect that no amount of reading the code would have surfaced.
+
+**Defect A — one transport failure destroyed the whole latency sample.** The gateway returned
+`Read timed out (read timeout=30)` on a single call. `measure_latency` let `LlmTransportError`
+propagate, so the loop ended at that attempt; the samples already written to
+`logs/llm_calls.jsonl` survived, the rest were never taken. The log shows it plainly: one
+`usage_source="gateway"` row, then one `request_made=true, usage_source="missing"` row, then
+nothing.
+
+**Defect B — the token sample had no distribution.** Every successful call returned
+`tokens = {input: 91, output: 12, total: 103}`. The probe sentence is byte-identical and
+`temperature: 0`, so the prompt, the completion and therefore the token count are identical by
+construction. Thirteen rows with one distinct value cannot support a percentile, and the owner of
+NFR-002 would be right to ask why every row is the same.
+
+**What I did instead of dictating a fix.** Both defects are design questions with several defensible
+answers, so I asked for three designs each, against a criteria list fixed in advance: the ten-key log
+schema is untouched, no estimation or zero-filling, the frozen report format is unchanged, latency is
+measured on a fixed input while token cost is measured across varied inputs, and the tooling must
+stay offline-testable. Six designs came back.
+
+| Design | Verdict | Why |
+|---|---|---|
+| A1 count the failure and continue | **chosen** | smallest change; prints `(n=…)` on the same line as each percentile, so a reviewer sees the sample size without opening the code |
+| A2 circuit breaker after K consecutive failures | rejected | needs a `K` we cannot justify from one data point, and truncates runs that would have succeeded |
+| A3 sampler writes every attempt, separate `report_latency.py` | rejected for now | creates a **second evidence schema** for `logs/latency.jsonl`; the contract owner has approved no such schema |
+| B1 second script with a built-in corpus | **chosen** | produces a genuine distribution with no new data file and no new owner |
+| B2 one script, two modes | rejected | one command carrying two invariants; a reviewer cannot tell which mode produced a row |
+| B3 external corpus file | deferred | adds a repository file whose content *is* evidence, and its owner (B or D) is unsettled |
+
+**The four amendments I added.** The chosen designs were sound but incomplete, and three of the four
+gaps were things the proposal had not considered at all:
+
+1. exit code **2** when no sample succeeded, so CI can distinguish "ran and produced nothing" from
+   "crashed";
+2. an explicit `low_confidence` line when `0 < ok < 5` — printing `(n=3)` is honest, but a reader
+   skimming will not notice three is nearly nothing;
+3. catch **`JSONDecodeError` as well as `LlmTransportError`** — a non-JSON answer is a failed
+   sample, not the end of the run;
+4. the failure tally records **kind and count only** — never a response body, never a raw exception
+   `repr`. This one is not about measurement at all: `str(exc)` for a transport error can contain
+   the full request URL, which can contain a credential. We settled "no secrets in logs" in Phase 1,
+   and a new summary line is exactly where that rule would have been broken by accident.
+
+**Reflection.** Both defects were invisible in review and obvious in one run. The code was correct
+against its own intentions: the loop really did measure latency, the probe really did produce real
+`usage` values. What was wrong was the *measurement design* — a tool that dies on the first failure,
+and a sample of size twenty drawn from one point. That is a category of defect that tests do not
+find, because the tests stub the very thing that misbehaves; it only appears when the tool meets a
+flaky network. The fix is not "write more tests" but "run it once for real, and treat the first
+failure as data".
+
+Second reflection, about the working relationship: the agent's proposal was genuinely good — it
+listed its own risks, named two invalid alternatives unprompted, and recommended the cheapest
+option rather than the most impressive one. It still missed the secrets exposure, because that rule
+lives in our governance documents rather than in the measurement problem. The division that worked:
+it designed, I supplied the constraints it could not know, and the amendments were the part that
+belongs to the person who owns the project's rules.
+
