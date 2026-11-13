@@ -109,8 +109,9 @@ write (`structural-constraints.md §4`).
 ### RP-007 — Storage boundary failure
 
 - **Trigger:** storage rejects a record's shape or duplicate `call_id`, cannot read existing
-  records (including malformed JSON or a nonnumeric stored amount), or cannot write a
-  validated record (I/O error, unwritable path, persistence error).
+  records (including malformed JSON, an invalid stored `call_id`, or a nonnumeric stored
+  amount), or cannot write a validated record (I/O error, unwritable path, persistence or
+  JSON serialization error).
 - **Action:** raise an **independent `StorageError`**. It is an infrastructure failure, not
   a rule decision.
 - **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
@@ -124,9 +125,19 @@ write (`structural-constraints.md §4`).
   implementation**; it must not be read as confirmed.
 - **Not a policy rejection:** a storage failure is **not** a normal policy rejection and
   **must not** create a policy review line (`logs/review.jsonl`).
-- **Evidence:** the failure surfaces as `StorageError` to the caller. A read or validation
-  failure stops before a new storage record is appended. A write failure has the separate
-  no-partial-state requirement above, which is not yet verified.
+- **Evidence:** the required failure signal is `StorageError` to the caller. A read or
+  validation failure stops before a new storage record is appended. A write failure has
+  the separate no-partial-state requirement above, which is not yet verified. The two
+  uncaught `TypeError` paths below do not yet meet this signal contract.
+
+**Unresolved D exception paths (code review, not test-verified).** In
+`src/storage.py::_existing_call_ids`, a persisted JSON object with an unhashable
+`call_id` (for example a list) reaches `ids.add(...)` and raises `TypeError`; the read
+path does not convert it to `StorageError`. In `append_validated(record)`, structural
+checks do not validate `decided_at` for JSON serializability. A direct caller can pass a
+nonserializable value (for example a date/time object); `json.dumps(record)` then raises
+`TypeError`, while the write handler catches only `OSError`. Both failures must stop the
+operation and surface as `StorageError` under RP-007; this conversion is **not implemented**.
 
 > **Pending clarification.** The exact storage-failure evidence detail (whether it is
 > logged at all and, if so, in what record and format) is **not** defined by D's current
