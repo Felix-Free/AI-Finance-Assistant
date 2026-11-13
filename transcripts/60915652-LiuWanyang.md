@@ -628,3 +628,49 @@ which is impossible if the scan works. The pattern was rebuilt by concatenating 
 guard-removal row was re-run. Two lessons: a passing test is not evidence until you have seen it fail,
 and the cheapest way to make a test fail on demand is to write down, in advance, the mutation that
 should break it.
+
+---
+
+## 2026-11-14 · Closing the two blocking findings: a float comparison that rejected legitimate records
+
+**Context.** The reviewer found two blocking defects in PR #18: storage could be bypassed by calling
+`append_validated` directly with a policy-invalid record, and `report_tokens.LOG_PATH` was still
+relative to the working directory while the guard test never looked at that file. Role C had already
+approved the design for the first one (`runtime-policy-catalog.md` §5.5): an `expected_spent` numeric
+parameter, `total == expected_spent + amount`, and `expected_spent >=` the persisted cumulative spend.
+
+**What was implemented.** Storage now re-runs `policy_core`'s three guards against the effective
+spend, refuses under-reported spend, refuses arithmetic inconsistency, and never re-implements a
+threshold. `pipeline.process` passes its `spent` through, so the existing call pattern still works and
+an over-budget rejection still surfaces as `policy:budget` rather than becoming a storage error. The
+second defect was closed by anchoring the path and by four guards in the test file: the manifest grew
+from four constants to five, every constant must be absolute and inside the repository, any relative
+`logs`/`data` literal anywhere in `src/` fails the suite (with file and line), and the duplicated
+`logs/llm_calls.jsonl` string is pinned equal across its two owners.
+
+**The defect inside the fix.** The arithmetic consistency check was written as
+
+```python
+if float(record["total"]) != float(effective) + float(record["amount"]):
+```
+
+`enforce_budget` returns `float(Decimal(str(spent)) + Decimal(str(amount)))`, so for `spent=0.1,
+amount=0.2` the left side is `0.3` while the right side evaluates to `0.30000000000000004`. A
+legitimate record would have been rejected for a rounding artefact — and no existing test covered a
+decimal whose sum is not exactly representable in binary floating point. The check was rewritten with
+`Decimal(str(...))` on all three values, and the regression test seeds `0.1`, writes `0.2` with
+`total=0.3`, and asserts the line is appended. Reverting to the float comparison makes exactly that
+test fail.
+
+**Two things this episode shows.** First, "it passes the tests" is not the same as "it is correct":
+145 tests were green both before and after this bug was fixed, because the fixture values happened to
+be binary-exact. The bug was found by reading the code against the spec, not by running it. Second, the
+guard-removal discipline is what makes such a fix verifiable: the only reason the float version was
+noticed at all is that I asked for the mutation that should break each guard, and a mutation that
+*doesn't* break anything is information.
+
+**Working relationship note.** The agent volunteered that four existing fixtures had to change because
+their `total` values were not arithmetically consistent, and it refused to delete or weaken their
+assertions — it changed the data instead. It also caught that its first relative-literal scan was
+vacuous (a `%r`-built pattern matched nothing) and reported that before I saw the green suite. Both are
+the behaviour the process is supposed to produce: report the defect, do not paper over it.
