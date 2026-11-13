@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 
 import pytest
 
-from src import measure_latency, report_tokens
+from src import measure_latency, measure_tokens, report_tokens
 
 
 def _write_log(tmp_path, records):
@@ -236,3 +236,86 @@ def test_latency_dry_run_does_not_call_extract(tmp_path, monkeypatch):
     assert code == 0
     assert called == []
     assert not (tmp_path / "logs").exists()
+
+
+def _run_tokens(argv):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = measure_tokens.main(argv)
+    return code, buf.getvalue()
+
+
+def test_token_corpus_has_at_least_twenty_sentences():
+    assert len(measure_tokens.CORPUS) >= 20
+
+
+def test_token_corpus_has_at_least_eight_distinct_lengths():
+    assert len({len(s) for s in measure_tokens.CORPUS}) >= 8
+
+
+def test_token_dry_run_does_not_call_extract(monkeypatch, capsys):
+    called = _stub_extract(monkeypatch, [{} for _ in range(5)])
+    code, out = _run_tokens(["--dry-run"])
+    assert code == 0
+    assert "dry-run" in out
+    assert str(len(measure_tokens.CORPUS)) in out
+    assert called == []
+
+
+def test_token_mixed_run_counts_failures_and_does_not_stop(monkeypatch):
+    from src import call_llm
+
+    err = call_llm.LlmTransportError("transport: read timed out (read timeout=30)")
+    called = _stub_extract(monkeypatch, [err, {}, {}, err, {}])
+    code, out = _run_tokens(["--n", "5"])
+    assert code == 0
+    assert len(called) == 5
+    assert "attempted=5 ok=3 failed=2 failure_rate=0.40" in out
+    assert "failures: 2 x transport: read timeout (LlmTransportError)" in out
+    assert "next: run `python -m src.report_tokens`" in out
+
+
+def test_token_all_fail_run_returns_two(monkeypatch):
+    from src import call_llm
+
+    err = call_llm.LlmTransportError("transport: read timed out")
+    _stub_extract(monkeypatch, [err, err, err])
+    code, out = _run_tokens(["--n", "3"])
+    assert code == 2
+    assert "ok=0" in out
+    assert "no successful samples" in out
+    assert "next: run `python -m src.report_tokens`" not in out
+
+
+def test_token_file_corpus_cycles_when_n_exceeds_size(tmp_path, monkeypatch):
+    corpus = tmp_path / "corpus.txt"
+    corpus.write_text("alpha 1\nbeta 2.5\ngamma 3\n", encoding="utf-8")
+    called = _stub_extract(monkeypatch, [{} for _ in range(6)])
+    code, out = _run_tokens(["--file", str(corpus), "--n", "6"])
+    assert code == 0
+    assert called == ["alpha 1", "beta 2.5", "gamma 3",
+                      "alpha 1", "beta 2.5", "gamma 3"]
+    assert "attempted=6 ok=6 failed=0 failure_rate=0.00" in out
+
+
+def test_token_dry_run_reads_file_corpus_without_calling(tmp_path, monkeypatch):
+    corpus = tmp_path / "corpus.txt"
+    corpus.write_text("alpha 1\nbeta 2\n", encoding="utf-8")
+    called = _stub_extract(monkeypatch, [{}])
+    code, out = _run_tokens(["--file", str(corpus), "--dry-run"])
+    assert code == 0
+    assert "2 sentence(s)" in out
+    assert called == []
+
+
+def test_failure_kind_label_never_carries_secrets():
+    from src import call_llm
+
+    err = call_llm.LlmTransportError(
+        "transport: read timed out to https://gw.example/v1?key=sk-secret"
+    )
+    label = measure_tokens._failure_kind(err)
+    assert label == "transport: read timeout (LlmTransportError)"
+    assert "sk-secret" not in label
+    assert "https://" not in label
+    assert label == measure_latency._failure_kind(err)
