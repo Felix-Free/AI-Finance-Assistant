@@ -28,6 +28,7 @@ test/           Test suites.
   live/         Tests that call the model gateway.
 docs/           Requirements, architecture, and code-governance documentation.
 .github/        CI/CD workflows and blocking quality gates.
+```
 
 ## How to Run Tests
 
@@ -40,6 +41,7 @@ pytest test/live
 
 # Full suite
 pytest
+```
 
 ## CI/CD & Blocking Gates
 
