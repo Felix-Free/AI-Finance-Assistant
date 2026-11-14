@@ -1,0 +1,617 @@
+# =============================================================================
+# AI Finance Assistant — Requirements Registry
+# Owner: Role B (Requirements & Architecture)
+# Status: Phase 1 · D1 draft. Machine-readable source of truth for requirements.
+#
+# Grounding: this file reflects the ACTUAL merged/known code state, not intended
+# features. Items that are not confirmed against code or role-C security specs are
+# marked status: pending_confirmation and MUST NOT be read as approved.
+#
+# !! ITEMS MARKED "NEEDS CONFIRMATION" ARE NOT YET APPROVED BY OTHER ROLES. !!
+#    They are collected in `pending_decisions` and also flagged inline.
+#
+# Primary sources:
+#   - docs/architecture/invariants.md            (INV-001/002/003)
+#   - docs/architecture/runtime-policy-catalog.md (RP-001..RP-006)
+#   - docs/architecture/permission-model.md
+#   - AGENTS.md
+#   - docs/code-governance/structural-constraints.md §3 (naming)
+#   - src/call_llm.py, src/policy_core.py, src/pipeline.py (main; feat/D-policy-core merged through PR #9, commit 0dda36b)
+# =============================================================================
+
+project_metadata:
+  name: AI Finance Assistant
+  version: "0.1.0-phase1"
+  phase: 1
+  role_owner: B
+  repository: "https://github.com/Felix-Free/AI-Finance-Assistant"
+  default_branch: main
+  model:
+    id: "DeepSeek-V4-Flash"
+    configured_via: env
+    env_var: LLM_MODEL
+    # NEEDS CONFIRMATION (owner: D) -> PD-004
+    note: >-
+      Default in call_llm.py and .env.example is CS5351/DeepSeek-V4-Flash.
+      The runtime .env value is NOT in the repository and cannot be verified.
+  sources:
+    - docs/architecture/invariants.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/permission-model.md
+    - AGENTS.md
+    - docs/code-governance/structural-constraints.md
+
+scope:
+  summary: >-
+    A personal finance assistant that turns one natural-language sentence describing a
+    purchase into a validated, structured spending record. The model only understands
+    and parses; deterministic code decides whether the record is accepted.
+  in_scope:
+    - "SC-1: Accept a natural-language sentence describing a purchase (e.g. Chinese or English)."
+    - "SC-2: Call the DeepSeek model through the single entry point src/call_llm.py::extract."
+    - "SC-3: Extract structured spending data (amount, category) from the model output."
+    - "SC-4: Run deterministic business-rule validation (src/policy_core.py)."
+    - "SC-5: Reject, or flag for human review, any invalid or unreliable result per the runtime policy catalog."
+    - "SC-6: Record parse, validation and rejection outcomes in logs."
+  non_goals:
+    - "NG-1: Connecting to real bank accounts or aggregators."
+    - "NG-2: Performing real payments or transfers."
+    - "NG-3: Providing investment advice or portfolio management."
+    - "NG-4: Automatic transfers or bill payment."
+    - "NG-5: Complex financial planning, forecasting or tax filing."
+    - "NG-6: Any feature not explicitly approved in this registry."
+  out_of_current_scope_notes:
+    - "Persistence/storage layer is not implemented yet; pipeline.process returns a record but does not persist it."
+    - "Budget limit storage/configuration is not implemented; budget_limit is passed in by the caller."
+
+functional_requirements:
+  - id: FR-001
+    title: Natural-language spending parsing
+    description: >-
+      Given one natural-language sentence describing a purchase, submit it to the model
+      and obtain a raw parsed response. Parsing is performed only through
+      src/call_llm.py::extract (single model entry point).
+    input: "One natural-language sentence (string)."
+    output: "Raw model response parsed to a JSON object (UNVALIDATED), or an LlmTransportError / JSONDecodeError."
+    preconditions: "LLM_BASE_URL and LLM_API_KEY are configured; gateway reachable."
+    expected_behavior: >-
+      The sentence is sent with a system prompt that requests ONLY a JSON object with
+      keys amount and category; the raw response is returned unvalidated.
+    acceptance_criteria:
+      - "A valid sentence yields a JSON object from extract()."
+      - "A non-JSON response raises JSONDecodeError and logs error=not_json (RP-001)."
+      - "A transport/HTTP failure raises LlmTransportError (RP-002)."
+    verification_method: "pytest test/offline (monkeypatched transport) + test/live (approved); unit tests on call_llm."
+    priority: high
+    status: approved
+
+  - id: FR-002
+    title: Structured data extraction and field checks
+    description: >-
+      From the parsed object, obtain the fields amount and category. Records that are not
+      a JSON object are rejected before field checks.
+    input: "Parsed model object (dict)."
+    output: "Normalised record {amount, category, total} on success; PolicyError on failure."
+    preconditions: "A parsed object exists."
+    expected_behavior: >-
+      validate_record requires a dict; non-dict input raises PolicyError(code=policy:amount,
+      review=false). amount is checked first, then category, then budget.
+    acceptance_criteria:
+      - "A non-dict record (e.g. a JSON array) is rejected as policy:amount."
+      - "A valid dict yields {amount, category, total}."
+    verification_method: "test_validate_record_rejects_non_dict; test_validate_record_returns_normalised_record."
+    priority: high
+    status: approved
+
+  - id: FR-003
+    title: Spending amount validity check
+    description: >-
+      The amount must be a finite positive number with at most two decimal places.
+    input: "amount field from the parsed object."
+    output: "The unchanged amount if valid; PolicyError(code=policy:amount) otherwise."
+    preconditions: "Record is a dict."
+    expected_behavior: >-
+      Reject when amount is missing, boolean, non-numeric, non-finite (NaN/Inf), <= 0, or has
+      more than 2 decimal places (money is cents). See INV-001.
+    acceptance_criteria:
+      - "Reject -1, 0, 0.005, 100.001, \"350\", null, true, NaN, Inf."
+      - "Accept 0.01 and integers such as 350."
+      - "The guard returns the original value (int stays int, float stays float)."
+    verification_method: "test_policy_core_smoke::test_inv001_* (smoke); E's test/offline/test_invariants.py (full boundary suite, pending)."
+    priority: high
+    status: approved
+
+  - id: FR-004
+    title: Spending category validity check
+    description: >-
+      The category must exactly match a code-defined, closed whitelist (case-sensitive).
+    input: "category field from the parsed object."
+    output: "The category if whitelisted; PolicyError(code=policy:category, review=true) otherwise."
+    preconditions: "Record is a dict."
+    expected_behavior: >-
+      Compare against the closed vocabulary defined in code (CATEGORY_WHITELIST), never in a
+      prompt and never inferred from the model. See INV-002.
+    acceptance_criteria:
+      - "Reject \"Food\", \"餐饮\", \"meal\", \"\", null, and non-string values."
+      - "Accept every value in the code-defined whitelist."
+    verification_method: "test_policy_core_smoke::test_inv002_*."
+    priority: high
+    status: approved
+    # NEEDS CONFIRMATION (owner: C) -> PD-002
+    notes: >-
+      The exact whitelist membership is fixed in code (currently 8 values:
+      food, transport, shopping, entertainment, housing, utilities, health, other).
+      Whether this set is final is pending confirmation by C (see pending_decisions).
+
+  - id: FR-005
+    title: Budget rule check
+    description: >-
+      Cumulative spending must never exceed the budget limit. Equality at the limit is allowed.
+    input: "existing spent total, new amount, budget_limit."
+    output: "New running total if within budget; PolicyError(code=policy:budget, review=true) otherwise."
+    preconditions: "amount and category have already passed."
+    expected_behavior: >-
+      Reject only when spent + amount > budget_limit (strictly greater than). Decimal
+      comparison is used. budget_limit comes from stored configuration (source pending).
+      See INV-003.
+    acceptance_criteria:
+      - "spent+amount == budget_limit is accepted."
+      - "spent+amount > budget_limit is rejected with review=true."
+      - "The check is cumulative, not per-record."
+    verification_method: "test_inv003_equality_is_allowed; test_inv003_over_budget_rejected_with_review."
+    priority: high
+    status: approved
+    # NEEDS CONFIRMATION (owner: C) -> PD-003
+    notes: >-
+      budget_limit origin (storage/configuration) is not implemented and is pending (see pending_decisions).
+
+  - id: FR-006
+    title: Abnormal-parse and illegal-result handling
+    description: >-
+      Non-JSON model output, transport failures and malformed response envelopes must be
+      handled per the runtime policy catalog, never turned into a valid record.
+    input: "Raw model response."
+    output: "Documented exception (JSONDecodeError or LlmTransportError)."
+    preconditions: "None."
+    expected_behavior: >-
+      RP-001: non-JSON -> log not_json, re-raise. RP-002: transport/HTTP -> LlmTransportError.
+      Malformed envelope (missing choices/message/content) -> LlmTransportError (protocol).
+      No fabricated record is produced.
+    acceptance_criteria:
+      - "Non-JSON is logged once and re-raised."
+      - "A malformed envelope raises LlmTransportError, not KeyError/IndexError."
+    verification_method: "test_pipeline_seam::test_seam_non_json_is_logged_then_reraised; test_post_raises_on_malformed_envelope."
+    priority: high
+    status: approved
+
+  - id: FR-007
+    title: Block invalid data from proceeding after a failed check
+    description: >-
+      Any invariant failure must stop the record from affecting stored data.
+    input: "Record failing one or more invariants."
+    output: "PolicyError; no state change."
+    preconditions: "A validation failure occurred."
+    expected_behavior: >-
+      Validation happens before any state change. The caller receives PolicyError and the
+      record is discarded. The model can never bypass policy_core.
+    acceptance_criteria:
+      - "validate_record stops at the first failure and raises PolicyError."
+      - "No accepted record is produced when any invariant fails."
+    verification_method: "test_validate_record_stops_at_first_failure; architecture review; negative tests."
+    priority: high
+    status: approved
+
+  - id: FR-008
+    title: Logging and rejection-reason recording
+    description: >-
+      Every model call and every policy rejection must be recorded with a documented error code.
+    input: "Model call outcomes and policy rejections."
+    output: "One line per model call in logs/llm_calls.jsonl; one line per policy rejection in logs/review.jsonl."
+    preconditions: "Logs directory writable at runtime."
+    expected_behavior: >-
+      RP-004: exactly one llm_calls.jsonl line per call with input/raw/parsed/error; fail-closed
+      if it cannot be written. Each policy rejection (amount/category/budget) appends exactly
+      one review.jsonl line with error, amount, category, spent, total, review.
+    acceptance_criteria:
+      - "A successful call appends exactly one llm_calls.jsonl line."
+      - "Each policy rejection appends exactly one review.jsonl line with the correct error code."
+      - "If logging fails, the result must not be used (fail-closed)."
+    verification_method: "test_seam_returns_parsed_object_and_logs_once; test_policy_rejection_writes_one_review_line."
+    priority: high
+    status: approved
+
+nonfunctional_requirements:
+  - id: NFR-001
+    name: Model API response time
+    metric: "wall-clock latency per model call (extract round-trip)"
+    threshold: null
+    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95."
+    priority: medium
+    status: pending_confirmation
+    owner: B
+    # NEEDS CONFIRMATION (owner: B) -> PD-007
+    notes: "No approved latency budget exists. Threshold to be set by B with D/E; do not invent a number."
+
+  - id: NFR-002
+    name: Token consumption budget
+    metric: "tokens per request and per session"
+    threshold: null
+    verification: "read token usage from gateway response/logs if available; aggregate per session."
+    priority: medium
+    status: pending_confirmation
+    owner: B
+    # NEEDS CONFIRMATION (owner: B) -> PD-007
+    notes: "No token budget defined; gateway may not expose usage. To be decided by B with the course/team."
+
+  - id: NFR-003
+    name: API call failure handling
+    metric: "behaviour on transport/HTTP failure (deterministic outcome)"
+    threshold: null
+    verification: "pytest test/offline transport-failure tests; ensure LlmTransportError surfaces and nothing is persisted."
+    priority: high
+    status: pending_confirmation
+    owner: C
+    # NEEDS CONFIRMATION (owner: C) -> PD-008
+    notes: "Behaviour is defined (RP-002); a pass/fail threshold (e.g. retry policy) is pending C confirmation. Retry is not implemented."
+
+  - id: NFR-004
+    name: Data security (secrets)
+    metric: "count of committed secret occurrences"
+    threshold: 0
+    verification: "grep/secret scan across tracked files; .env gitignored; .env.example holds placeholders only."
+    priority: high
+    status: approved
+
+  - id: NFR-005
+    name: Input/output reliability
+    metric: "rate of accepted records that later fail deterministic checks"
+    threshold: null
+    verification: "property/negative tests plus code review that validation precedes any state change."
+    priority: high
+    status: pending_confirmation
+    owner: B
+    # NEEDS CONFIRMATION (owner: B) -> PD-007
+    notes: "Target reliability tolerance is not defined. To be decided by B with C."
+
+  - id: NFR-006
+    name: Log traceability
+    metric: "percentage of model calls and policy rejections with a corresponding log line"
+    threshold: null
+    verification: "count calls vs llm_calls.jsonl lines; count rejections vs review.jsonl lines in tests."
+    priority: high
+    status: pending_confirmation
+    owner: C
+    # NEEDS CONFIRMATION (owner: C) -> PD-008
+    notes: "Logging contract is defined (RP-004) and enforced fail-closed; a numeric coverage threshold is pending C."
+
+  - id: NFR-007
+    name: Testability
+    metric: "fraction of approved invariants with at least one offline, network-free negative test that fails when the corresponding guard is removed"
+    threshold: 1.0
+    verification: "map every approved INV to at least one corresponding guard-removal negative test; run the complete offline invariant test suite using pytest test/offline; verify that all tests pass with guards enabled and that each corresponding test fails when its guard is removed."
+    priority: high
+    status: pending_confirmation
+    owner: E
+    # NEEDS CONFIRMATION (owner: E)
+    notes: "Full boundary suite (test/offline/test_invariants.py) is E's deliverable and pending; only D smoke tests exist."
+
+invariants:
+  - id: INV-001
+    source_ref: "docs/architecture/invariants.md#INV-001"
+    rule: "amount is a finite positive number with at most two decimal places"
+    enforcement: "src/policy_core.py::enforce_amount"
+    owner_spec: C
+    owner_impl: D
+    status: approved
+  - id: INV-002
+    source_ref: "docs/architecture/invariants.md#INV-002"
+    rule: "category is in the code-defined closed whitelist (case-sensitive exact match)"
+    enforcement: "src/policy_core.py::enforce_category"
+    owner_spec: C
+    owner_impl: D
+    status: approved
+  - id: INV-003
+    source_ref: "docs/architecture/invariants.md#INV-003"
+    rule: "cumulative spending never exceeds the budget; equality is allowed"
+    enforcement: "src/policy_core.py::enforce_budget"
+    owner_spec: C
+    owner_impl: D
+    status: approved
+  - id: INV-PENDING-01
+    source_ref: "pending"
+    rule: "Exact membership of the category whitelist (currently 8 code-defined values)"
+    enforcement: "src/policy_core.py::CATEGORY_WHITELIST"
+    owner_spec: C
+    owner_impl: D
+    status: pending_confirmation
+    # NEEDS CONFIRMATION (owner: C) -> PD-002
+    notes: "C must confirm the final vocabulary. Do not treat the current 8 values as approved permanently."
+
+data_requirements:
+  layers:
+    - "ai_raw: the model's parsed JSON object returned by call_llm.extract (UNVALIDATED, untrusted)."
+    - "schema_validated: structural checks (record is a JSON object with amount and category present)."
+    - "deterministic_validated: output of policy_core.validate_record -> {amount, category, total}."
+  fields:
+    - name: amount
+      layer: ai_raw -> deterministic_validated
+      type: number
+      required: true
+      legal_values: "finite, > 0, at most 2 decimal places"
+      validation: "INV-001 / enforce_amount"
+    - name: category
+      layer: ai_raw -> deterministic_validated
+      type: string
+      required: true
+      legal_values: "one of the code-defined whitelist (case-sensitive)"
+      validation: "INV-002 / enforce_category"
+    - name: total
+      layer: deterministic_validated
+      type: number
+      required: false
+      legal_values: "spent + amount, <= budget_limit"
+      validation: "computed by enforce_budget; added by validate_record"
+  excluded_fields_not_in_code: "description, date, time, currency — NOT present in the current code and therefore not requirements. Adding them requires a change request."
+  storage_status: "No persistence layer is implemented; records are returned, not stored."
+
+ai_requirements:
+  - id: AI-REQ-001
+    statement: "AI is responsible for natural-language understanding and structured parsing only."
+    status: approved
+  - id: AI-REQ-002
+    statement: "AI has no final safety decision authority; the model proposes, code disposes."
+    status: approved
+  - id: AI-REQ-003
+    statement: "All AI output must pass programmatic schema validation before use."
+    status: approved
+  - id: AI-REQ-004
+    statement: "After schema validation, output must still pass deterministic business-rule validation."
+    status: approved
+  - id: AI-REQ-005
+    statement: "Prompt injection must not be able to alter business safety rules; rules live in code, not prompt text."
+    status: approved
+  - id: AI-REQ-006
+    statement: "If AI parsing fails, the system must not fabricate a valid record."
+    status: approved
+  - id: AI-REQ-007
+    statement: "When the model is uncertain or returns an unexpected shape, the approved error-handling policy must be applied (RP-001/RP-002)."
+    status: approved
+  - id: AI-REQ-008
+    statement: "AI must not modify project requirements or expand functional scope."
+    status: approved
+
+error_handling_requirements:
+  - id: ERR-001
+    title: Non-JSON model output
+    source_ref: "runtime-policy-catalog.md RP-001"
+    behavior: "log error=not_json with raw text; re-raise JSONDecodeError; do not retry."
+    status: approved
+  - id: ERR-002
+    title: Transport / HTTP failure
+    source_ref: "runtime-policy-catalog.md RP-002"
+    behavior: "raise LlmTransportError; persist nothing; distinct from policy rejection."
+    status: approved
+  - id: ERR-003
+    title: Invariant violation
+    source_ref: "runtime-policy-catalog.md RP-003/005/006"
+    behavior: "raise PolicyError; no state change; category/budget flagged REVIEW."
+    status: approved
+  - id: ERR-004
+    title: Logging integrity (fail-closed)
+    source_ref: "runtime-policy-catalog.md RP-004"
+    behavior: "if a call cannot be logged, its result must not be used."
+    status: approved
+  - id: ERR-005
+    title: Rejection evidence
+    source_ref: "invariants.md §2 rejection evidence (option B)"
+    behavior: "one logs/review.jsonl line per policy rejection with error, amount, category, spent, total, review."
+    status: approved
+
+security_requirements:
+  - id: SEC-001
+    statement: "No API key, token or password may appear in any committed file."
+    status: approved
+  - id: SEC-002
+    statement: "All model calls go through src/call_llm.py; no other module imports requests for model calls."
+    status: approved
+  - id: SEC-003
+    statement: "src/policy_core.py must never be bypassed; every model output passes deterministic checks before affecting data."
+    status: approved
+  - id: SEC-004
+    statement: ".env is neither readable nor writable by the coding agent; secrets are never logged."
+    status: approved
+  - id: SEC-005
+    statement: "Logging is fail-closed: an unlogged result must not be used."
+    status: approved
+
+acceptance_criteria:
+  - id: AC-001
+    requirement: FR-001
+    scenario: "Normal"
+    given: "a valid spending sentence and a reachable gateway"
+    when: "extract is called"
+    then: "a parsed JSON object is returned and one llm_calls.jsonl line is appended"
+    verification: "test_seam_returns_parsed_object_and_logs_once"
+    status: approved
+  - id: AC-002
+    requirement: FR-003
+    scenario: "Negative"
+    given: "amount = -1"
+    when: "validate_record / enforce_amount runs"
+    then: "PolicyError(policy:amount, review=false)"
+    verification: "test_inv001_rejects_invalid_amount [-1]"
+    status: approved
+  - id: AC-003
+    requirement: FR-003
+    scenario: "Boundary"
+    given: "amount = 0, 0.005, 100.001"
+    when: "enforce_amount runs"
+    then: "all rejected (zero, too many decimals)"
+    verification: "test_inv001_rejects_invalid_amount [0,0.005,100.001]"
+    status: approved
+  - id: AC-004
+    requirement: FR-003
+    scenario: "Boundary"
+    given: "amount = 0.01 and 350 (int)"
+    when: "enforce_amount runs"
+    then: "accepted; int stays int"
+    verification: "test_inv001_accepts_boundary_and_returns_unchanged"
+    status: approved
+  - id: AC-005
+    requirement: FR-004
+    scenario: "Negative"
+    given: "category = 'Food' / '餐饮' / 'meal' / ''"
+    when: "enforce_category runs"
+    then: "PolicyError(policy:category, review=true)"
+    verification: "test_inv002_rejects_out_of_vocabulary"
+    status: approved
+  - id: AC-006
+    requirement: FR-004
+    scenario: "Positive"
+    given: "every whitelisted category value"
+    when: "enforce_category runs"
+    then: "all accepted"
+    verification: "test_inv002_accepts_every_whitelisted_category"
+    status: approved
+  - id: AC-007
+    requirement: FR-005
+    scenario: "Boundary"
+    given: "spent=990, amount=10, limit=1000"
+    when: "enforce_budget runs"
+    then: "accepted (equality allowed)"
+    verification: "test_inv003_equality_is_allowed"
+    status: approved
+  - id: AC-008
+    requirement: FR-005
+    scenario: "Negative"
+    given: "spent=990, amount=10.01, limit=1000"
+    when: "enforce_budget runs"
+    then: "PolicyError(policy:budget, review=true)"
+    verification: "test_inv003_over_budget_rejected_with_review"
+    status: approved
+  - id: AC-009
+    requirement: FR-001
+    scenario: "Abnormal"
+    given: "the model returns non-JSON"
+    when: "extract is called"
+    then: "JSONDecodeError raised and one line with error=not_json logged"
+    verification: "test_seam_non_json_is_logged_then_reraised"
+    status: approved
+  - id: AC-010
+    requirement: FR-006
+    scenario: "Abnormal"
+    given: "HTTP 200 with a malformed envelope"
+    when: "_post parses the response"
+    then: "LlmTransportError (protocol), not KeyError/IndexError"
+    verification: "test_post_raises_on_malformed_envelope"
+    status: approved
+  - id: AC-011
+    requirement: FR-007
+    scenario: "Negative"
+    given: "a record with two failures (amount=-1, category='Food')"
+    when: "validate_record runs"
+    then: "stops at first failure with policy:amount"
+    verification: "test_validate_record_stops_at_first_failure"
+    status: approved
+  - id: AC-012
+    requirement: FR-008
+    scenario: "Negative"
+    given: "any policy rejection (amount/category/budget)"
+    when: "pipeline.process runs"
+    then: "exactly one review.jsonl line with the matching error and review flag"
+    verification: "test_policy_rejection_writes_one_review_line"
+    status: approved
+  - id: AC-013
+    requirement: FR-002
+    scenario: "Negative"
+    given: "the model returns a JSON array"
+    when: "validate_record runs"
+    then: "PolicyError(policy:amount, review=false)"
+    verification: "test_validate_record_rejects_non_dict"
+    status: approved
+
+traceability:
+  note: "Lightweight registry only; the formal Trace Matrix is a Phase 3 deliverable."
+  mappings:
+    - requirement: FR-003
+      invariant: INV-001
+      runtime_policy: RP-003
+      code: "src/policy_core.py::enforce_amount"
+      tests: ["test_inv001_rejects_invalid_amount", "test_inv001_accepts_boundary_and_returns_unchanged"]
+    - requirement: FR-004
+      invariant: INV-002
+      runtime_policy: RP-006
+      code: "src/policy_core.py::enforce_category"
+      tests: ["test_inv002_rejects_out_of_vocabulary", "test_inv002_accepts_every_whitelisted_category"]
+    - requirement: FR-005
+      invariant: INV-003
+      runtime_policy: RP-005
+      code: "src/policy_core.py::enforce_budget"
+      tests: ["test_inv003_equality_is_allowed", "test_inv003_over_budget_rejected_with_review"]
+    - requirement: FR-008
+      invariant: null
+      runtime_policy: RP-004
+      code: "src/call_llm.py::_append_log; src/pipeline.py::_append_review"
+      tests: ["test_seam_returns_parsed_object_and_logs_once", "test_policy_rejection_writes_one_review_line"]
+
+# =============================================================================
+# NEEDS CONFIRMATION — these are NOT approved. Each item names its owner.
+# Do NOT change any deadline until PD-001 is confirmed.
+# =============================================================================
+pending_decisions:
+  - id: PD-001
+    topic: "Deadline alignment: worksheet vs GitHub Issue"
+    question: "Are the worksheet and the GitHub Issue deadline identical?"
+    status: pending_confirmation
+    owner: A
+    verification: "Compare the worksheet date with the Issue due date; record any mismatch. Not verified (images unavailable)."
+    notes: "NEEDS CONFIRMATION (owner: A). Do NOT change any deadline until confirmed."
+  - id: PD-002
+    topic: "Category whitelist final vocabulary"
+    question: "Is the current 8-value whitelist final, or should it change?"
+    status: pending_confirmation
+    owner: C
+    verification: "C confirms in invariants.md; E tests every member."
+    notes: "NEEDS CONFIRMATION (owner: C). Current values: food, transport, shopping, entertainment, housing, utilities, health, other."
+  - id: PD-003
+    topic: "Budget limit value and storage"
+    question: "What is the budget limit, per what period, and where is it stored/read?"
+    status: pending_confirmation
+    owner: C
+    verification: "Storage/config module exists and budget_limit is loaded from it; tests cover it."
+    notes: "NEEDS CONFIRMATION (owner: C). Currently budget_limit is passed by caller; no storage layer."
+  - id: PD-004
+    topic: "Model runtime value"
+    question: "Is the runtime LLM_MODEL exactly CS5351/DeepSeek-V4-Flash?"
+    status: pending_confirmation
+    owner: D
+    verification: "Inspect the runtime .env (not in repo); confirm via a live call log."
+    notes: "NEEDS CONFIRMATION (owner: D)."
+  - id: PD-005
+    topic: "Merge of feat/D-policy-core"
+    question: "When will src/policy_core.py and src/pipeline.py be merged into main?"
+    status: pending_confirmation
+    owner: A
+    verification: "Factually satisfied: main (0dda36b, PR #9) contains src/call_llm.py, src/policy_core.py and src/pipeline.py; offline tests exist at test/offline/test_policy_core_smoke.py and test/offline/test_pipeline_seam.py and pass. CI is NOT yet on main (a separate, unmerged deliverable on feat/e-ci-skeleton)."
+    notes: "The merge condition is factually satisfied. Historical branch feat/D-policy-core was merged into main via PR #9 (commit 0dda36b); the three core modules and their offline tests are on main. The 'CI passes' sub-clause is still unmet because CI has not been merged. Administrative closure confirmation by owner A remains pending."
+  - id: PD-006
+    topic: "Python version baseline"
+    question: "Is the baseline Python 3.9.7 (as documented) or the 3.14.4 observed in the venv?"
+    status: pending_confirmation
+    owner: D
+    verification: "Declared in structural-constraints.md and enforced in CI; D confirms venv."
+    notes: "NEEDS CONFIRMATION (owner: D)."
+  - id: PD-007
+    topic: "Latency and token budgets (NFR-001/NFR-002)"
+    question: "What latency and token thresholds are approved?"
+    status: pending_confirmation
+    owner: B
+    verification: "Thresholds set and measured in test/live."
+    notes: "NEEDS CONFIRMATION (owner: B)."
+  - id: PD-008
+    topic: "Retry policy for transport failures"
+    question: "Is any bounded retry allowed, or fail immediately?"
+    status: pending_confirmation
+    owner: C
+    verification: "runtime-policy-catalog.md RP-002 states the retry rule; code matches."
+    notes: "NEEDS CONFIRMATION (owner: C)."

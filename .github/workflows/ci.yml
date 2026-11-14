@@ -1,0 +1,191 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run offline tests
+        run: python -m pytest test/offline -q
+
+      - name: Ruff static checks
+        run: python -m ruff check --select E9,F63,F7,F82 src test
+
+      - name: AI-use-log increment check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+
+          import yaml
+
+          LOG_PATH = "docs/ai-use-log.yaml"
+          WATCHED = ("src/", "test/", "prompts/")
+          KNOWN_DEFECT = "======="
+          KEY_FIELDS = ("student_id", "phase", "session")
+
+          def git(*args):
+              return subprocess.run(
+                  ["git"] + list(args),
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout
+
+          def watched(path):
+              return path == "Prompt.md" or any(path.startswith(p) for p in WATCHED)
+
+          def read_at(rev):
+              try:
+                  return git("show", rev + ":" + LOG_PATH)
+              except subprocess.CalledProcessError:
+                  return None
+
+          def strip_base_defect(text):
+              # Only the compared (base) log may carry the single historical
+              # separator line that literally equals KNOWN_DEFECT. HEAD is
+              # parsed strictly with no tolerance. Remove exactly one such line
+              # and only when it occurs exactly once; keep all other text.
+              lines = text.splitlines()
+              if lines.count(KNOWN_DEFECT) == 1:
+                  lines.remove(KNOWN_DEFECT)
+              return "\n".join(lines)
+
+          def parse(text, label, tolerant):
+              if text is None:
+                  return None
+              source = strip_base_defect(text) if tolerant else text
+              try:
+                  doc = yaml.safe_load(source)
+              except yaml.YAMLError as exc:
+                  print("FAIL: cannot parse %s YAML: %s" % (label, exc))
+                  sys.exit(1)
+              if not isinstance(doc, list):
+                  print("FAIL: %s must be a YAML list" % label)
+                  sys.exit(1)
+              keys = []
+              for index, entry in enumerate(doc):
+                  if not isinstance(entry, dict):
+                      print("FAIL: %s entry %d is not a mapping" % (label, index))
+                      sys.exit(1)
+                  for field in KEY_FIELDS:
+                      if field not in entry or entry[field] is None:
+                          print(
+                              "FAIL: %s entry %d missing key %s" % (label, index, field)
+                          )
+                          sys.exit(1)
+                      if not str(entry[field]).strip():
+                          print(
+                              "FAIL: %s entry %d empty key %s" % (label, index, field)
+                          )
+                          sys.exit(1)
+                  keys.append(
+                      tuple(str(entry[field]) for field in KEY_FIELDS)
+                  )
+              if len(set(keys)) != len(keys):
+                  print("FAIL: %s has duplicate session keys" % label)
+                  sys.exit(1)
+              return keys
+
+          base_sha = os.environ.get("BASE_SHA", "").strip()
+          if not base_sha:
+              print("FAIL: BASE_SHA is empty (not a pull_request event)")
+              sys.exit(1)
+
+          base = git("merge-base", base_sha, "HEAD").strip()
+          if not base:
+              print("FAIL: could not compute merge base")
+              sys.exit(1)
+          print("merge base:", base)
+
+          changed = git("diff", "--name-only", "-z", "--no-renames", base + "...HEAD")
+          changed_paths = [p for p in changed.split("\0") if p]
+          triggers = [p for p in changed_paths if watched(p)]
+          if not triggers:
+              print("No watched paths changed; skipping AI-use-log check")
+              sys.exit(0)
+          print("Watched paths changed:", triggers)
+
+          head_entries = parse(read_at("HEAD"), "HEAD " + LOG_PATH, tolerant=False)
+          if head_entries is None:
+              print("FAIL: %s missing on HEAD" % LOG_PATH)
+              sys.exit(1)
+          if not head_entries:
+              print("FAIL: HEAD %s list is empty" % LOG_PATH)
+              sys.exit(1)
+
+          base_entries = parse(read_at(base), "base " + LOG_PATH, tolerant=True) or []
+
+          head_set = set(head_entries)
+          base_set = set(base_entries)
+          added = head_set - base_set
+          if not added:
+              print("FAIL: no new AI-use-log entry added")
+              sys.exit(1)
+          print("OK: %d new AI-use-log entry/entries" % len(added))
+          PY
+
+      - name: Validate requirements schema (Draft 2020-12)
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          import yaml
+          from jsonschema import Draft202012Validator
+
+          DOC = "docs/req/requirements.yaml"
+          SCHEMA = "docs/req/req-schema.json"
+
+          missing = [p for p in (DOC, SCHEMA) if not os.path.isfile(p)]
+          if missing:
+              print("FAIL: required file(s) missing: %s" % ", ".join(missing))
+              sys.exit(1)
+
+          with open(SCHEMA, encoding="utf-8") as fh:
+              schema = json.load(fh)
+          with open(DOC, encoding="utf-8") as fh:
+              document = yaml.safe_load(fh)
+
+          try:
+              Draft202012Validator.check_schema(schema)
+          except Exception as exc:
+              print("FAIL: schema itself is invalid: %s" % exc)
+              sys.exit(1)
+
+          validator = Draft202012Validator(schema)
+          errors = sorted(
+              validator.iter_errors(document),
+              key=lambda e: tuple(str(part) for part in e.path),
+          )
+          if errors:
+              for err in errors:
+                  print("SCHEMA ERROR at %s: %s" % (list(err.path), err.message))
+              sys.exit(1)
+          print("OK: %s validates against Draft 2020-12 schema" % DOC)
+          PY
