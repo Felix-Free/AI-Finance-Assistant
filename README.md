@@ -48,7 +48,7 @@ pytest
 Merges are guarded by mandatory, blocking gates. A failure in any gate blocks the change.
 
 - **Offline tests** — deterministic suite must pass.
-- **Schema Gate** — structured AI output must conform to its declared schema.
+- **Requirements schema** — docs/req/requirements.yaml is validated against req-schema.json (Draft 2020-12).
 - **AI-use log gate** — every model call must be logged with the required fields.
 - **...plus the remaining required gates** (type/style checks, secret scanning, and the deterministic-boundary check).
 
