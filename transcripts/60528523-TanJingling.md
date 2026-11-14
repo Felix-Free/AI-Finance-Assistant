@@ -364,7 +364,7 @@ I formally rejected PR #18 and requested changes. I instructed Role D to either 
 **Reflection.** 
 This is a classic "defense in depth" scenario. Humans might assume that because the main pipeline works, the system is safe. However, the AI agent actively tried to bypass the main route and found a vulnerability in the public API of the storage layer. This demonstrates that AI can act as a ruthless adversary to test our security boundaries, proving the necessity of AI-assisted architectural audits.
 
-## Session 12: 2026-11-13 - README Creation via Web UI (Bypassing VM Network Failure)
+## Session 11: 2026-11-13 - README Creation via Web UI (Bypassing VM Network Failure)
 
 **Context.** After successfully merging Role B's requirements and Role E's CI pipeline into `main`, the project foundation was fully established. I needed to generate the final `README.md`. However, my local Ubuntu VM encountered a persistent `GnuTLS recv error (-54)` when trying to `git pull`, blocking the local Git workflow.
 
