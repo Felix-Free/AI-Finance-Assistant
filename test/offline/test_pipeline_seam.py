@@ -177,6 +177,8 @@ def test_private_key_is_popped_before_validation(captured_log, monkeypatch, tmp_
 
 def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp_path):
     monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+    review_path = tmp_path / "review.jsonl"
+    monkeypatch.setattr(pipeline, "REVIEW_PATH", review_path)
     storage.append_validated({
         "call_id": "seed00000001", "amount": 990, "category": "food",
         "total": 990.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
@@ -188,6 +190,14 @@ def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp
     with pytest.raises(policy_core.PolicyError) as exc:
         pipeline.process("x", budget_limit=1000.0)
     assert exc.value.code == "policy:budget"
+
+    lines = review_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["error"] == "policy:budget"
+    assert record["review"] is True
+    assert record["spent"] == 990.0
+    assert record["total"] == 1010.0
 
 
 def test_process_without_spent_passes_persisted_as_expected_spent(

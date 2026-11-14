@@ -43,13 +43,17 @@ pytest test/live
 pytest
 ```
 
+The live suite needs a real gateway: set `LLM_BASE_URL` and `LLM_API_KEY` (and optionally `LLM_MODEL`, defaulting to `src/call_llm.py::MODEL`).
+
 ## CI/CD & Blocking Gates
 
-Merges are guarded by mandatory, blocking gates. A failure in any gate blocks the change.
+`.github/workflows/ci.yml` runs six named PR jobs; `branch-ci.yml` runs static checks and offline tests on every push.
 
-- **Offline tests** — deterministic suite must pass.
-- **Requirements schema** — docs/req/requirements.yaml is validated against req-schema.json (Draft 2020-12).
-- **AI-use log gate** — every model call must be logged with the required fields.
-- **...plus the remaining required gates** (type/style checks, secret scanning, and the deterministic-boundary check).
+- **`test-approval-loop`** — Gate 1: verifies a real human, non-author, member approval on a test-first commit.
+- **`static-analysis`** — Gate 2: ruff, mypy, pip check, secret scan, entry-point/API/permission/ADR checks.
+- **`schema-validation`** — Gate 3: strict YAML + Draft 2020-12 schema for docs/req/requirements.yaml.
+- **`semantic-eval`** — Gate 4: live semantic evaluation; `needs:` Gate 1 and runs only when Gate 1 reports a semantic change. Requires the protected `semantic-eval` environment with `LLM_BASE_URL` (var), `LLM_API_KEY` (secret) and optional `LLM_MODEL`.
+- **`offline-regression`** — Gate 5: full offline suite.
+- **`ai-use-log`** — Gate 6: append-only AI-use development sessions (a PR-level record, not the runtime `logs/llm_calls.jsonl`).
 
-**Phasing:** Phase 1 establishes the project skeleton and the core modules. Phase 2 finalizes all **six** required gates, wiring each one as a blocking check before merge.
+**Pending:** these checks are not yet set as required branch protection rules, and no failing PR has yet been shown to be blocked by them.

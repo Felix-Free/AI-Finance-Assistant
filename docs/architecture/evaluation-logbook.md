@@ -223,3 +223,42 @@ tests are skipped, so the join remains unverified.
   `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
   `gateway` usage is never treated as zero when usage is `missing`. The token aggregates are
   descriptive statistics only and do not receive a pass/fail threshold.
+
+---
+
+## 5. Phase 2 E observations (2026-11-14)
+
+> Appended by role E. **This section adds evidence only; it does not change C's entries in
+> §1–§4 or any earlier value.** Baseline: `main f73e9b4` + D #18 `eec1724` + C #19
+> `6808d7e`. Implemented with OpenCode and verified by separate local QA runs. The detailed run record is
+> `docs/measurements/phase2-qa-evidence.md`. Items not run are marked not verified; nothing
+> here is promoted to `measured` beyond what was actually observed.
+
+- **NFR-007 — offline guard-removal negatives (measured, local).** Network disabled, `pytest
+  test/offline -q` → **201 passed**. With each guard individually disabled, the selected
+  corresponding test failed: `test_inv001_rejects_negative_amount`,
+  `test_inv002_rejects_unknown_category`, `test_inv003_rejects_one_cent_over_budget`. The
+  run produced no repository `logs/` or `data/` files. This is local offline evidence, not a
+  GitHub CI run.
+- **Semantic extraction (local, simulated).** This is semantic-layer evidence only: the
+  built-in prompt and a candidate YAML each passed 5 extraction cases, and a simulated wrong
+  amount produced 4 failures. **No real gateway run was performed.**
+- **NFR-006 (offline, local).** Separately from the semantic simulation above, offline
+  evidence exists for the call-id joins: accepted records join `llm_calls` to storage, and
+  rejected decisions join `llm_calls` to review, with the recorded paths and the fail-closed
+  write failures exercised. The semantic simulation is **not** counted as a log-traceability
+  result.
+- **Gate 1 (local, simulated GitHub reviews).** Run against a real local Git history plus
+  simulated GitHub reviews: a cross-timezone approval passed; a docs-only approval, a late
+  approval, a self-approval, a dismissed approval, a non-member approval, and an approval on
+  a newly modified test were each rejected.
+- **Schema (local).** The real requirements registry validates against the Draft 2020-12
+  schema; deleting a required field makes validation fail.
+- **NFR-001 / NFR-002 (pending).** The original latency and token samples are missing, so no
+  measurement is recorded here. If D's self-reported figures are mentioned, they must be
+  labelled as D-reported and kept distinct from an E measurement; they are not treated as a
+  measured result.
+- **Open code issues (distinct, not merged).** Two separate problems are tracked apart: a
+  storage partial-write (partial bytes on an interrupted append) and a log error-body
+  problem (error text reaching the call log). They are not the same defect and neither is
+  resolved by the other.

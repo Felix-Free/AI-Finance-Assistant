@@ -1,16 +1,58 @@
 name: CI
 
+# Phase 2 pull-request workflow. Exactly six independent, named jobs:
+#   1. test-approval-loop    Gate 1 — verify real human approval, not AI-use log
+#   2. static-analysis       Gate 2 — ruff + mypy + pip check + helper security
+#   3. schema-validation     Gate 3 — strict YAML + Draft 2020-12 schema
+#   4. semantic-eval         Gate 4 — live semantic eval in the protected environment
+#   5. offline-regression    Gate 5 — the full offline test suite
+#   6. ai-use-log            Gate 6 — the AI-use log increment
+# No workflow-level `paths:` filter: a filter there skips the WHOLE workflow and
+# would hide the approval gate. Gate 4 decides relevance itself via Gate 1.
+
 on:
   pull_request:
     branches:
       - main
+      - review/e-phase2-base
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - labeled
+      - unlabeled
+  pull_request_review:
+    types:
+      - submitted
+      - dismissed
 
+# Least privilege by default; each job narrows further where it can.
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.9"
+
 jobs:
-  offline-tests:
+  # ---------------------------------------------------------------------------
+  # Gate 1 — real human approval. Reads only the PR review state; it does NOT
+  # look at the AI-use log (that is Gate 6). Its outputs (semantic_required and
+  # runtime_prompts) come straight from the helper and feed Gate 4 unchanged.
+  # ---------------------------------------------------------------------------
+  test-approval-loop:
+    name: Gate 1 · test-approval
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      semantic_required: ${{ steps.scope.outputs.semantic_required }}
+      runtime_prompts: ${{ steps.scope.outputs.runtime_prompts }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -18,10 +60,216 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Set up Python 3.9
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Verify human approval
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .github/ci_checks.py test-approval
+
+      - name: Compute semantic scope
+        id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The helper writes semantic_required and runtime_prompts (JSON) to
+          # $GITHUB_OUTPUT itself; Gate 4 consumes those outputs verbatim.
+          python .github/ci_checks.py semantic-scope
+
+  # ---------------------------------------------------------------------------
+  # Gate 2 — static analysis + helper security/credential scan.
+  # ---------------------------------------------------------------------------
+  static-analysis:
+    name: Gate 2 · static-analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install "mypy==1.8.0"
+
+      - name: pip check
+        run: python -m pip check
+
+      - name: Ruff static checks
+        run: python -m ruff check --select E9,F63,F7,F82 src test .github/ci_checks.py
+
+      - name: Helper security / credential scan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .github/ci_checks.py secret-scan
+
+      - name: Helper static analysis
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .github/ci_checks.py static-analysis
+
+      - name: mypy type checks
+        run: python -m mypy --disable-error-code import-untyped src
+
+  # ---------------------------------------------------------------------------
+  # Gate 3 — strict YAML parse and Draft 2020-12 schema validation. The helper
+  # has no `schema` subcommand, so this inlines the check against the two real
+  # repository files and validates the schema itself first.
+  # ---------------------------------------------------------------------------
+  schema-validation:
+    name: Gate 3 · schema-validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate requirements YAML and schema
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          import yaml
+          from jsonschema import Draft202012Validator
+
+          with open("docs/req/req-schema.json", encoding="utf-8") as fh:
+              schema = json.load(fh)
+          with open("docs/req/requirements.yaml", encoding="utf-8") as fh:
+              document = yaml.safe_load(fh)
+
+          # Validate the schema document itself first.
+          try:
+              Draft202012Validator.check_schema(schema)
+          except Exception as exc:
+              print("FAIL: schema is not a valid Draft 2020-12 schema: %s" % exc)
+              sys.exit(1)
+
+          errors = sorted(
+              Draft202012Validator(schema).iter_errors(document),
+              key=lambda e: [str(p) for p in e.path],
+          )
+          if errors:
+              for err in errors:
+                  print("SCHEMA ERROR at %s: %s" % (list(err.path), err.message))
+              sys.exit(1)
+          print("OK: requirements validate against the Draft 2020-12 schema")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Gate 4 — semantic evaluation. Runs only when Gate 1's helper output says a
+  # semantic change is required. Credentials come from the protected
+  # `semantic-eval` environment (vars + secret); if missing the step FAILS.
+  # LLM_MODEL empty -> `env -u LLM_MODEL` then import the call_llm default;
+  # explicit value is kept. Either way the result is checked against the demand
+  # model.id suffix. No configuration values are printed.
+  # ---------------------------------------------------------------------------
+  semantic-eval:
+    name: Gate 4 · semantic-eval
+    needs: test-approval-loop
+    if: ${{ needs.test-approval-loop.result == 'success' && needs.test-approval-loop.outputs.semantic_required == 'true' }}
+    runs-on: ubuntu-latest
+    environment: semantic-eval
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run live semantic evaluation
+        env:
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SEMANTIC_PROMPT_FILES: ${{ needs.test-approval-loop.outputs.runtime_prompts }}
+        run: |
+          if [ -z "${LLM_BASE_URL:-}" ] || [ -z "${LLM_API_KEY:-}" ]; then
+            echo "FAIL: semantic-eval requires LLM_BASE_URL (vars) and LLM_API_KEY (secret) from the protected environment"
+            exit 1
+          fi
+
+          if [ -z "${LLM_MODEL:-}" ]; then
+            resolved=$(env -u LLM_MODEL python -c "import src.call_llm as m; print(m.MODEL)")
+          else
+            resolved="$LLM_MODEL"
+          fi
+
+          expected=$(python -c "import yaml; print(yaml.safe_load(open('docs/req/requirements.yaml', encoding='utf-8'))['project_metadata']['model']['id'])")
+          if [ -z "$expected" ] || [ "${resolved##*/}" != "${expected##*/}" ]; then
+            echo "FAIL: resolved model id does not exactly match the requirements model.id suffix"
+            exit 1
+          fi
+
+          export LLM_MODEL="$resolved"
+          python -m pytest -q --tb=no test/live/test_live_model.py
+
+  # ---------------------------------------------------------------------------
+  # Gate 5 — full offline regression.
+  # ---------------------------------------------------------------------------
+  offline-regression:
+    name: Gate 5 · offline-regression
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
@@ -29,163 +277,31 @@ jobs:
       - name: Run offline tests
         run: python -m pytest test/offline -q
 
-      - name: Ruff static checks
-        run: python -m ruff check --select E9,F63,F7,F82 src test
+  # ---------------------------------------------------------------------------
+  # Gate 6 — AI-use log increment.
+  # ---------------------------------------------------------------------------
+  ai-use-log:
+    name: Gate 6 · ai-use-log
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
 
       - name: AI-use-log increment check
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          python - <<'PY'
-          import os
-          import subprocess
-          import sys
-
-          import yaml
-
-          LOG_PATH = "docs/ai-use-log.yaml"
-          WATCHED = ("src/", "test/", "prompts/")
-          KNOWN_DEFECT = "======="
-          KEY_FIELDS = ("student_id", "phase", "session")
-
-          def git(*args):
-              return subprocess.run(
-                  ["git"] + list(args),
-                  check=True,
-                  capture_output=True,
-                  text=True,
-              ).stdout
-
-          def watched(path):
-              return path == "Prompt.md" or any(path.startswith(p) for p in WATCHED)
-
-          def read_at(rev):
-              try:
-                  return git("show", rev + ":" + LOG_PATH)
-              except subprocess.CalledProcessError:
-                  return None
-
-          def strip_base_defect(text):
-              # Only the compared (base) log may carry the single historical
-              # separator line that literally equals KNOWN_DEFECT. HEAD is
-              # parsed strictly with no tolerance. Remove exactly one such line
-              # and only when it occurs exactly once; keep all other text.
-              lines = text.splitlines()
-              if lines.count(KNOWN_DEFECT) == 1:
-                  lines.remove(KNOWN_DEFECT)
-              return "\n".join(lines)
-
-          def parse(text, label, tolerant):
-              if text is None:
-                  return None
-              source = strip_base_defect(text) if tolerant else text
-              try:
-                  doc = yaml.safe_load(source)
-              except yaml.YAMLError as exc:
-                  print("FAIL: cannot parse %s YAML: %s" % (label, exc))
-                  sys.exit(1)
-              if not isinstance(doc, list):
-                  print("FAIL: %s must be a YAML list" % label)
-                  sys.exit(1)
-              keys = []
-              for index, entry in enumerate(doc):
-                  if not isinstance(entry, dict):
-                      print("FAIL: %s entry %d is not a mapping" % (label, index))
-                      sys.exit(1)
-                  for field in KEY_FIELDS:
-                      if field not in entry or entry[field] is None:
-                          print(
-                              "FAIL: %s entry %d missing key %s" % (label, index, field)
-                          )
-                          sys.exit(1)
-                      if not str(entry[field]).strip():
-                          print(
-                              "FAIL: %s entry %d empty key %s" % (label, index, field)
-                          )
-                          sys.exit(1)
-                  keys.append(
-                      tuple(str(entry[field]) for field in KEY_FIELDS)
-                  )
-              if len(set(keys)) != len(keys):
-                  print("FAIL: %s has duplicate session keys" % label)
-                  sys.exit(1)
-              return keys
-
-          base_sha = os.environ.get("BASE_SHA", "").strip()
-          if not base_sha:
-              print("FAIL: BASE_SHA is empty (not a pull_request event)")
-              sys.exit(1)
-
-          base = git("merge-base", base_sha, "HEAD").strip()
-          if not base:
-              print("FAIL: could not compute merge base")
-              sys.exit(1)
-          print("merge base:", base)
-
-          changed = git("diff", "--name-only", "-z", "--no-renames", base + "...HEAD")
-          changed_paths = [p for p in changed.split("\0") if p]
-          triggers = [p for p in changed_paths if watched(p)]
-          if not triggers:
-              print("No watched paths changed; skipping AI-use-log check")
-              sys.exit(0)
-          print("Watched paths changed:", triggers)
-
-          head_entries = parse(read_at("HEAD"), "HEAD " + LOG_PATH, tolerant=False)
-          if head_entries is None:
-              print("FAIL: %s missing on HEAD" % LOG_PATH)
-              sys.exit(1)
-          if not head_entries:
-              print("FAIL: HEAD %s list is empty" % LOG_PATH)
-              sys.exit(1)
-
-          base_entries = parse(read_at(base), "base " + LOG_PATH, tolerant=True) or []
-
-          head_set = set(head_entries)
-          base_set = set(base_entries)
-          added = head_set - base_set
-          if not added:
-              print("FAIL: no new AI-use-log entry added")
-              sys.exit(1)
-          print("OK: %d new AI-use-log entry/entries" % len(added))
-          PY
-
-      - name: Validate requirements schema (Draft 2020-12)
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import sys
-
-          import yaml
-          from jsonschema import Draft202012Validator
-
-          DOC = "docs/req/requirements.yaml"
-          SCHEMA = "docs/req/req-schema.json"
-
-          missing = [p for p in (DOC, SCHEMA) if not os.path.isfile(p)]
-          if missing:
-              print("FAIL: required file(s) missing: %s" % ", ".join(missing))
-              sys.exit(1)
-
-          with open(SCHEMA, encoding="utf-8") as fh:
-              schema = json.load(fh)
-          with open(DOC, encoding="utf-8") as fh:
-              document = yaml.safe_load(fh)
-
-          try:
-              Draft202012Validator.check_schema(schema)
-          except Exception as exc:
-              print("FAIL: schema itself is invalid: %s" % exc)
-              sys.exit(1)
-
-          validator = Draft202012Validator(schema)
-          errors = sorted(
-              validator.iter_errors(document),
-              key=lambda e: tuple(str(part) for part in e.path),
-          )
-          if errors:
-              for err in errors:
-                  print("SCHEMA ERROR at %s: %s" % (list(err.path), err.message))
-              sys.exit(1)
-          print("OK: %s validates against Draft 2020-12 schema" % DOC)
-          PY
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .github/ci_checks.py ai-use-log

@@ -1015,3 +1015,84 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 8
+  topic: Merge-gate helper, invariant and evidence tests
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/ci_checks.py
+  files_modified:
+    - test/offline/test_invariants.py
+    - test/offline/test_evidence_join.py
+    - test/offline/test_pipeline_seam.py
+  summary: "Added CI checks for approvals, security and log updates, plus invariant and evidence-join tests."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+  validation:
+    pytest_offline: 201 passed with network blocked
+    gate1_simulated_reviews: Passed in local QA
+    guard_removal: All three tests failed with their guard disabled
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 9
+  topic: CI workflows and live test suite
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/workflows/branch-ci.yml
+    - test/live/test_live_model.py
+  files_modified:
+    - .github/workflows/ci.yml
+  summary: "Added six PR jobs, separate push checks and live model tests."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+  validation:
+    mock_model: 5 cases passed per prompt variant; 4 incorrect-amount replies were rejected.
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 10
+  topic: Phase 2 documentation
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - docs/code-governance/verification-constraints.md
+    - docs/review-memo.md
+    - docs/bug-diary.md
+    - docs/debt-register.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/measurements/phase2-qa-evidence.md
+  files_modified:
+    - README.md
+    - docs/architecture/evaluation-logbook.md
+  summary: "Added four QA documents, the CI ADR and QA evidence. Updated the README and evaluation logbook."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+
+- date: "2026-11-15"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 11
+  topic: Gate 2 contract tightening and evidence refresh
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/ci_checks.py
+    - .github/workflows/ci.yml
+    - README.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/measurements/phase2-qa-evidence.md
+    - docs/ai-use-log.yaml
+  summary: "Tightened Gate 2 and refreshed main 94b0ec4 with D #18 and C #19 snapshots. Enabled CI on the temporary review base."
+  human_review:
+    - Approved the review-base trigger as an E-owned workflow exception.
+  validation:
+    offline_isolation: 201 tests passed in separate local QA with network blocked and no logs or data written
+    pending: Real gateway, GitHub approval and merge enforcement

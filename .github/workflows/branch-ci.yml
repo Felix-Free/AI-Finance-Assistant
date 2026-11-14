@@ -1,0 +1,91 @@
+name: Branch CI
+
+# Phase 2 push workflow. Runs on every push, to main and to ordinary branches.
+# Two independent jobs so a static-analysis failure never skips the offline
+# regression:
+#   1. branch-static    ruff + mypy + pip check + reusable secret-scan helper
+#   2. branch-offline   the full offline test suite
+# Job names deliberately differ from the six PR jobs in ci.yml so the two
+# workflows never collide on a status check name.
+# Fully offline: no model credentials are used or required.
+
+on:
+  push:
+    branches:
+      - "**"
+
+# Least privilege: read-only contents, jobs get nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.9"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Static analysis. Independent of branch-offline; its failure does not cancel
+  # or skip the regression job.
+  # ---------------------------------------------------------------------------
+  branch-static:
+    name: Branch · static-analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install "mypy==1.8.0"
+
+      - name: Ruff static checks
+        run: python -m ruff check --select E9,F63,F7,F82 src test .github/ci_checks.py
+
+      - name: mypy type checks
+        run: python -m mypy --disable-error-code import-untyped src
+
+      - name: pip check
+        run: python -m pip check
+
+      - name: Secret / credential scan
+        run: python .github/ci_checks.py secret-scan
+
+  # ---------------------------------------------------------------------------
+  # Full offline regression. No `needs:` on branch-static, so it always runs.
+  # ---------------------------------------------------------------------------
+  branch-offline:
+    name: Branch · offline-regression
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run offline tests
+        run: python -m pytest test/offline -q
