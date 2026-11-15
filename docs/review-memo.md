@@ -3,8 +3,12 @@
 > Purpose: a short, PR-by-PR record of the Phase 2 QA review findings against the fixed
 > integration baseline. Written from local review and observed runs only.
 >
-> Baseline: `main f73e9b4` + D #18 `eec1724` + C #19 `6808d7e`. Each PR is reviewed on its
-> own; a green local suite is not a substitute for GitHub CI, which is not verified here.
+> Baseline (historical): `main f73e9b4` + D #18 `eec1724` + C #19 `6808d7e`.
+> **Refreshed 2026-11-16 (Beijing time)** to `main 94b0ec4` + D #18 `df729a9` + C #19
+> `6808d7e`; D fixed the mypy errors in `959ac97`. E reran mypy 1.8 on Python 3.11 (success in
+> eight source files) and the isolated offline suite (201 passed, sockets blocked). This is a
+> local recheck; **no new GitHub review was posted.** Each PR is reviewed on its own; a green
+> local suite is not a substitute for GitHub CI, which is not verified here.
 >
 > **Result labels (read carefully).** Two different numbers exist and must not be conflated:
 > **#18 = 191 is the old local integration result**; **the current 201 is the new OpenCode
@@ -20,18 +24,20 @@ call is no longer free to write policy-invalid values.
 
 **Findings.**
 
-1. **mypy: 4 failures in the fixed integration.** In the integrated tree the type check
-   reports four errors. These are reproduced locally against the fixed baseline; they are
-   not inferred from a clean branch. Status: **failing** in this configuration.
-2. **Append interruption leaves 16 bytes.** An interrupted append was reproduced leaving a
-   partial 16-byte write behind. This contradicts the "no partial state" boundary the
-   policy catalog requires; status: **reproduced, not fixed**.
-3. **Uncleaned HTTP error body leaks into the call log.** In the reproduced run an uncleaned
-   HTTP error body carrying a synthetic sensitive marker reached `logs/llm_calls.jsonl`.
-   The real issue is not the marker but that an uncleaned response body is logged at all;
-   status: **reproduced, not fixed**.
+1. **mypy: 4 failures on `eec1724`→ fixed on `df729a9`.** The four errors reproduced on
+   `eec1724`; D fixed them in `959ac97`. E's local recheck on `df729a9` (mypy 1.8, Python
+   3.11) reports success in eight source files. Status: **closed in local recheck** (not a
+   GitHub CI run).
+2. **Append interruption leaves 16 bytes.** Still reproduced on the refresh (`df729a9`) with
+   the same fault injection: an interrupted append leaves a partial 16-byte write behind.
+   This contradicts the "no partial state" boundary the policy catalog requires; status:
+   **reproduced, not fixed**.
+3. **Uncleaned HTTP error body leaks into the call log.** Still reproduced on the refresh
+   (`df729a9`): the synthetic HTTP error marker still entered the error field. The real issue
+   is not the marker but that an uncleaned response body is logged at all; status:
+   **reproduced, not fixed**.
 
-The storage/spend defences are present, but the three findings above mean PR #18 cannot be
+The storage/spend defences are present, but findings 2 and 3 remain open, so PR #18 cannot be
 certified as clean on this baseline. **Result: CHANGES REQUIRED.**
 
 ---
@@ -50,7 +56,8 @@ independent online evidence** for any of them.
   **local-review only**. None is backed by independent online evidence, and none is
   reported here as met.
 - Where PR #19's wording depends on D #18 being clean, it must be read together with the
-  #18 findings (mypy failures, partial append, log error body) and not as a final pass.
+  #18 findings (partial append, log error body — the mypy errors are now closed on `df729a9`)
+  and not as a final pass.
 
 **Conclusion:** PR #19's non-local claims remain pending until reconciled with D and backed
 by independent evidence. **Result: CHANGES REQUIRED.**

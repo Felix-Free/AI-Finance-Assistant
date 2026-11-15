@@ -4,12 +4,15 @@
 > was run and what was observed; anything not observed is marked **not verified**.
 >
 > Implementation: OpenCode with DeepSeek V4 Flash. Verification: separate local QA runs.
-> Baseline: `main f73e9b4` + D #18 `eec1724` + C #19 `6808d7e`.
+> Baseline: `main 94b0ec4` + D #18 `df729a9` + C #19 `6808d7e`.
 >
-> **Baseline note:** some historical scenarios above were verified on `f73e9b4`; the
-> integration was refreshed to `main 94b0ec4` with A #12 merged and the D/C inputs unchanged,
-> and the full offline suite was rerun on that refresh: 201 passed with network blocked and no
-> `logs/`/`data/` produced.
+> **Baseline note:** the original baseline was `main f73e9b4` + D #18 `eec1724` + C #19
+> `6808d7e`; its historical observations below stay identifiable as such. The integration was
+> refreshed (as of 2026-11-16 Beijing time) to `main 94b0ec4` + D #18 `df729a9` + C #19
+> `6808d7e`. D fixed the four mypy errors (`eec1724` → `959ac97`, current #18 HEAD
+> `df729a9`); E verified mypy 1.8 on Python 3.11: success in eight source files, and a clean
+> isolated offline run still passed 201 tests with sockets blocked and no `logs/`/`data/`
+> produced.
 
 ---
 
@@ -64,19 +67,22 @@ This is local logic verification, not an end-to-end GitHub run.
 
 ## 6. D-reported items (not E measurements)
 
-- **D mypy:** still **4** failures in the fixed integration. Reported here as an observed
-  count from the review, not a fix.
+- **D mypy:** the earlier **4** failures on `eec1724` are historical. On `df729a9` (after D's
+  `959ac97` fix) E verified mypy 1.8 on Python 3.11: **success in eight source files** (no
+  errors). This is an E-observed local run, not a GitHub CI execution.
 - **Original latency and token samples:** missing. No latency/token measurement is recorded.
   D's self-reported latency/token figures, if mentioned, are **D-reported** and are kept
   distinct from any E measurement; they are not treated as a result.
 
 ## 7. Open code issues (tracked separately)
 
-These are two different defects and neither resolves the other:
+These are two different defects and neither resolves the other. Both were re-tested on the
+refresh (`df729a9`) with the same fault injection and **both remain open**:
 
-- **Storage partial write:** an interrupted append leaves partial bytes behind (no atomic
-  rollback). Not fixed.
-- **Log error body:** error text reaches the call log. Not fixed.
+- **Storage partial write:** an interrupted append still left **16 bytes** behind on
+  `df729a9` (no atomic rollback). Reproduced on the refresh; not fixed.
+- **Log error body:** the synthetic HTTP error marker still entered the error field on
+  `df729a9`. Reproduced on the refresh; not fixed.
 
 ## 8. Not verified
 

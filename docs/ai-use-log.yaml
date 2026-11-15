@@ -214,13 +214,11 @@
   - transcripts/60915652-LiuWanyang.md
   - docs/ai-use-log.yaml
   files_not_modified:
-  - AGENTS.md
-  - docs/architecture/**
-  - docs/code-governance/**
-  - docs/req/**
-  - requirements.txt
-  - src/call_llm.py
   - src/policy_core.py
+  - src/call_llm.py
+  - docs/**
+  - AGENTS.md
+  - requirements.txt
   summary: 'Compared the implementation against every field of role C''s guard specification (Condition, Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and Boundary conformed for all three invariants; Evidence did not. The call line in logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry a policy outcome, and RP-004 forbids a second line there. The specification owner chose option B: every policy rejection now appends exactly one line to logs/review.jsonl with error = policy:amount / policy:category / policy:budget and review = false / true / true, while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields) and runtime-policy-catalog.md (RP-003/005/006 point at the file).
 
     '
@@ -1096,3 +1094,26 @@
   validation:
     offline_isolation: 201 tests passed in separate local QA with network blocked and no logs or data written
     pending: Real gateway, GitHub approval and merge enforcement
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 12
+  topic: QA docs refresh on D #18
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/measurements/phase2-qa-evidence.md
+    - docs/review-memo.md
+    - docs/debt-register.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  summary: "Refreshed the QA documentation against D #18 (df729a9). The earlier four mypy errors are now cleared in E local QA. 201 offline tests passed with network blocked, and both open faults were reproduced. GitHub revalidation is pending at authoring time."
+  human_review:
+    - Role E approved an append to the AI use log only, scoped to this entry.
+  validation:
+    offline_isolation: 201 tests passed with network blocked
+    mypy: earlier four errors cleared in E local QA
+    open_faults: both reproduced
+    pending: GitHub revalidation

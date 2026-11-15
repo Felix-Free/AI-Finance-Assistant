@@ -262,3 +262,18 @@ tests are skipped, so the join remains unverified.
   storage partial-write (partial bytes on an interrupted append) and a log error-body
   problem (error text reaching the call log). They are not the same defect and neither is
   resolved by the other.
+
+## 6. Phase 2 E recheck (2026-11-16)
+
+> Appended by role E. **Evidence only; §1–§5 and all earlier C/E entries are unchanged.**
+> These are fresh results and are kept distinct from the older measurements above. Baseline:
+> `main 94b0ec4` + D #18 `df729a9` + C #19 `6808d7e`.
+
+- **Recheck (local).** With the network blocked, E reran `mypy` across eight files with no
+  errors, and `pytest test/offline -q` → **201 passed**. This is a new local run, not the
+  older §5 figure and not a GitHub CI run.
+- **Fault injections (local, re-reproduced).** Both prior defects still reproduce: the
+  storage partial-write (16 partial bytes on an interrupted append) and the log error-body
+  problem (a synthetic HTTP error body copied into the call log).
+- **Pending.** Live (real-gateway) verification, human test-first approval, and merge
+  blocking all remain pending; nothing here is promoted to a merge-gate result.

@@ -28,6 +28,7 @@ import pathlib
 import sys
 import time
 from datetime import datetime, timezone
+from typing import Dict
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 LATENCY_PATH = _REPO_ROOT / "logs" / "latency.jsonl"
@@ -79,7 +80,7 @@ def measure(n: int) -> int:
 
     samples = []
     failed = 0
-    tally = {}
+    tally: Dict[str, int] = {}
     for index in range(1, n + 1):
         start = time.perf_counter()
         try:
