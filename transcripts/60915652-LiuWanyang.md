@@ -674,3 +674,32 @@ their `total` values were not arithmetically consistent, and it refused to delet
 assertions — it changed the data instead. It also caught that its first relative-literal scan was
 vacuous (a `%r`-built pattern matched nothing) and reported that before I saw the green suite. Both are
 the behaviour the process is supposed to produce: report the defect, do not paper over it.
+
+---
+
+## 2026-11-15 · The four type errors that stopped Gate 2, and a checker that cannot target the version we ship
+
+**Context.** Role E's Phase 2 status note recorded where Gate 2 stopped: four mypy errors on PR #18 —
+an unannotated empty set, an `amount` that the checker still saw as `Any | None` after a custom
+`_is_number` guard, and two unannotated `tally` dictionaries. None of them was a runtime defect; the
+code was already covered by 152 passing tests.
+
+**What made the difference.** The task sheet asked for a diagnosis phase before any edit: run the
+checker, quote its exact messages, propose at least two fixes per finding, and state why the chosen one
+is the minimal change. The agent then chose `typing.Set` / `typing.Dict` over the builtin generics, and
+`cast(float, …)` placed **after** the existing guard, arguing explicitly that a `float(...)` conversion
+would silently coerce a bool if the guard were ever weakened — the one thing the guard exists to
+prevent. That is the kind of reasoning a sheet cannot supply.
+
+**The environment fact worth recording.** The local mypy is 2.4.1, which has **dropped support for
+`--python-version 3.9`** (`must be 3.10 or higher`). So the checker that is supposed to protect 3.9
+compatibility can no longer target 3.9. The four annotations are still 3.9-safe because they use
+`typing` generics, but that is now guaranteed by reading, not by the checker. This is a verification
+gap, not a code bug, and it belongs in the report to role E: either the project pins `mypy<2` for the
+3.9 gate, or the 3.9 baseline question (`PD-006`, still `pending_confirmation`) is settled differently.
+
+**Evidence discipline.** Each annotation was removed on a temporary copy and the original error was
+observed to return — four mutations, four messages. The socket dropped three times while this was being
+reported; the evidence was completed on retry with a deliberately tiny output format. What matters for
+the record is not that the run was smooth, but that the claim "the annotation is what silences that
+error" is backed by having seen the error reappear.
