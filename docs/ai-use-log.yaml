@@ -214,13 +214,11 @@
   - transcripts/60915652-LiuWanyang.md
   - docs/ai-use-log.yaml
   files_not_modified:
-  - AGENTS.md
-  - docs/architecture/**
-  - docs/code-governance/**
-  - docs/req/**
-  - requirements.txt
-  - src/call_llm.py
   - src/policy_core.py
+  - src/call_llm.py
+  - docs/**
+  - AGENTS.md
+  - requirements.txt
   summary: 'Compared the implementation against every field of role C''s guard specification (Condition, Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and Boundary conformed for all three invariants; Evidence did not. The call line in logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry a policy outcome, and RP-004 forbids a second line there. The specification owner chose option B: every policy rejection now appends exactly one line to logs/review.jsonl with error = policy:amount / policy:category / policy:budget and review = false / true / true, while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields) and runtime-policy-catalog.md (RP-003/005/006 point at the file).
 
     '

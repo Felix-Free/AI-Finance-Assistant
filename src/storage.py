@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import pathlib
 from decimal import Decimal
-from typing import Iterator
+from typing import Iterator, Set, cast
 
 from src import policy_core
 
@@ -85,7 +85,7 @@ def _check_stored_call_id(stored: dict) -> None:
 
 def _existing_call_ids() -> set:
     """Collect call_ids already stored; malformed lines are a StorageError."""
-    ids = set()
+    ids: Set[str] = set()
     if not DATA_PATH.exists():
         return ids
     try:
@@ -180,6 +180,7 @@ def current_total() -> float:
                 "stored record has no numeric amount: %r"
                 % (record.get("call_id") if isinstance(record, dict) else record,)
             )
+        amount = cast(float, amount)
         total += amount
     return total
 
