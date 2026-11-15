@@ -25,6 +25,7 @@ import argparse
 import json
 import pathlib
 import sys
+from typing import Dict
 
 from src.measure_latency import _failure_kind
 
@@ -69,7 +70,7 @@ def measure(sentences, n: int) -> int:
 
     ok = 0
     failed = 0
-    tally = {}
+    tally: Dict[str, int] = {}
     for index in range(1, n + 1):
         sentence = sentences[(index - 1) % len(sentences)]
         try:
