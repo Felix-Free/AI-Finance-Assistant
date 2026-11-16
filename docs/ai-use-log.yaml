@@ -1117,3 +1117,27 @@
     mypy: earlier four errors cleared in E local QA
     open_faults: both reproduced
     pending: GitHub revalidation
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 13
+  topic: Review feedback follow-up
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - test/offline/test_ci_regressions.py
+  files_modified:
+    - pytest.ini
+    - docs/code-governance/verification-constraints.md
+    - docs/bug-diary.md
+    - docs/ai-use-log.yaml
+  summary: "Added the requirements-to-test matrix, strict pytest markers and offline regressions for BUG-01 and BUG-02."
+  human_review:
+    - Role E approved appending this single session row and scoping the edits to the listed paths.
+  validation:
+    offline_isolation: 204 offline tests passed with network blocked in local QA
+    collection: all original 206 collected nodes still present, including 5 live collected only
+    strict_markers: a typo marker fails at collection
+    bug_regression: both new negative tests detected an injected regression
+    pending: GitHub revalidation

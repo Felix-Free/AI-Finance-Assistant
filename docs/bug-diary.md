@@ -14,10 +14,13 @@
 - **Reproduction.** Run the gate logic against that approval/commit pair; it accepts.
 - **Root cause.** Test-only change detection did not exclude docs-only commits from the
   qualified test-first commit set.
-- **Fix.** Fixed in this Phase 2 QA pass (gate logic tightened).
+- **Fix.** Gate 1 now requires the reviewed commit to add or change a test. In the regression
+  fixture, an approval on a docs-only commit after the test commit is rejected, while an
+  approval on the test commit passes. See the [Phase 2 E implementation](https://github.com/Felix-Free/AI-Finance-Assistant/commit/cc6e65090ebc84edc52edc4a2751250e8ff2c672).
 - **Rule gap.** Gate 1 must treat a docs-only commit as not satisfying test-first; recorded
   as the rule the fix now enforces.
-- **Status.** Fixed; verified by the regression added for it.
+- **Status.** Fixed; verified by `test/offline/test_ci_regressions.py::test_gate1_rejects_docs_only_approval`
+  (parametrised cases `[docs-only-rejected]` and `[test-only-accepted]`).
 
 ## BUG-02 — Offline budget test wrote to the repository logs
 
@@ -25,10 +28,18 @@
   deterministic test mutated runtime state.
 - **Reproduction.** Run the offline suite and observe `logs/` gaining a line.
 - **Root cause.** The test used the default log path instead of an isolated temporary path.
-- **Fix.** Fixed in this Phase 2 QA pass (log path redirected to a temporary location).
+- **Fix.** Fixed in this Phase 2 QA pass by having the budget test call `policy_core` directly,
+  so the dedicated INV-003 guard test
+  `test/offline/test_invariants.py::test_inv003_rejects_one_cent_over_budget` never touches the
+  pipeline's runtime file writes. See the [Phase 2 E implementation](https://github.com/Felix-Free/AI-Finance-Assistant/commit/cc6e65090ebc84edc52edc4a2751250e8ff2c672).
+  The regression
+  `test/offline/test_ci_regressions.py::test_budget_regression_leaves_runtime_paths_unchanged`
+  runs the node in an isolated checkout without networking and asserts the existing sentinel
+  bytes and the file set under `logs/` and `data/` are unchanged.
 - **Rule gap.** Offline tests must never write to `logs/` or `data/`; recorded here as the
   rule the fix now enforces.
-- **Status.** Fixed; verified by running the suite and confirming `logs/` stays unchanged.
+- **Status.** Fixed; verified by
+  `test/offline/test_ci_regressions.py::test_budget_regression_leaves_runtime_paths_unchanged`.
 
 ## BUG-03 — Append interruption leaves a partial 16-byte write
 
