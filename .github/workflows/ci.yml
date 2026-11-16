@@ -76,7 +76,14 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python .github/ci_checks.py test-approval
+          FIRST_ROLLOUT_WAIVER: ${{ github.repository == 'Felix-Free/AI-Finance-Assistant' && github.event.pull_request.number == 20 && contains(github.event.pull_request.labels.*.name, 'skip-test-gate') }}
+        run: |
+          if [ "$FIRST_ROLLOUT_WAIVER" = "true" ]; then
+            echo 'Gate 1: Waived (one-time first rollout of PR #20)'
+            echo 'Gate 1: Waived (one-time first rollout of PR #20)' >> "$GITHUB_STEP_SUMMARY"
+          else
+            python .github/ci_checks.py test-approval
+          fi
 
       - name: Compute semantic scope
         id: scope

@@ -1141,3 +1141,22 @@
     strict_markers: a typo marker fails at collection
     bug_regression: both new negative tests detected an injected regression
     pending: GitHub revalidation
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 14
+  topic: One-time PR #20 rollout authorization
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/ai-use-log.yaml
+  summary: "Recorded role A's 2026-11-16 authorization to use skip-test-gate for the first rollout of #20 only, distinct from test-first evidence. #20 carrying the label logs Waived, the existing test-first check runs for all nonmatching PRs, and Gate 4 keeps its configured environment and real-run requirement. The ADR stays Proposed; no GitHub run or course exemption is claimed verified."
+  human_review:
+    - Role E approved this single session row scoped to the listed paths.
+  validation:
+    local_bash: passed for labeled #20; unlabeled #20, labeled #21, and another repository followed normal Gate 1
+    actionlint: passed
+    pending: GitHub CI verification

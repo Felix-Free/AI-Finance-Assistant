@@ -49,8 +49,12 @@ cannot be replaced by offline evidence.
 
 - **Real pre-implementation test approval** is a prerequisite: implementation work is
   expected to descend from a test-first commit that has been approved by a real reviewer.
-- **First introduction:** this ADR is `Proposed`; the first introduction of these workflows
-  is pending team confirmation. It is not asserted here that they have already been adopted.
+- **First introduction:** this ADR remains `Proposed`. On 2026-11-16, role A authorized using
+  `skip-test-gate` for the first rollout of PR #20 only. This is distinct from test-first
+  evidence: PR #20 carrying the label is logged `Waived` by the approval gate, whereas the
+  existing test-first check continues to run for all nonmatching PRs and is not relaxed. Gate 4
+  still requires the protected `semantic-eval` environment to be configured and the real run to be verified. No
+  GitHub run and no course exemption has been verified; GitHub verification remains pending.
 - **Branch protection will be checked with a deliberately failing PR:** to confirm the
   gates actually block a bad merge, a PR containing an intended failure will be opened and
   observed to be blocked, before the gates are relied on.
