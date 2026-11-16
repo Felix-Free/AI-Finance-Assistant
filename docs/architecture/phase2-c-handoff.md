@@ -1,6 +1,6 @@
 # Phase 2 C 文档说明与交接
 
-> 核对基准：2026-11-13 的 C 分支、`origin/main` 需求表及 D 的 `feat/D-phase2-measurement` 分支。本文区分 C 已完成的文档工作与 D/E 尚未完成的实现、验证工作；不把 `pending` 当作通过。
+> 核对基准：2026-11-16 的 C 分支、`origin/main` 需求表及 D 的 `feat/D-phase2-measurement` 分支。本文区分 C 已完成的文档工作与 D/E 尚未合入或验证的实现；不把 `pending` 当作通过。
 
 ## C 已交付的内容
 
@@ -10,14 +10,14 @@
 | [`evaluation-logbook.md`](evaluation-logbook.md) | 对齐 main 的 NFR-001–007，写明指标、阈值来源、测量办法、预期证据和当前状态。NFR-004 的 0 表示不能提交任何密钥；NFR-007 的 1.0 表示每条获批不变量都要有能检出移除守卫的离线反例测试，需求状态仍待确认。其余数值阈值在需求表中是 `null`，未自行编造。另有 C 对存储层的代码审查记录。 |
 | [`mcp-tool-manifest.md`](../code-governance/mcp-tool-manifest.md) | 登记 Phase 2 的存储、测量、报告和 pipeline 入口，注明仓库未配置 MCP server/tool；入口登记不授予绕过策略校验的权限。 |
 | [`permission-model.md`](permission-model.md) 与 [`.opencode/permissions.jsonc`](../../.opencode/permissions.jsonc) | 为 Phase 2 测量工作开放 `data/**`、`scripts/**`、`docs/measurements/**` 的读写范围和指定命令，保留其他限制。 |
-| [`docs/ai-use-log.yaml`](../ai-use-log.yaml) 与 [`transcripts/60339160-QiangWanyun.md`](../../transcripts/60339160-QiangWanyun.md) | 保留 C 的 Phase 2 工作记录；现有会话为 5–12，没有第 13 次记录。 |
+| [`docs/ai-use-log.yaml`](../ai-use-log.yaml) 与 [`transcripts/60339160-QiangWanyun.md`](../../transcripts/60339160-QiangWanyun.md) | 保留 C 的 Phase 2 工作记录；现有会话为 5–13。 |
 
 ## 交接给 D：实现与安全边界
 
-1. **存储不能绕过规则。** 当前 `pipeline.process` 先调用 `policy_core.validate_record` 再写入，但直接调用 `storage.append_validated(record)` 只检查结构和基本类型，可写入违反金额、类别或预算规则的记录。调用方提供偏低的 `spent` 时，pipeline 也不会与已持久化累计金额核对。已批准的 `expected_spent` 校验设计记录在策略目录 §5.5；D 当前函数仍只有 `record` 参数，不能把设计视作已实现。
+1. **存储不能绕过规则。** `main` 当前的 `pipeline.process` 先调用 `policy_core.validate_record` 再写入，但旧的 `storage.append_validated(record)` 边界不会在直接调用时重新执行全部业务规则，也不会核对偏低的 `spent`。D 的 `df729a9` 已实现 `append_validated(record, expected_spent=None)`：重新执行策略校验、拒绝低于已持久化累计金额的 `expected_spent`，并检查 `total == expected_spent + amount`；该实现及测试仍未合入 `main`，因此不能标为 main 已实现。
 2. **存储失败分类。** 读取已存记录时，列表型 `call_id` 会抛出未转换的 `TypeError`；缺失的 ID 被跳过，空字符串没有被拒绝。直接写入不可 JSON 序列化的 `decided_at` 也会抛出未转换的 `TypeError`。这些路径尚未全部满足 RP-007 的 `StorageError` 合同。
 3. **部分写入与日志。** 存储和拒绝证据都使用追加写入；发生中途写入错误时，尚无回滚保证。`call_llm` 的部分传输/协议错误仍把 `str(exc)` 写入日志，需满足短且不泄露密钥的错误信息规则。存储失败是否另记专门证据及其格式尚待确定。
-4. **报告口径。** `report_tokens.py` 已有单次调用、按 `session_id` 聚合及总计；按 `request_id` 聚合尚未实现。`measure_latency.py` 标头的 NFR 编号应按 main 修正为 NFR-001。
+4. **报告口径。** D 的 `df729a9` 已支持按 `request_id` 聚合，并保留单次调用、按 `session_id` 聚合及总计；该版本尚未合入 `main`，所以评估台账应标为“D 分支已实现，尚未合入”。`measure_latency.py` 标头的 NFR 编号应按 main 修正为 NFR-001。
 
 ## 交接给 E 与 B：验证和需求确认
 

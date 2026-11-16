@@ -932,3 +932,37 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-16"
+  role: C
+  student_id: "60339160"
+  phase: 2
+  session: 13
+  topic: refresh D branch implementation status and reconcile Phase 2 records
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/architecture/phase2-c-handoff.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/req/**
+    - logs/**
+    - data/**
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Updated the policy catalog, evaluation logbook and C handoff to match D's
+    df729a9 branch: expected_spent validation and request_id aggregation are implemented
+    on D but are not yet merged into main. Preserved the existing main history in the
+    AI-use log and appended this C session without rewriting earlier records.
+  human_review:
+    - requested that D's expected_spent validation and request_id aggregation be marked as implemented but unmerged
+    - required the AI-use log to retain main's history and append C's new session
+  validation:
+    yaml_parse: pass
+    git_diff_check: pass
+    tests: not run (documentation-only session); no runtime behavior changed

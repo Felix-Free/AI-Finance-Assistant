@@ -62,7 +62,7 @@
 | Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` value. Three recorded integers → `gateway`; at least one recorded integer and one `null` → `partial`; `tokens: null` or three `null` counts → `missing`. Non-integer counts in a processed usage object normalize to `null`. Check `usage_source` agrees with recorded `tokens` and missing counts are never replaced with `0` or estimates. `tokens` is always present: it is `null` when usage was not recorded (including model-content JSON parse failure), or an object with `input`, `output` and `total` when usage was processed (missing counts `null`). These are descriptive statistics, with no pass/fail judgment. |
 | Meaning of `api_call_count` | `request_made: true` counts attempted HTTP calls, including DNS, connection and timeout failures. It does not count only requests known to have reached the gateway. |
 | Meaning of `usage_source: missing` | No usable token counts were recorded in that log line. On a JSON parsing failure, D records `tokens: null` and `usage_source: missing` even if the gateway response included usage. Therefore the missing-usage count cannot establish how often the gateway omitted usage. |
-| D's current report implementation (verified) | `src/report_tokens.py` produces: **per-call rows** (columns include `call_id`, `request_id`, `session_id`, `input`, `output`, `total`), **per-session aggregation** grouped by `session_id`, and **global counters** (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). It does **not** implement per-request aggregation — `request_id` appears only as a per-call column, not as a grouping aggregate. So requirement (b) is **C-required but not yet implemented in `report_tokens`**. |
+| D's current report implementation (verified at `df729a9`, unmerged) | `src/report_tokens.py` produces **per-call rows** (including `call_id`, `request_id`, `session_id`, `input`, `output`, and `total`), **per-session aggregation** grouped by `session_id`, **per-request aggregation** grouped by `request_id`, and the global counters (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). This implementation exists on D's branch and is **not yet present on `main`**. |
 | Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
 | Owner | B (definition), E (measurement), D (logging fields and report). |
 | Status | pending |
@@ -178,15 +178,15 @@ tests are skipped, so the join remains unverified.
 | No partial state | **Required boundary; verification pending.** Append-mode write raises `StorageError` on `OSError`, but the code shows no rollback of bytes written before the error. Not demonstrated. | Not verified. |
 | `call_id` linkage | The stored record and the rejection line both carry the same `call_id` as the `llm_calls` line; `request_id` is additionally present on the rejection line. | Code only; `test_evidence_join.py` skipped. |
 
-- **Budget-bypass gap (not secured).** `pipeline.process(spent=...)` trusts a caller-supplied
-  `spent` and reads the persisted total only when `spent is None`; `append_validated` does not
-  compare against persisted cumulative spend. A lower caller-supplied `spent` can weaken the
-  cumulative budget check. See `runtime-policy-catalog.md §5.5` for the approved-but-unimplemented
-  `expected_spent` boundary.
-- **Direct storage-call gap (not secured).** The `append_validated(record)` name and its
-  structural recheck do not guarantee the record passed `policy_core`. Calling it directly
-  with correctly typed but policy-invalid values can bypass C-INV-001/002/003. C requires
-  all production writes to follow `pipeline.process` until D enforces this boundary in code.
+- **Budget-bypass gap on `main` (addressed on D's unmerged branch).** The current `main`
+  snapshot still trusts a caller-supplied `spent` when it is passed through the old
+  storage boundary. D's `df729a9` implementation passes `spent` as `expected_spent` and
+  rejects values below persisted cumulative spend, but that protection is not on `main`
+  until the branch is merged.
+- **Direct storage-call gap on `main` (addressed on D's unmerged branch).** The current
+  `main` `append_validated(record)` boundary does not re-run C-INV-001/002/003. D's
+  `append_validated(record, expected_spent=None)` re-runs those guards before writing,
+  but the implementation is still branch-only and must not be treated as merged evidence.
 
 ---
 
