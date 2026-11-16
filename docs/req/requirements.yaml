@@ -225,23 +225,23 @@ nonfunctional_requirements:
     name: Model API response time
     metric: "wall-clock latency per model call (extract round-trip)"
     threshold: null
-    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95."
+    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95. Measurement method provided by D's src/measure_latency.py (nearest-rank; reports attempted/ok/failed/failure_rate and p50/p95 with n=ok) on branch feat/D-phase2-measurement (UNMERGED, not on main). No committed run-evidence file exists (logs/ is a runtime artifact, not in the repo); the figures reported by D are self-reported and are NOT independent verification. Do not treat them as an acceptance threshold."
     priority: medium
     status: pending_confirmation
     owner: B
     # NEEDS CONFIRMATION (owner: B) -> PD-007
-    notes: "No approved latency budget exists. Threshold to be set by B with D/E; do not invent a number."
+    notes: "No approved latency budget exists. Threshold to be set by B with D/E; do not invent a number. Evidence status: measurement code exists on D's unmerged branch; independent, committed measurement evidence is still pending (E)."
 
   - id: NFR-002
     name: Token consumption budget
     metric: "tokens per request and per session"
     threshold: null
-    verification: "read token usage from gateway response/logs if available; aggregate per session."
+    verification: "read token usage from the gateway response/logs and aggregate. Source: the gateway response usage object, mapped to {input: prompt_tokens, output: completion_tokens, total: total_tokens}. Aggregation implemented by D's src/report_tokens.py on branch feat/D-phase2-measurement (UNMERGED, not on main): per-request (grouped by request_id), per-session (grouped by session_id), api_call_count (rows with request_made=true), usage_source three-state distribution (gateway/partial/missing), and missing-usage count. Missing values are never zero-filled or estimated; a session with any incomplete/missing call is marked incomplete. All IDs are 32-hex. user_request_count is NOT implemented (tracked here as a pending gap; no new metric is added)."
     priority: medium
     status: pending_confirmation
     owner: B
     # NEEDS CONFIRMATION (owner: B) -> PD-007
-    notes: "No token budget defined; gateway may not expose usage. To be decided by B with the course/team."
+    notes: "No token budget defined; gateway may not expose usage. To be decided by B with the course/team. Evidence status: aggregation code exists on D's unmerged branch and is statistics-only; independent, committed token-run evidence is still pending (E). user_request_count remains unimplemented (confirm with D before adding)."
 
   - id: NFR-003
     name: API call failure handling
@@ -277,12 +277,12 @@ nonfunctional_requirements:
     name: Log traceability
     metric: "percentage of model calls and policy rejections with a corresponding log line"
     threshold: null
-    verification: "count calls vs llm_calls.jsonl lines; count rejections vs review.jsonl lines in tests."
+    verification: "count calls vs llm_calls.jsonl lines; count rejections vs review.jsonl lines in tests. call_id correlation is implemented by D on branch feat/D-phase2-measurement (UNMERGED, not on main): accepted path joins logs/llm_calls.jsonl.call_id == data/records.jsonl.call_id; rejected path joins logs/llm_calls.jsonl.call_id == logs/review.jsonl.call_id, and a rejected record never enters storage (records.jsonl). The end-to-end join test test/offline/test_evidence_join.py is still skipped on D's branch (assertions pending E); it is NOT a passing test. This join has not been verified on main."
     priority: high
     status: pending_confirmation
     owner: C
     # NEEDS CONFIRMATION (owner: C) -> PD-008
-    notes: "Logging contract is defined (RP-004) and enforced fail-closed; a numeric coverage threshold is pending C."
+    notes: "Logging contract is defined (RP-004) and enforced fail-closed; a numeric coverage threshold is pending C. Evidence status: call_id join code exists on D's unmerged branch; the evidence-join test is skipped there (E to complete). Runtime log/record files are runtime artifacts, not committed evidence."
 
   - id: NFR-007
     name: Testability
