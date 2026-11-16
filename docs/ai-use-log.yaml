@@ -1160,3 +1160,22 @@
     local_bash: passed for labeled #20; unlabeled #20, labeled #21, and another repository followed normal Gate 1
     actionlint: passed
     pending: GitHub CI verification
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 15
+  topic: Case-specific transport and grocery aliases in live extraction checks
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/live/test_live_model.py
+    - docs/ai-use-log.yaml
+  summary: "Allowed case-specific transport and grocery aliases in the live extraction checks while retaining amount, JSON and non-expense assertions. The aliases apply only to the bus-fare and groceries test cases; production category validation is unchanged and still rejects those alias strings."
+  human_review:
+    - Role A requested synonym-tolerant live assertions.
+  validation:
+    local_replay: canonical 5 passed and alias 5 passed
+    negative_outcomes: "Five intentional failures: three wrong categories, one wrong amount and one non-expense returned as a record."
+    offline_isolation: 204 offline passed with network blocked
+    latest_github_run: 2 failed/3 passed on the prior version; a real rerun of the proposed change is pending
