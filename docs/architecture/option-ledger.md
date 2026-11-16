@@ -2,8 +2,8 @@
 
 > Records the design options considered across Phase 2 (Issue #13), the option selected (if any),
 > and its status. Sources are **current `main`** and the verified unmerged branches
-> `origin/feat/D-phase2-measurement` (`df729a9`), `origin/feat/e-phase2-verification` (`cc6e650`),
-> `origin/feat/c-phase2-policy-60339160` (`6808d7e`). **Branch state verified as of 2026-11-16**;
+> `origin/feat/D-phase2-measurement` (`df729a9`), `origin/feat/e-phase2-verification` (`cab1901`),
+> `origin/feat/c-phase2-policy-60339160` (`01e3bc7`). **Branch state verified as of 2026-11-16**;
 > the SHAs are review-time identifiers, not a claim of being permanently current.
 >
 > **Status vocabulary** (each OPT uses exactly one):
