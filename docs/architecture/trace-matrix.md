@@ -5,19 +5,31 @@
 > an explicit evidence-status field that distinguishes what is on `main` from what only exists on an
 > unmerged branch.
 >
-> Baseline recorded for this matrix:
+> Baseline recorded for this matrix (Phase 2 refresh).
 >
-> - `main` HEAD `0dda36b` (Merge pull request #9, `feat/D-policy-core`). `main` contains
->   `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py`, and the offline tests
->   `test/offline/test_policy_core_smoke.py` + `test/offline/test_pipeline_seam.py`. CI is **not**
->   on `main`.
-> - `origin/feat/e-ci-skeleton` HEAD `7d29552` adds `.github/workflows/ci.yml`, `pytest.ini`,
->   `test/offline/test_invariants.py` (two INV-001 tests) and a `requirements.txt` update. **None of
->   this is on `main` yet.**
+> **Branch state verified as of 2026-11-16.** The SHA below is the identifier at review time and does
+> **not** mean "permanently current"; branches keep moving.
+>
+> - `main` HEAD `94b0ec4` (includes Phase 1 Role B docs + PR #11 CI skeleton + PR #12). `main`
+>   contains `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py`, the offline tests
+>   `test/offline/test_policy_core_smoke.py`, `test/offline/test_pipeline_seam.py`,
+>   `test/offline/test_invariants.py` (INV-001 only, 2 tests), `.github/workflows/ci.yml`, and
+>   `pytest.ini`.
+> - `origin/feat/D-phase2-measurement` HEAD `df729a9` — **UNMERGED** (24 ahead / 0 behind `main`).
+>   Adds `src/storage.py`, `src/report_tokens.py`, `src/measure_latency.py`, `src/measure_tokens.py`,
+>   token/usage capture in `src/call_llm.py`, `call_id` threading in `src/pipeline.py`, and tests
+>   (`test_token_usage.py`, `test_storage.py`, `test_measurement_scripts.py`,
+>   `test_evidence_join.py` — the last is **skipped** on this branch).
+> - `origin/feat/e-phase2-verification` HEAD `cc6e650` — **UNMERGED** (41 ahead / 0 behind `main`).
+>   Carries the E verification work (un-skips `test_evidence_join.py`, local evidence in
+>   `docs/measurements/phase2-qa-evidence.md`, guard-removal negatives; 12 INV-related tests covering
+>   INV-001/002/003). Neither branch's results are evidence on `main` or in CI.
+> - `origin/feat/c-phase2-policy-60339160` HEAD `6808d7e` — **UNMERGED** (17 ahead / 18 behind `main`).
 >
 > This file does **not** modify or restate requirement text; `requirements.yaml` remains the single
 > source of truth for requirement content. It does **not** invent ids: every id below appears in
-> `requirements.yaml`.
+> `requirements.yaml`. Status values describe **where the evidence lives**, not that a requirement is
+> "approved" or "passing".
 
 ---
 
@@ -27,8 +39,8 @@
 
 | Value | Meaning |
 |---|---|
-| `IN_MAIN` | The named test/CI exists on `main` (`0dda36b`) and runs from the merged code. |
-| `PENDING_MERGE` | The evidence exists only on an unmerged remote branch (`origin/feat/e-ci-skeleton`) and must be treated as **not yet present** on `main`. |
+| `IN_MAIN` | The named test/CI exists on `main` (`94b0ec4`) and runs from the merged code. (Phase 1 recorded this against `0dda36b`; the label means "on `main`", not a fixed SHA.) |
+| `PENDING_MERGE` | The evidence exists only on an unmerged remote branch (e.g. `origin/feat/D-phase2-measurement`, `origin/feat/e-phase2-verification`) and must be treated as **not yet present** on `main`. |
 | `MISSING` | No code and/or no test evidence found for the requirement. |
 
 ### 1.2 Verification Status (how far the requirement is satisfied)
@@ -45,6 +57,24 @@
 > a real test function name is cited; it counts as *verified* only when that test is `IN_MAIN` and
 > asserted to pass by the offline suite. `PENDING_MERGE` rows have a mapping but are **not** verified
 > on `main`.
+
+### 1.3 Runtime Monitor and the four Phase-2 status labels
+
+"Enforcing Component", "Test Evidence" and "Runtime Monitor" are three **independent** facts about a
+requirement and are recorded separately. A requirement may carry **more than one** of the following
+labels at once; a single NFR is **not** forced into one and only one label.
+
+| Label | Meaning |
+|---|---|
+| `main-implemented` | The named code/test exists on `main` (`94b0ec4`) and runs from merged code. |
+| `D-branch-implemented-unmerged` | The implementation exists only on `origin/feat/D-phase2-measurement` and is **not** on `main`. Treat as not yet present in the product. |
+| `test-pending` | The relevant automated test is absent, **or** present but **skipped** (e.g. D's `test_evidence_join.py`), **or** the assertion is still E's to complete. A skipped test is never counted as passing. |
+| `runtime-evidence-pending` | No committed, reproducible run evidence exists. Runtime artifacts (`logs/*.jsonl`, `data/records.jsonl`) are produced at run time and are **not** repository evidence; D-reported figures are not independent verification. |
+
+**Runtime Monitor** column: names an actual continuous monitor/observer if one exists; otherwise `—`.
+Running log files (`logs/llm_calls.jsonl`, `logs/review.jsonl`, `data/records.jsonl`) are **outputs**,
+not monitoring mechanisms, so they are **not** listed as a Runtime Monitor — they appear, if at all,
+only as uncommitted runtime artifacts under `runtime-evidence-pending`.
 
 ---
 
@@ -65,15 +95,15 @@
 
 ### 2.2 Non-functional requirements (NFR-001 … NFR-007)
 
-| Requirement ID | Requirement Summary | Acceptance Criteria | Architecture Component | Source File / Function | Test File / Test Case | Evidence Status | Verification Status | Gap / Remarks |
-|---|---|---|---|---|---|---|---|---|
-| NFR-001 | Model API response time | — (no AC; threshold null) | Model client | `src/call_llm.py::extract` (live round-trip) | none (no latency test on `main`) | MISSING | NOT_VERIFIED | No approved latency budget; no live measurement. pytest duration is **not** a proxy for API latency. PD-007 (owner B). |
-| NFR-002 | Token consumption | — (threshold null) | Model client | `src/call_llm.py` (gateway usage) | none | MISSING | NOT_VERIFIED | Gateway may not expose token usage; no measurement. PD-007 (owner B). |
-| NFR-003 | API call failure handling | transport-failure behaviour | Model client / policy | `src/call_llm.py::_post`; `src/call_llm.py::extract` | `test_pipeline_seam.py::test_seam_transport_error_logs_once`; `test_config_error_logs_once`; `test_post_raises_on_malformed_envelope` | IN_MAIN | PARTIALLY_IMPLEMENTED | Behaviour (RP-002) is tested; a pass/fail **threshold** (retry policy) and retry are pending C (PD-008). |
-| NFR-004 | Data security (secrets), threshold = 0 | count of committed secrets | Call client / repo | `.env` gitignored; `.env.example` placeholders (`src/call_llm.py` reads env only) | none (no automated secret scan on `main`) | MISSING | PARTIALLY_IMPLEMENTED | Threshold 0 is `approved`, but there is **no automated secret-scan test**; verification is manual grep only. |
-| NFR-005 | Input/output reliability | rate of accepted records failing later checks | Policy core / pipeline | `src/policy_core.py::validate_record` (validation precedes return) | `test_policy_core_smoke.py::test_validate_record_stops_at_first_failure`; `test_validate_record_rejects_non_dict`; `test_pipeline_seam.py::test_policy_rejection_writes_one_review_line` | IN_MAIN | PARTIALLY_IMPLEMENTED | Behaviour is tested; no defined reliability tolerance / rate measurement. PD-007 (owner B). |
-| NFR-006 | Log traceability | % calls and rejections with a log line | Model client / pipeline | `src/call_llm.py::_append_log`; `src/pipeline.py::_append_review` | `test_pipeline_seam.py::test_seam_returns_parsed_object_and_logs_once`; `test_seam_non_json_is_logged_then_reraised`; `test_policy_rejection_writes_one_review_line` | IN_MAIN | PARTIALLY_IMPLEMENTED | "Exactly one line" behaviour is tested; no numeric coverage threshold. PD-008 (owner C). |
-| NFR-007 | Testability | fraction of invariants with an offline negative test | test suite / CI | `test/offline/test_policy_core_smoke.py`; `test/offline/test_invariants.py` (E) | smoke INV tests on `main` (IN_MAIN); E `test/offline/test_invariants.py::test_inv001_rejects_negative_amount` and `test_inv001_accepts_valid_amount` (PENDING_MERGE) | IN_MAIN | IMPLEMENTED_AND_TESTED | Original acceptance criterion (`verification`: "map each INV to at least one test that fails without the guard; run pytest test/offline") is **met on `main`**: INV-001/002/003 each have a `pytest.raises(PolicyError)` negative smoke test in `test_policy_core_smoke.py` that fails if the guard is removed, and `pytest test/offline` passes. Enhancement NOT yet done (and NOT part of the original AC — appears only in E's `notes`): E's dedicated `test/offline/test_invariants.py` covers only INV-001 (two tests, a subset; it does NOT cover INV-002/003) and is PENDING_MERGE; CI is PENDING_MERGE. Status reflects the met original AC, not the pending enhancement. |
+| Requirement ID | Requirement Summary | Acceptance Criteria | Architecture Component | Source File / Function | Test File / Test Case | Runtime Monitor | Evidence Status | Verification Status | Phase-2 labels | Gap / Remarks |
+|---|---|---|---|---|---|---|---|---|---|---|
+| NFR-001 | Model API response time | — (no AC; threshold null) | Model client | `src/call_llm.py::extract` (live round-trip); D `src/measure_latency.py` | none on `main`; D `test/offline/test_measurement_scripts.py` (unmerged) | — | MISSING | NOT_VERIFIED | D-branch-implemented-unmerged; test-pending; runtime-evidence-pending | No approved latency budget; no committed live measurement (logs/ is a runtime artifact). D-reported p50/p95 are self-reported, not independent verification. pytest duration is **not** a proxy for API latency. PD-007 (owner B). |
+| NFR-002 | Token consumption | — (threshold null) | Model client | `src/call_llm.py` (gateway usage capture); D `src/report_tokens.py` | none on `main`; D `test/offline/test_token_usage.py` (unmerged) | — | MISSING | NOT_VERIFIED | D-branch-implemented-unmerged; test-pending; runtime-evidence-pending | Per-request/per-session/api_call_count/usage_source(three-state)/missing-usage implemented on D's **unmerged** branch; `user_request_count` NOT implemented. No committed token-run evidence. Statistics only, no approved threshold. PD-007 (owner B). |
+| NFR-003 | API call failure handling | transport-failure behaviour | Model client / policy | `src/call_llm.py::_post`; `src/call_llm.py::extract` | `test_pipeline_seam.py::test_seam_transport_error_logs_once`; `test_config_error_logs_once`; `test_post_raises_on_malformed_envelope` | — | IN_MAIN | PARTIALLY_IMPLEMENTED | main-implemented | Behaviour (RP-002) is tested; a pass/fail **threshold** (retry policy) and retry are pending C (PD-008). |
+| NFR-004 | Data security (secrets), threshold = 0 | count of committed secrets | Call client / repo | `.env` gitignored; `.env.example` placeholders (`src/call_llm.py` reads env only) | none (no automated secret scan on `main`) | — | MISSING | PARTIALLY_IMPLEMENTED | main-implemented; test-pending | Threshold 0 is `approved`, but there is **no automated secret-scan test**; verification is manual grep only. |
+| NFR-005 | Input/output reliability | rate of accepted records failing later checks | Policy core / pipeline | `src/policy_core.py::validate_record` (validation precedes return) | `test_policy_core_smoke.py::test_validate_record_stops_at_first_failure`; `test_validate_record_rejects_non_dict`; `test_pipeline_seam.py::test_policy_rejection_writes_one_review_line` | — | IN_MAIN | PARTIALLY_IMPLEMENTED | main-implemented | Behaviour is tested; no defined reliability tolerance / rate measurement. PD-007 (owner B). |
+| NFR-006 | Log traceability | % calls and rejections with a log line | Model client / pipeline | `src/call_llm.py::_append_log`; `src/pipeline.py::_append_rejection`; D `src/storage.py` (call_id join) | `test_pipeline_seam.py::test_seam_returns_parsed_object_and_logs_once`; `test_seam_non_json_is_logged_then_reraised`; `test_policy_rejection_writes_one_review_line`; D `test/offline/test_evidence_join.py` (**skipped**) | — | IN_MAIN | PARTIALLY_IMPLEMENTED | main-implemented; D-branch-implemented-unmerged; test-pending | "Exactly one line" behaviour tested on `main`; call_id accepted/rejected join implemented on D's **unmerged** branch; the join test is **skipped** on D and only asserted on E's unmerged branch. No numeric coverage threshold. PD-008 (owner C). |
+| NFR-007 | Testability | fraction of invariants with an offline negative test | test suite / CI | `test/offline/test_policy_core_smoke.py`; `test/offline/test_invariants.py` (E) | smoke INV tests on `main` (IN_MAIN); E `test/offline/test_invariants.py` (PENDING_MERGE) | — | IN_MAIN | IMPLEMENTED_AND_TESTED | main-implemented; D-branch-implemented-unmerged; test-pending | Original acceptance criterion (`verification`: "map each INV to at least one test that fails without the guard; run pytest test/offline") is **met on `main`**: INV-001/002/003 each have a `pytest.raises(PolicyError)` negative smoke test in `test_policy_core_smoke.py` that fails if the guard is removed, and `pytest test/offline` passes. **`main`'s `test/offline/test_invariants.py` has only 2 INV-001 tests.** E's dedicated `test_invariants.py` on the **unmerged** branch `feat/e-phase2-verification` (`cc6e650`) has **12 INV-related tests covering INV-001/002/003** (guard-removal negatives); those are E's **local** results on an unmerged branch and are **not** `main` or CI results. Status reflects the met original AC on `main`, not E's pending enhancement. |
 
 ### 2.3 Business invariants (INV-001 … INV-003, INV-PENDING-01)
 
@@ -123,21 +153,28 @@
 
 ---
 
-## 3. Branch-evidence separation (main vs. E `feat/e-ci-skeleton`)
+## 3. Branch-evidence separation (Phase 1 as of `0dda36b` → Phase 2 as of `94b0ec4`)
 
-| Artifact | On `main` (`0dda36b`)? | Status | What it is |
+> **Historical vs current.** The "Phase 1 (`0dda36b`)" column records what was true at the Phase 1
+> baseline; the "Now on `main` (`94b0ec4`)" column records the verified current state (as of
+> 2026-11-16). Items that were `PENDING_MERGE` in Phase 1 were later merged via **PR #11**
+> (`feat/e-ci-skeleton`) plus the Phase 1 Role B docs.
+
+| Artifact | Phase 1 (`0dda36b`) | Now on `main` (`94b0ec4`) | What it is |
 |---|---|---|---|
-| `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py` | Yes | IN_MAIN | Implementation. |
-| `test/offline/test_policy_core_smoke.py` | Yes | IN_MAIN | Smoke tests for INV-001/002/003 + validate_record. |
-| `test/offline/test_pipeline_seam.py` | Yes | IN_MAIN | Seam + rejection-logging tests. |
-| `.github/workflows/ci.yml` | **No** | PENDING_MERGE | CI workflow (branch `feat/e-ci-skeleton`, `7d29552`). |
-| `pytest.ini` | **No** | PENDING_MERGE | Offline/live markers. |
-| `requirements.txt` (`jsonschema`, `ruff`) additions | **No** | PENDING_MERGE | New dev deps. |
-| `test/offline/test_invariants.py::test_inv001_rejects_negative_amount` | **No** | PENDING_MERGE | Negative INV-001 (subset of smoke). |
-| `test/offline/test_invariants.py::test_inv001_accepts_valid_amount` | **No** | PENDING_MERGE | Positive INV-001 (subset of smoke). |
+| `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py` | Yes | Yes | Implementation. |
+| `test/offline/test_policy_core_smoke.py` | Yes | Yes | Smoke tests for INV-001/002/003 + validate_record. |
+| `test/offline/test_pipeline_seam.py` | Yes | Yes | Seam + rejection-logging tests. |
+| `.github/workflows/ci.yml` | No (PENDING_MERGE) | **Yes** (merged via PR #11) | CI workflow. |
+| `pytest.ini` | No (PENDING_MERGE) | **Yes** (merged via PR #11) | Offline/live markers. |
+| `requirements.txt` (`jsonschema`, `ruff`) additions | No (PENDING_MERGE) | **Yes** (merged via PR #11) | New dev deps. |
+| `test/offline/test_invariants.py` | No (PENDING_MERGE) | **Yes** — but **only 2 INV-001 tests** on `main` | E's invariant test file (see note). |
 
-**Important:** the E branch adds **no** INV-002 or INV-003 test. Any statement that E supplied a
-"full boundary suite" is **incorrect**; on the current E HEAD only two INV-001 tests exist.
+**Note (INV coverage).** `main`'s `test/offline/test_invariants.py` contains **2 INV-001 tests only**.
+The **unmerged** E branch `feat/e-phase2-verification` (`cc6e650`, verified 2026-11-16) adds a fuller
+`test_invariants.py` with **12 INV-related tests covering INV-001/002/003** (guard-removal negatives).
+E's branch results are **E's local results on an unmerged branch — not `main` or CI results**; they
+must not be reported as passing on `main`/CI until merged and run in the hosted pipeline.
 
 ---
 
@@ -151,7 +188,7 @@ Counted rows: FR (8) + NFR (7) + invariants (4) + AI-REQ (8) + ERR (5) + SEC (5)
 |---|---|---|
 | Total requirements traced | 37 | All real ids across the six groups. |
 | With architecture-component mapping | 37 | Every row names a component. |
-| With source-file/function mapping | 34 | 3 rows have no concrete function: NFR-001, NFR-002 (no measurement code) and AI-REQ-008 (governance only). |
+| With source-file/function mapping | 34 | 3 rows have no concrete function: NFR-001, NFR-002 (**no committed measurement evidence**; measurement code exists only on the unmerged `feat/D-phase2-measurement`) and AI-REQ-008 (governance only). |
 | With a cited test-case mapping (incl. `PENDING_MERGE`) | 29 | A concrete test function name is cited in the "Test File / Test Case" column (including the two `PENDING_MERGE` E tests cited in remarks). |
 | Without a cited test-case mapping | 8 | NFR-001, NFR-002, NFR-004, AI-REQ-008, ERR-004, SEC-001, SEC-004, SEC-005. These are **requirement rows**, not "gap rows": ERR-004 and SEC-005 share the same missing `OSError`→fail-closed test, but they remain two separate requirement rows and are counted as two. 29 + 8 = 37. |
 
@@ -161,12 +198,18 @@ Counted rows: FR (8) + NFR (7) + invariants (4) + AI-REQ (8) + ERR (5) + SEC (5)
 |---|---|---|
 | IN_MAIN | 30 | every FR/AI-REQ/ERR/SEC/invariant row traced to `main` code/tests, plus NFR-003/005/006/007 (their `main` smoke evidence is the primary status; E's unmerged tests are noted only in remarks). |
 | PENDING_MERGE | 0 | No row uses `PENDING_MERGE` as its **primary** status. The E `test_invariants.py` tests (both INV-001) are recorded as `PENDING_MERGE` in the remarks of FR-003 / INV-001 / NFR-007 and in §3, never as a row status. |
-| MISSING | 7 | NFR-001, NFR-002 (no measurement code); NFR-004, SEC-001, SEC-004 (no automated secret scan); ERR-004, SEC-005 (no fail-closed OSError test). |
+| MISSING | 7 | NFR-001, NFR-002 (**no committed measurement evidence**; measurement code only on the unmerged D branch); NFR-004, SEC-001, SEC-004 (no automated secret scan); ERR-004, SEC-005 (no fail-closed OSError test). |
 | **Total** | **37** | Equals the matrix row count. |
 
 > Because each row carries a **single** Evidence Status, the per-row counts above already equal the
 > row count. Unmerged E evidence is always surfaced as `PENDING_MERGE` in its own remarks cell and is
 > never promoted to `IN_MAIN`.
+>
+> **Phase-2 labels do not affect this count.** §2.2 adds a separate "Phase-2 labels" column whose
+> values (`main-implemented` / `D-branch-implemented-unmerged` / `test-pending` /
+> `runtime-evidence-pending`) are **multi-valued** and may coexist for one row. They are orthogonal to
+> the single-valued Evidence Status counted here, so they do **not** change the 37-row tally or the
+> distribution above.
 
 ### 4.3 Verification-status distribution
 
@@ -186,11 +229,15 @@ Counted rows: FR (8) + NFR (7) + invariants (4) + AI-REQ (8) + ERR (5) + SEC (5)
 
 ## 5. Known gaps carried forward
 
-| Gap | Evidence source | Requirement(s) | Owner | Note |
-|---|---|---|---|---|
-| CI not on `main` | `feat/e-ci-skeleton` `7d29552` | NFR-007 | E | Merge after B's requirements files land (CI schema step depends on them). |
-| No live latency/token measurement | `test/live/` empty; thresholds null | NFR-001, NFR-002 | B | PD-007; do not substitute pytest timing. |
-| Fail-closed log branch untested | `src/call_llm.py` `# pragma: no cover` | ERR-004, SEC-005 | D/E | Environment-failure branch. |
-| No automated secret scan | `.gitignore` only | NFR-004, SEC-001, SEC-004 | B/C | Manual verification only. |
-| Only `policy_core` import-checked | `test_policy_core_has_no_io_imports` | SEC-002 | E | No test asserts pipeline/extract import `requests` alone. |
-| Dedicated INV-002/003 boundary suite absent | E `test_invariants.py` has only INV-001 | INV-002/003, NFR-007 | E | Smoke tests cover them on `main`; "exhaustive" suite is still E's deliverable. |
+> Status column distinguishes **Resolved** (fixed on `main`) from **Open** (still a gap). Phase-1
+> history is preserved in the Note; current state is as of 2026-11-16.
+
+| Gap | Evidence source | Requirement(s) | Owner | Status | Note |
+|---|---|---|---|---|---|
+| CI configuration missing | Phase 1: `feat/e-ci-skeleton` `7d29552`; now `.github/workflows/ci.yml` on `main` | NFR-007 | E | **Resolved** | CI + `pytest.ini` + `requirements.txt`(jsonschema,ruff) are now on `main@94b0ec4` (merged via PR #11). Historical Phase-1 note: not on `main` then. |
+| No committed latency/token measurement evidence | thresholds null; `logs/`/`data/` are runtime artifacts | NFR-001, NFR-002 | B (records) / E (runs) | **Open** | D's branch (`df729a9`, **unmerged**) has `measure_latency.py` / `measure_tokens.py` / `report_tokens.py`, but there is **no committed runtime evidence** and D-reported figures are not independent verification. PD-007. Do not substitute pytest timing. |
+| Fail-closed log branch untested | `src/call_llm.py` `# pragma: no cover` | ERR-004, SEC-005 | D/E | **Open** | Environment-failure branch. |
+| No automated secret scan | `.gitignore` only | NFR-004, SEC-001, SEC-004 | B/C | **Open** | Manual verification only. |
+| Only `policy_core` import-checked | `test_policy_core_has_no_io_imports` | SEC-002 | E | **Open** | No test asserts pipeline/extract import `requests` alone. |
+| INV-002/003 boundary suite absent on `main` | `main` `test_invariants.py` has only INV-001 (2 tests); E branch `cc6e650` has 12 INV tests | INV-002/003, NFR-007 | E | **Open on `main`; covered on E's unmerged branch** | E's `feat/e-phase2-verification` (`cc6e650`) covers INV-001/002/003 with guard-removal negatives, but it is **unmerged** and its results are E's **local** results — not `main` or CI. |
+| Runtime Monitor | `trace-matrix.md` §2.2 Runtime Monitor column | all | B | **Open / unconfirmed** | No confirmed continuous monitor exists; log files are outputs, not monitors (all Runtime Monitor cells remain `—`). |
