@@ -18,7 +18,6 @@
     "transcripts/**": "allow",
     "data/**": "allow",
     "scripts/**": "allow",
-    "docs/measurements/**": "allow",
     ".env": "deny"
   },
 
