@@ -1,246 +1,212 @@
 # AI Use Log
 # One entry per working session. Append; do not rewrite earlier entries.
 
-- date: "2026-11-06"
+- date: '2026-11-06'
   role: A
-  student_id: "60528523"
+  student_id: '60528523'
   phase: 1
   session: 1
   topic: Repository initialization and manual rectification
   tool: Human Review (Manual)
   files_created:
-    - .github/workflows/.gitkeep
-    - .opencode/.gitkeep
-    - .agent/.gitkeep
-    - Report.md
-    - Prompt.md
-    - docs/ai-use-log.yaml
+  - .github/workflows/.gitkeep
+  - .opencode/.gitkeep
+  - .agent/.gitkeep
+  - Report.md
+  - Prompt.md
+  - docs/ai-use-log.yaml
   files_modified:
-    - README.md
+  - README.md
   files_not_modified:
-    - src/**
-  summary: >
-    Reviewed PR #6 (Initial project skeleton). Identified that the AI agent 
-    missed critical governance directories (.github/workflows, .opencode, .agent). 
-    Manually added the missing directories to enforce architectural constraints 
-    and CI governance.
+  - src/**
+  summary: 'Reviewed PR #6 (Initial project skeleton). Identified that the AI agent  missed critical governance directories (.github/workflows, .opencode, .agent).  Manually added the missing directories to enforce architectural constraints  and CI governance.
+
+    '
   human_review:
-    - rejected the incomplete AI-generated structure.
-    - manually supplemented hidden directories to ensure compliance with PDF requirements.
+  - rejected the incomplete AI-generated structure.
+  - manually supplemented hidden directories to ensure compliance with PDF requirements.
   validation:
     structure_check: pass (aligned with PDF page 24)
-    
-- date: "2026-11-06"
+- date: '2026-11-06'
   role: D
-  student_id: "60915652"
+  student_id: '60915652'
   phase: 1
   session: 1
   topic: agent-governance draft, conventions draft, requirements for the model entry point, transcript 1
-  tool: "human authoring (documents and configuration only; no source code in this session)"
+  tool: human authoring (documents and configuration only; no source code in this session)
   files_created:
-    - AGENTS.md
-    - docs/code-governance/structural-constraints.md
-    - transcripts/60915652-LiuWanyang.md
-    - requirements.txt
-    - .gitignore
-    - .gitattributes
-    - .env.example
+  - AGENTS.md
+  - docs/code-governance/structural-constraints.md
+  - transcripts/60915652-LiuWanyang.md
+  - requirements.txt
+  - .gitignore
+  - .gitattributes
+  - .env.example
   files_modified:
-    - docs/ai-use-log.yaml
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - docs/req/**
-    - docs/architecture/**
-    - test/**
-  summary: >
-    Authored the agent-governance file and the code-governance conventions, fixed the
-    requirements for the model entry point (one module, one log line per call, fail-closed),
-    and recorded the first transcript entry. No source code was authored in this session: the
-    model client in the repository is the version written through OpenCode in session 2, which
-    is where it is listed.
+  - src/**
+  - docs/req/**
+  - docs/architecture/**
+  - test/**
+  summary: 'Authored the agent-governance file and the code-governance conventions, fixed the requirements for the model entry point (one module, one log line per call, fail-closed), and recorded the first transcript entry. No source code was authored in this session: the model client in the repository is the version written through OpenCode in session 2, which is where it is listed.
+
+    '
   human_review:
-    - required all model calls to be confined to one module, with no second requests.post
-    - required .env and logs/ to stay out of the repository, verified with git check-ignore
-    - required the category vocabulary to be enforced by code, not by prompt text
-    - required the recorded Python version to be the observed one (3.14.4), not a placeholder
+  - required all model calls to be confined to one module, with no second requests.post
+  - required .env and logs/ to stay out of the repository, verified with git check-ignore
+  - required the category vocabulary to be enforced by code, not by prompt text
+  - required the recorded Python version to be the observed one (3.14.4), not a placeholder
   validation:
     py_compile: pass (Python 3.9.7 system interpreter)
     live_call: pass (parsed amount=350, category=food; one JSONL line appended)
     pytest: no tests existed at this point (suite created in session 2)
-    
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 1
   session: 1
   topic: security and governance specs
   tool: opencode
   files_created:
-    - docs/architecture/invariants.md
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/permission-model.md
-    - .opencode/permissions.jsonc
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/permission-model.md
+  - .opencode/permissions.jsonc
   files_modified:
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-  summary: >
-    Documented three business invariants (finite positive amount, closed category
-    whitelist, cumulative budget) using role-scoped ids C-INV-001..003 to avoid
-    colliding with the INV-002 already reserved in transcript 60915652, logging
-    integrity recorded as runtime policy RP-004, and a default-deny permission
-    model plus permissions.jsonc whitelist. Specs only; guards are D's, tests E's.
+  - src/**
+  - test/**
+  summary: 'Documented three business invariants (finite positive amount, closed category whitelist, cumulative budget) using role-scoped ids C-INV-001..003 to avoid colliding with the INV-002 already reserved in transcript 60915652, logging integrity recorded as runtime policy RP-004, and a default-deny permission model plus permissions.jsonc whitelist. Specs only; guards are D''s, tests E''s.
+
+    '
   human_review:
-    - rejected replacing the budget invariant with a logging-integrity invariant
-    - required C-INV-### numbering instead of redefining global INV ids
+  - rejected replacing the budget invariant with a logging-integrity invariant
+  - required C-INV-### numbering instead of redefining global INV ids
   validation:
     jsonc_parse: pass (generic JSONC only)
     pytest: no tests ran (empty suite; not evidence of passing)
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 1
   session: 2
   topic: final validation of the C-Security artefacts
   tool: opencode
   files_modified:
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
-    - .opencode/permissions.jsonc
-  summary: >
-    Re-validated the session-1 artefacts using the project virtual environment
-    ./.venv/bin/python. ai-use-log.yaml parsed (YAML OK). permissions.jsonc parsed
-    with generic JSONC parsing only; no OpenCode-specific permission validator exists
-    in this repository, so schema conformance is not verified. pytest reported no
-    tests ran. Corrected the session-1 transcript where it overstated the YAML and
-    pytest results, added session numbers, and added explicit read-whitelist entries
-    so permissions.jsonc matches permission-model.md; edit permissions remain denied.
-  human_review:
-    - required the OpenCode-validator limitation to be stated explicitly
-    - required the permission config read whitelist to match permission-model.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
+  - .opencode/permissions.jsonc
+  summary: 'Re-validated the session-1 artefacts using the project virtual environment ./.venv/bin/python. ai-use-log.yaml parsed (YAML OK). permissions.jsonc parsed with generic JSONC parsing only; no OpenCode-specific permission validator exists in this repository, so schema conformance is not verified. pytest reported no tests ran. Corrected the session-1 transcript where it overstated the YAML and pytest results, added session numbers, and added explicit read-whitelist entries so permissions.jsonc matches permission-model.md; edit permissions remain denied.
 
-- date: "2026-11-09"
+    '
+  human_review:
+  - required the OpenCode-validator limitation to be stated explicitly
+  - required the permission config read whitelist to match permission-model.md
+- date: '2026-11-09'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 1
   session: 3
   topic: D3 coding-governance files (OpenCode rules, agent covenant, MCP tool manifest)
   tool: opencode
   files_created:
-    - .opencode/rules.md
-    - .agent/rules.md
-    - docs/code-governance/mcp-tool-manifest.md
+  - .opencode/rules.md
+  - .agent/rules.md
+  - docs/code-governance/mcp-tool-manifest.md
   files_modified:
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - .opencode/permissions.jsonc
-    - src/**
-    - test/**
-  summary: >
-    Created the three D3 governance files. .opencode/rules.md is OpenCode-specific and
-    subordinate to AGENTS.md; .agent/rules.md is tool-agnostic and references AGENTS.md
-    instead of copying it; the MCP tool manifest states that no MCP server is configured
-    and separates application entry points (EP-001/EP-002) and test commands
-    (TC-001/TC-002) from MCP tools. permissions.jsonc was not modified; its broad docs/**
-    and test/** read rules are documented as intentional, not as a mismatch.
+  - .opencode/permissions.jsonc
+  - src/**
+  - test/**
+  summary: 'Created the three D3 governance files. .opencode/rules.md is OpenCode-specific and subordinate to AGENTS.md; .agent/rules.md is tool-agnostic and references AGENTS.md instead of copying it; the MCP tool manifest states that no MCP server is configured and separates application entry points (EP-001/EP-002) and test commands (TC-001/TC-002) from MCP tools. permissions.jsonc was not modified; its broad docs/** and test/** read rules are documented as intentional, not as a mismatch.
+
+    '
   human_review:
-    - required the manifest not to treat functions or pytest as MCP tools
-    - required the "no MCP server configured" fact to be stated explicitly
-    - required permissions.jsonc to stay unmodified with the equivalence documented
-    - required a malformed change-protocol paragraph in the manifest to be cleaned up
+  - required the manifest not to treat functions or pytest as MCP tools
+  - required the "no MCP server configured" fact to be stated explicitly
+  - required permissions.jsonc to stay unmodified with the equivalence documented
+  - required a malformed change-protocol paragraph in the manifest to be cleaned up
   validation:
     yaml_parse: pass (YAML OK via ./.venv/bin/python)
     git_diff_check: pass
     pytest: no tests ran (empty suite; not evidence of passing)
     opencode_mcp_schema: unavailable (no validator in repo)
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: D
-  student_id: "60915652"
+  student_id: '60915652'
   phase: 1
   session: 2
   topic: deterministic guards INV-001..003, transport seam, pipeline with review logging
   tool: opencode
   files_created:
-    - src/call_llm.py
-    - src/__init__.py
-    - src/policy_core.py
-    - src/pipeline.py
-    - test/offline/test_policy_core_smoke.py
-    - test/offline/test_pipeline_seam.py
+  - src/call_llm.py
+  - src/__init__.py
+  - src/policy_core.py
+  - src/pipeline.py
+  - test/offline/test_policy_core_smoke.py
+  - test/offline/test_pipeline_seam.py
   files_modified:
-    - docs/code-governance/structural-constraints.md
-    - transcripts/60915652-LiuWanyang.md
-    - docs/ai-use-log.yaml
+  - docs/code-governance/structural-constraints.md
+  - transcripts/60915652-LiuWanyang.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - docs/req/**
-    - docs/architecture/**
-    - .opencode/**
-    - requirements.txt
-  summary: >
-    Implemented role C's three invariants as deterministic guards with a single
-    PolicyError carrying a log code and a review flag; extracted the HTTP call of
-    call_llm into a module-level _post so tests can stub the transport; added
-    pipeline.process with the runtime-policy precedence (parse and log before
-    invariants) and exactly one line to logs/review.jsonl for rejections that need
-    human inspection. No rule is enforced by prompt text. Two smoke test files were
-    added; the exhaustive boundary suite remains with role E (test_invariants.py).
+  - docs/req/**
+  - docs/architecture/**
+  - .opencode/**
+  - requirements.txt
+  summary: 'Implemented role C''s three invariants as deterministic guards with a single PolicyError carrying a log code and a review flag; extracted the HTTP call of call_llm into a module-level _post so tests can stub the transport; added pipeline.process with the runtime-policy precedence (parse and log before invariants) and exactly one line to logs/review.jsonl for rejections that need human inspection. No rule is enforced by prompt text. Two smoke test files were added; the exhaustive boundary suite remains with role E (test_invariants.py).
+
+    '
   human_review:
-    - rejected the agent's envelope handling, because a malformed HTTP 200 would escape as KeyError; required LlmTransportError for every protocol failure
-    - rejected the agent's test filename test_invariants.py, which is reserved for role E; required *_smoke and *_seam names plus a note in CHANGED FILES
-    - required validate_record to reject non-dict input instead of raising AttributeError
-    - required the running total to be returned so the review line can record it
-    - required exactly one log line on the missing-credentials path
-    - rejected the agent's offer to guess the three fixes; required the FIX text to be pasted verbatim (AGENTS.md 1.5, "do not guess")
-    - corrected my own instruction "commit A and B separately", which named an action but not an actor; the agent executed it and I kept both commits rather than rewriting history
+  - rejected the agent's envelope handling, because a malformed HTTP 200 would escape as KeyError; required LlmTransportError for every protocol failure
+  - rejected the agent's test filename test_invariants.py, which is reserved for role E; required *_smoke and *_seam names plus a note in CHANGED FILES
+  - required validate_record to reject non-dict input instead of raising AttributeError
+  - required the running total to be returned so the review line can record it
+  - required exactly one log line on the missing-credentials path
+  - rejected the agent's offer to guess the three fixes; required the FIX text to be pasted verbatim (AGENTS.md 1.5, "do not guess")
+  - corrected my own instruction "commit A and B separately", which named an action but not an actor; the agent executed it and I kept both commits rather than rewriting history
   validation:
     py_compile: pass
     pytest_offline: 36 passed
     live_call: pass after provisioning .env (parsed amount=350, category=food)
     guard_boundaries: pass (-1, 0, 0.005, 100.001, "350", None, True, nan, inf rejected; equality at the budget accepted; over-budget and out-of-vocabulary rejected with review=true)
     review_log: pass (one line written to logs/review.jsonl for an out-of-vocabulary category)
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: D
-  student_id: "60915652"
+  student_id: '60915652'
   phase: 1
   session: 3
   topic: conformance check against invariants.md, and the rejection-evidence fix (option B)
   tool: opencode
   files_modified:
-    - src/pipeline.py
-    - test/offline/test_pipeline_seam.py
-    - transcripts/60915652-LiuWanyang.md
-    - docs/ai-use-log.yaml
+  - src/pipeline.py
+  - test/offline/test_pipeline_seam.py
+  - transcripts/60915652-LiuWanyang.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/policy_core.py
-    - src/call_llm.py
-    - docs/**
-    - AGENTS.md
-    - requirements.txt
-  summary: >
-    Compared the implementation against every field of role C's guard specification (Condition,
-    Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and
-    Boundary conformed for all three invariants; Evidence did not. The call line in
-    logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry
-    a policy outcome, and RP-004 forbids a second line there. The specification owner chose
-    option B: every policy rejection now appends exactly one line to logs/review.jsonl with
-    error = policy:amount / policy:category / policy:budget and review = false / true / true,
-    while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no
-    trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields)
-    and runtime-policy-catalog.md (RP-003/005/006 point at the file).
+  - src/policy_core.py
+  - src/call_llm.py
+  - AGENTS.md
+  - requirements.txt
+  - docs/architecture/**
+  - docs/code-governance/**
+  - docs/req/**
+  summary: 'Compared the implementation against every field of role C''s guard specification (Condition, Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and Boundary conformed for all three invariants; Evidence did not. The call line in logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry a policy outcome, and RP-004 forbids a second line there. The specification owner chose option B: every policy rejection now appends exactly one line to logs/review.jsonl with error = policy:amount / policy:category / policy:budget and review = false / true / true, while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields) and runtime-policy-catalog.md (RP-003/005/006 point at the file).
+
+    '
   human_review:
-    - found the Evidence gap by comparing field by field, not by trusting 36 passing tests
-    - refused to resolve the conflict myself because it is between two documents owned by role C; put options A/B/C to the owner instead
-    - refused to edit invariants.md, because the specification is C's artefact
-    - required the field rename code to error rather than adding a second field
-    - required review to be taken from exc.review instead of hard-coded true
-    - required the llm_calls.jsonl behaviour to stay untouched (RP-004)
-    - recorded two test weaknesses instead of hiding them: a near-vacuous captured_log assertion, and the now-misleading _append_review / review.jsonl names
+  - found the Evidence gap by comparing field by field, not by trusting 36 passing tests
+  - refused to resolve the conflict myself because it is between two documents owned by role C; put options A/B/C to the owner instead
+  - refused to edit invariants.md, because the specification is C's artefact
+  - required the field rename code to error rather than adding a second field
+  - required review to be taken from exc.review instead of hard-coded true
+  - required the llm_calls.jsonl behaviour to stay untouched (RP-004)
+  - recorded two test weaknesses instead of hiding them: a near-vacuous captured_log assertion, and the now-misleading _append_review / review.jsonl names
   validation:
     py_compile: pass
     pytest_offline: 39 passed (36 existing + 3 new parametrised cases, one per invariant)
@@ -248,97 +214,86 @@
     requests_in_pipeline: absent
     llm_calls_untouched_by_pipeline: pass (RP-004 preserved)
     spec_conformance: Evidence now conforms to option B; role C's document edit still pending
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 1
   session: 4
   topic: required policy-review evidence edits
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/invariants.md
-    - docs/architecture/runtime-policy-catalog.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - .DS_Store
-    - docs/c-role-handoff.md
-    - src/**
-    - test/**
-  summary: >
-    Applied the first three required C document edits: invariant policy rejections now
-    use logs/review.jsonl with the specified review flags, the rejection-evidence note
-    was added at the start of invariants.md §2, and only RP-003/RP-005/RP-006 received
-    review-log evidence paths. RP-001/RP-002/RP-004 were left unchanged.
+  - .DS_Store
+  - docs/c-role-handoff.md
+  - src/**
+  - test/**
+  summary: 'Applied the first three required C document edits: invariant policy rejections now use logs/review.jsonl with the specified review flags, the rejection-evidence note was added at the start of invariants.md §2, and only RP-003/RP-005/RP-006 received review-log evidence paths. RP-001/RP-002/RP-004 were left unchanged.
+
+    '
   human_review:
-    - confirmed the three invariant Evidence lines and review flags
-    - confirmed RP-001/RP-002/RP-004 were not changed
-    - confirmed the unrelated .DS_Store was excluded
+  - confirmed the three invariant Evidence lines and review flags
+  - confirmed RP-001/RP-002/RP-004 were not changed
+  - confirmed the unrelated .DS_Store was excluded
   validation:
     git_diff_check: pass
     yaml_parse: pass
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: A
-  student_id: "60528523"
+  student_id: '60528523'
   phase: 1
   session: 2
-  topic: Cross-review of PR #8 and PR #9
+  topic: Cross-review of PR
   tool: opencode
   files_modified:
-    - docs/ai-use-log.yaml
-    - transcripts/60528523-TANJingling.md
+  - docs/ai-use-log.yaml
+  - transcripts/60528523-TANJingling.md
   files_created: []
   files_not_modified:
-    - src/**
-    - test/**
-  summary: >
-    Conducted cross-review of PR #8 (security specs) and PR #9 (core logic). 
-    Used OpenCode to semantically compare C's updated invariants.md against the logging 
-    requirements, and ran boundary-value harness tests on D's policy_core.py.
+  - src/**
+  - test/**
+  summary: 'Conducted cross-review of PR #8 (security specs) and PR #9 (core logic).  Used OpenCode to semantically compare C''s updated invariants.md against the logging  requirements, and ran boundary-value harness tests on D''s policy_core.py.
+
+    '
   human_review:
-    - verified PR #8 Evidence fields were correctly updated to logs/review.jsonl.
-    - confirmed PR #9 explicitly rejects boolean types before int/float checks.
-    - manually resolved a Git merge conflict in ai-use-log.yaml between PR #8 and PR #9.
+  - verified PR
+  - confirmed PR
+  - manually resolved a Git merge conflict in ai-use-log.yaml between PR
   validation:
     pytest: 39 passed (verified via local OpenCode review)
     merge_conflict: resolved
-
-- date: "2026-11-10"
+- date: '2026-11-10'
   role: A
-  student_id: "60528523"
+  student_id: '60528523'
   phase: 1
   session: 3
-  topic: Cross-review of PR #10 and D5 transcript generation
+  topic: Cross-review of PR
   tool: opencode
   files_created:
-    - transcripts/60528523-TanJingling.md
+  - transcripts/60528523-TanJingling.md
   files_modified:
-    - docs/ai-use-log.yaml
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-  summary: >
-    Conducted a comprehensive cross-review of PR #10 (Role B's requirements and architecture).
-    Used OpenCode to audit the separation of AI advisory vs deterministic authority, and to verify
-    the invariant coverage in requirements.yaml. The agent successfully identified critical blocking
-    issues: a missing required deliverable (docs/architecture/trace-matrix.md) and internal documentation
-    contradictions (requirements.yaml header claimed PR #9 was unmerged, contradicting actual git history).
-    Generated the D5 transcript (transcripts/60528523-TanJingling.md) documenting the review process for PR #8, PR #9, and PR #10.
-  human_review:
-    - intervened based on AI's audit to reject PR #10 and requested changes from Role B.
-    - manually resolved Git merge conflicts in docs/ai-use-log.yaml between Role C's and Role D's branches.
-    - ensured all commit messages and transcripts strictly follow professional English standards.
-  validation:
-    pr_review: PR #10 rejected with actionable feedback
-    merge_conflict: resolved manually via GitHub web editor
-    pytest: 39 passed (verified via local OpenCode review on PR #9)
+  - src/**
+  - test/**
+  summary: 'Conducted a comprehensive cross-review of PR #10 (Role B''s requirements and architecture). Used OpenCode to audit the separation of AI advisory vs deterministic authority, and to verify the invariant coverage in requirements.yaml. The agent successfully identified critical blocking issues: a missing required deliverable (docs/architecture/trace-matrix.md) and internal documentation contradictions (requirements.yaml header claimed PR #9 was unmerged, contradicting actual git history). Generated the D5 transcript (transcripts/60528523-TanJingling.md) documenting the review process for PR #8, PR #9, and PR #10.
 
-- date: "2026-11-10"
+    '
+  human_review:
+  - intervened based on AI's audit to reject PR
+  - manually resolved Git merge conflicts in docs/ai-use-log.yaml between Role C's and Role D's branches.
+  - ensured all commit messages and transcripts strictly follow professional English standards.
+  validation:
+    pr_review: PR
+    merge_conflict: resolved manually via GitHub web editor
+    pytest: 39 passed (verified via local OpenCode review on PR
+- date: '2026-11-10'
   role: A
-  student_id: "60528523"
+  student_id: '60528523'
   phase: 1
   session: 4
   topic: QA Audit and CI Pipeline Review
@@ -346,199 +301,180 @@
   files_created: []
   files_modified: []
   files_not_modified:
-    - src/**
-    - test/**
-  summary: >
-    Audited PR #11 (CI/CD Pipeline and Offline Tests) submitted by Role E. Used OpenCode to verify
-    if the pipeline strictly implemented the 6 required blocking gates. The agent successfully identified
-    critical gaps: missing Schema Gate, lack of jsonschema dependency, and a silent-skip risk in pytest
-    using the `-m offline` marker.
-  human_review:
-    - rejected PR #11 based on the AI's QA audit.
-    - identified a cross-role dependency (PR #11 failed schema validation because PR #10 was not yet merged) and coordinated with Role B and Role E to fix the merge order.
-  validation:
-    pr_review: PR #11 rejected with actionable CI fixes
-    ci_yaml_check: identified missing blocking gates
+  - src/**
+  - test/**
+  summary: 'Audited PR #11 (CI/CD Pipeline and Offline Tests) submitted by Role E. Used OpenCode to verify if the pipeline strictly implemented the 6 required blocking gates. The agent successfully identified critical gaps: missing Schema Gate, lack of jsonschema dependency, and a silent-skip risk in pytest using the `-m offline` marker.
 
-- date: "2026-11-13"
+    '
+  human_review:
+  - rejected PR
+  - identified a cross-role dependency (PR
+  validation:
+    pr_review: PR
+    ci_yaml_check: identified missing blocking gates
+- date: '2026-11-13'
   role: A
-  student_id: "60528523"
+  student_id: '60528523'
   phase: 1
   session: 5
   topic: Comprehensive PR auditing, workflow unblocking, and sandbox supervision
   tool: opencode
   files_created: []
   files_modified:
-    - docs/ai-use-log.yaml
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-  summary: >
-    Audited multiple PRs across Phase 1 and Phase 2. Utilized OpenCode to perform differential audits (git diff) to catch fake updates in PR #11, and verified cross-role dependency blockers. In PR #18, supervised the agent's autonomous guard-removal testing which triggered the permission sandbox, and granted explicit authorization to proceed.
+  - src/**
+  summary: 'Audited multiple PRs across Phase 1 and Phase 2. Utilized OpenCode to perform differential audits (git diff) to catch fake updates in PR #11, and verified cross-role dependency blockers. In PR #18, supervised the agent''s autonomous guard-removal testing which triggered the permission sandbox, and granted explicit authorization to proceed.
+
+    '
   human_review:
-    - manually fixed leftover C-INV naming conventions in PR #10 to avoid another review cycle.
-    - authorized the agent's /tmp directory access to complete the guard-removal security experiment.
-    - orchestrated the merge order between Role B and Role E to resolve CI dependency failures.
+  - manually fixed leftover C-INV naming conventions in PR
+  - authorized the agent's /tmp directory access to complete the guard-removal security experiment.
+  - orchestrated the merge order between Role B and Role E to resolve CI dependency failures.
   validation:
     guard_removal_test: passed with human authorization
     pr_audits: successfully identified gaps and dependencies
-
-# Role E entries to append to docs/ai-use-log.yaml
-# Role E tool use: OpenCode with DeepSeek V4 Flash generated the workflow, pytest
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 1
   topic: repository startup and working directory
   tool: opencode (DeepSeek V4 Flash)
   summary: Fixed the working directory by passing the project path on the next attempt.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 2
   topic: initial PR CI workflow
   tool: opencode (DeepSeek V4 Flash)
   files_created:
-    - .github/workflows/ci.yml
+  - .github/workflows/ci.yml
   summary: Added a PR workflow to run offline tests on Python 3.9.
   human_review:
-    - Approved the workflow write exception.
+  - Approved the workflow write exception.
   validation:
     local_pytest: No tests collected (exit 5).
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 3
   topic: offline and live pytest markers
   tool: opencode (DeepSeek V4 Flash)
   files_created:
-    - pytest.ini
+  - pytest.ini
   summary: Registered the offline and live pytest markers.
   human_review:
-    - Approved the pytest.ini write exception. The completion summary omitted the exception label.
+  - Approved the pytest.ini write exception. The completion summary omitted the exception label.
   validation:
     markers: Both markers recognized.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 4
   topic: CI workflow and marker review
   tool: opencode (DeepSeek V4 Flash)
   summary: Reviewed the existing workflow and marker configuration.
   human_review:
-    - Requested a shorter prompt for the rerun.
-
-- date: "2026-11-09"
+  - Requested a shorter prompt for the rerun.
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 5
   topic: amount boundary test planning
   tool: opencode (DeepSeek V4 Flash)
   summary: Listed possible amount boundary cases before the guard interface was available.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 6
   topic: initial amount test scope
   tool: opencode (DeepSeek V4 Flash)
   summary: Scoped the first tests to one negative amount and one valid control.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 7
   topic: Phase 1 QA handoff draft
   tool: opencode (DeepSeek V4 Flash)
   summary: Drafted a QA handoff that distinguishes local checks from GitHub results.
   human_review:
-    - Corrected wording that implied an empty test file already existed.
-
-- date: "2026-11-09"
+  - Corrected wording that implied an empty test file already existed.
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 8
   topic: CI workflow rerun plan
   tool: opencode (DeepSeek V4 Flash)
   summary: Reviewed the workflow rerun plan and kept the offline directory and marker filter.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 9
   topic: pytest configuration rerun plan
   tool: opencode (DeepSeek V4 Flash)
   summary: Reviewed the existing marker configuration before recreating it in a later session.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 10
   topic: CI workflow recreation
   tool: opencode (DeepSeek V4 Flash)
   files_created:
-    - .github/workflows/ci.yml
+  - .github/workflows/ci.yml
   summary: Recreated the PR workflow after backing up the first version.
   human_review:
-    - Approved the workflow recreation and write exception.
+  - Approved the workflow recreation and write exception.
   validation:
     ci_config: PR trigger and pytest command checked locally.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 11
   topic: pytest configuration recreation
   tool: opencode (DeepSeek V4 Flash)
   files_created:
-    - pytest.ini
+  - pytest.ini
   summary: Recreated the pytest configuration with both markers.
   human_review:
-    - Approved the pytest.ini recreation and write exception.
+  - Approved the pytest.ini recreation and write exception.
   validation:
     markers: Both markers recognized.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 12
   topic: initial test plan against D's interface
   tool: opencode (DeepSeek V4 Flash)
   summary: Requested a plan against D's interface. The session ended before a plan was produced.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 13
   topic: INV-001 offline tests
   tool: opencode (DeepSeek V4 Flash)
   files_created:
-    - test/offline/test_invariants.py
+  - test/offline/test_invariants.py
   summary: Added a negative-amount test and a valid-amount control for INV-001.
   human_review:
-    - Approved the two cases and requested INV-001 in the test names.
+  - Approved the two cases and requested INV-001 in the test names.
   validation:
     negative_guard_check: The negative test failed when the guard accepted negative amounts.
-
-- date: "2026-11-09"
+- date: '2026-11-09'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 14
   topic: CI offline test selection review
@@ -546,424 +482,527 @@
   summary: Planned a CI change to include D's unmarked offline tests. The workflow was not changed.
   validation:
     pytest_offline: 41 passed locally against main at 0dda36b.
-    github_ci_followup: PR #11 passed with 2 tests selected by the marker filter; 39 unmarked tests were deselected locally.
-
-- date: "2026-11-10"
+    github_ci_followup: PR
+- date: '2026-11-10'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 15
   topic: CI check dependencies
   tool: opencode (DeepSeek V4 Flash)
   files_modified:
-    - requirements.txt
+  - requirements.txt
   summary: Added jsonschema and Ruff for the new CI checks.
   human_review:
-    - Approved the dependency changes and selected versions verified to support Python 3.9.
-
-- date: "2026-11-10"
+  - Approved the dependency changes and selected versions verified to support Python 3.9.
+- date: '2026-11-10'
   role: E
-  student_id: "61049313"
+  student_id: '61049313'
   phase: 1
   session: 16
   topic: Phase 1 CI review follow-up
   tool: opencode (DeepSeek V4 Flash)
   files_modified:
-    - .github/workflows/ci.yml
+  - .github/workflows/ci.yml
   summary: Ran the full offline suite and added Ruff, requirements schema and AI-use log checks.
   human_review:
-    - Approved the workflow scope. Review caught invalid YAML indentation, a repeated dependency install and overly broad log parsing.
+  - Approved the workflow scope. Review caught invalid YAML indentation, a repeated dependency install and overly broad log parsing.
   validation:
     offline_tests: 41 passed locally with network connections disabled.
     lint: Selected Ruff rules passed.
     ai_use_log: A new session passed. An unchanged, malformed or duplicate log failed.
     schema: B's PR files passed. Missing files and a missing required field failed.
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 5
   topic: Phase 2 C1 measurement permission configuration
   tool: opencode
   files_created: []
   files_modified:
-    - .opencode/permissions.jsonc
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - .opencode/permissions.jsonc
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - docs/architecture/**
-    - docs/code-governance/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    C1 only. Added data/**, scripts/** and docs/measurements/** to the read and edit
-    whitelists as allow, and added pytest*, python -m py_compile* and python scripts/*
-    to bash as allow. Every existing deny/ask rule, comment and default was preserved;
-    no other permission was broadened and no runtime data was generated.
+  - src/**
+  - test/**
+  - docs/architecture/**
+  - docs/code-governance/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'C1 only. Added data/**, scripts/** and docs/measurements/** to the read and edit whitelists as allow, and added pytest*, python -m py_compile* and python scripts/* to bash as allow. Every existing deny/ask rule, comment and default was preserved; no other permission was broadened and no runtime data was generated.
+
+    '
   human_review:
-    - limited scope to C1 only (no storage, call_id, tokens or NFR-006 work)
-    - required existing deny/ask rules and comments to be preserved unchanged
-    - required the pre-existing untracked .DS_Store files to be left alone
-    - required the diff to contain only the three intended files
+  - limited scope to C1 only (no storage, call_id, tokens or NFR-006 work)
+  - required existing deny/ask rules and comments to be preserved unchanged
+  - required the pre-existing untracked .DS_Store files to be left alone
+  - required the diff to contain only the three intended files
   validation:
     jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
     yaml_parse: pass (YAML OK via ./.venv/bin/python)
     git_diff_check: pass
-
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 6
   topic: C1 follow-up — synchronize permission model
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/permission-model.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/permission-model.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - .opencode/permissions.jsonc
-    - src/**
-    - test/**
-    - docs/architecture/invariants.md
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/code-governance/**
-    - logs/**
-    - .env
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    User-authorized follow-up to C1. Documented the Phase 2 C1 permission expansion in
-    permission-model.md (§2 rows plus new §3.1): data/**, scripts/** and
-    docs/measurements/** are read and edit allow, and pytest*, python -m py_compile* and
-    python scripts/* are bash allow, for measurement work only; runtime files under data/
-    must not be committed; default-deny, deny-overrides-allow, .env protection and the
-    protected paths are unchanged; permissions.jsonc stays the machine-readable config.
-    The C1 permission entries themselves were not modified.
+  - .opencode/permissions.jsonc
+  - src/**
+  - test/**
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/code-governance/**
+  - logs/**
+  - .env
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'User-authorized follow-up to C1. Documented the Phase 2 C1 permission expansion in permission-model.md (§2 rows plus new §3.1): data/**, scripts/** and docs/measurements/** are read and edit allow, and pytest*, python -m py_compile* and python scripts/* are bash allow, for measurement work only; runtime files under data/ must not be committed; default-deny, deny-overrides-allow, .env protection and the protected paths are unchanged; permissions.jsonc stays the machine-readable config. The C1 permission entries themselves were not modified.
+
+    '
   human_review:
-    - required the permission model to match permissions.jsonc rather than stay stale
-    - required a follow-up commit rather than amending 88aab30
-    - confirmed .opencode/permissions.jsonc and the pair of .DS_Store files were untouched
+  - required the permission model to match permissions.jsonc rather than stay stale
+  - required a follow-up commit rather than amending 88aab30
+  - confirmed .opencode/permissions.jsonc and the pair of .DS_Store files were untouched
   validation:
     jsonc_parse: pass (generic JSONC only; no OpenCode schema validator in repo)
     yaml_parse: pass (YAML OK)
     git_diff_check: pass
-
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 7
   topic: Phase 2 policy contracts (C2/C3/C4/C6) and evaluation logbook
   tool: opencode
   files_created:
-    - docs/architecture/evaluation-logbook.md
+  - docs/architecture/evaluation-logbook.md
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - docs/code-governance/mcp-tool-manifest.md
-    - src/**
-    - test/**
-    - .opencode/permissions.jsonc
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Documented the agreed Phase 2 contracts on the C side. Added a §5 addendum to the
-    runtime policy catalog: C2 uses 32-character uuid4().hex for call_id, returned
-    via __call_id__ and removed before policy_core. C3 preserves input/raw/parsed/error and adds
-    call_id and gateway-derived tokens. D now writes one call-log line per extract attempt
-    when logging succeeds, with tokens=null if usage is not recorded. C4 required an
-    independent StorageError and no partial state; the latter remains unverified in D's
-    append-mode writer. C6 added a call_id join to main's NFR-006 log-traceability
-    requirement. It uses the applicable evidence pair: accepted -> llm_calls +
-    storage, rejected -> llm_calls + review, with no storage record for a rejection. The
-    rejection writer is _append_rejection (not _append_review) and preserves the original
-    PolicyError.code. Evaluation-logbook.md follows main's NFR-001 model response time,
-    NFR-002 token usage and NFR-006 log traceability; observed results remain pending.
-    Input parsing is an unnumbered proposal. The MCP manifest distinguishes application
-    and measurement entry points from MCP tools.
+  - docs/code-governance/mcp-tool-manifest.md
+  - src/**
+  - test/**
+  - .opencode/permissions.jsonc
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Documented the agreed Phase 2 contracts on the C side. Added a §5 addendum to the runtime policy catalog: C2 uses 32-character uuid4().hex for call_id, returned via __call_id__ and removed before policy_core. C3 preserves input/raw/parsed/error and adds call_id and gateway-derived tokens. D now writes one call-log line per extract attempt when logging succeeds, with tokens=null if usage is not recorded. C4 required an independent StorageError and no partial state; the latter remains unverified in D''s append-mode writer. C6 added a call_id join to main''s NFR-006 log-traceability requirement. It uses the applicable evidence pair: accepted -> llm_calls + storage, rejected -> llm_calls + review, with no storage record for a rejection. The rejection writer is _append_rejection (not _append_review) and preserves the original PolicyError.code. Evaluation-logbook.md follows main''s NFR-001 model response time, NFR-002 token usage and NFR-006 log traceability; observed results remain
+    pending. Input parsing is an unnumbered proposal. The MCP manifest distinguishes application and measurement entry points from MCP tools.
+
+    '
   human_review:
-    - required generated call_id values with no caller-synthesized ids
-    - required tokens to be recorded only from gateway usage, never fabricated
-    - required storage failure to be an independent StorageError, not a policy:* code
-    - required NFR-006 conditional evidence for accepted versus rejected decisions
-    - required all NFR results to be pending/blocked, with none invented
-    - required the MCP manifest to stay untouched (no new MCP tool)
+  - required generated call_id values with no caller-synthesized ids
+  - required tokens to be recorded only from gateway usage, never fabricated
+  - required storage failure to be an independent StorageError, not a policy:* code
+  - required NFR-006 conditional evidence for accepted versus rejected decisions
+  - required all NFR results to be pending/blocked, with none invented
+  - required the MCP manifest to stay untouched (no new MCP tool)
   validation:
     yaml_parse: pass
     jsonc_parse: pass (generic JSONC only)
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
-
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 8
   topic: NFR-006 traceability and logbook table format
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/evaluation-logbook.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/evaluation-logbook.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - .opencode/permissions.jsonc
-    - docs/architecture/invariants.md
-    - docs/code-governance/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Main defines NFR-006 as log traceability. Its numeric coverage threshold is null;
-    measurement remains pending. Phase 2 adds path-specific call-id joins: accepted ->
-    llm_calls + storage; rejected -> llm_calls + review, with no storage record for a
-    rejection. The logbook records these evidence shapes and its Observed result inside
-    the NFR-006 table.
+  - src/**
+  - test/**
+  - .opencode/permissions.jsonc
+  - docs/architecture/invariants.md
+  - docs/code-governance/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Main defines NFR-006 as log traceability. Its numeric coverage threshold is null; measurement remains pending. Phase 2 adds path-specific call-id joins: accepted -> llm_calls + storage; rejected -> llm_calls + review, with no storage record for a rejection. The logbook records these evidence shapes and its Observed result inside the NFR-006 table.
+
+    '
   human_review:
-    - required path-specific accepted and rejected evidence pairs
-    - required the conditional evidence shape to stay a separate rule
-    - required the NFR-006 Observed result row to move inside its table
-    - required RP-001..RP-006 to stay unchanged
+  - required path-specific accepted and rejected evidence pairs
+  - required the conditional evidence shape to stay a separate rule
+  - required the NFR-006 Observed result row to move inside its table
+  - required RP-001..RP-006 to stay unchanged
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only correction); no measurement claimed
-
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 9
   topic: document approved logging metadata fields
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/evaluation-logbook.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/evaluation-logbook.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - .opencode/permissions.jsonc
-    - docs/architecture/invariants.md
-    - docs/code-governance/**
-    - logs/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Documentation-only. Extended the C3 llm_calls contract with the four user-approved
-    fields: session_id, request_id, usage_source (enum gateway, partial, missing) and
-    request_made. D's session_id is generated once per call_llm module load and groups a
-    process run, not necessarily a user session. D generates call_id per extract attempt,
-    including pre-HTTP failures; request_made=true means HTTP was attempted, not proven sent
-    to the gateway. The ids do not replace call_id as the evidence join key. Preserved
-    input/raw/parsed/error, no fabricated or zeroed token usage, and policy:* reservation.
-    The pre-HTTP lifecycle was pending at this session and was confirmed later. Extended
-    the NFR-002 logbook entry with per-session and per-request aggregation, attempted
-    HTTP-call counts, usage-source and missing-usage counts, and usage_source/tokens
-    consistency; thresholds are pending and
-    gateway usage is never treated as zero when usage is missing. NFR-006 later gained the
-    path-specific accepted/rejected evidence mapping.
+  - src/**
+  - test/**
+  - .opencode/permissions.jsonc
+  - docs/architecture/invariants.md
+  - docs/code-governance/**
+  - logs/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Documentation-only. Extended the C3 llm_calls contract with the four user-approved fields: session_id, request_id, usage_source (enum gateway, partial, missing) and request_made. D''s session_id is generated once per call_llm module load and groups a process run, not necessarily a user session. D generates call_id per extract attempt, including pre-HTTP failures; request_made=true means HTTP was attempted, not proven sent to the gateway. The ids do not replace call_id as the evidence join key. Preserved input/raw/parsed/error, no fabricated or zeroed token usage, and policy:* reservation. The pre-HTTP lifecycle was pending at this session and was confirmed later. Extended the NFR-002 logbook entry with per-session and per-request aggregation, attempted HTTP-call counts, usage-source and missing-usage counts, and usage_source/tokens consistency; thresholds are pending and gateway usage is never treated as zero when usage is missing. NFR-006 later gained the path-specific accepted/rejected
+    evidence mapping.
+
+    '
   human_review:
-    - approved the four additional fields (session_id, request_id, usage_source, request_made)
-    - required request_made to be a structured boolean, not inferred from error text
-    - required the pre-HTTP local failure behavior to be marked pending at the time; later confirmed against D's code
-    - required the NFR-002 aggregates to have no invented thresholds
-    - required the then-current strict three-call_id proposal and conditional evidence; later superseded by the approved path-specific pair
+  - approved the four additional fields (session_id, request_id, usage_source, request_made)
+  - required request_made to be a structured boolean, not inferred from error text
+  - required the pre-HTTP local failure behavior to be marked pending at the time; later confirmed against D's code
+  - required the NFR-002 aggregates to have no invented thresholds
+  - required the then-current strict three-call_id proposal and conditional evidence; later superseded by the approved path-specific pair
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
-
-- date: "2026-11-12"
+- date: '2026-11-12'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 10
   topic: align C2 rejection evidence and add RP-007
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/invariants.md
-    - docs/architecture/runtime-policy-catalog.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - .opencode/permissions.jsonc
-    - docs/architecture/permission-model.md
-    - docs/architecture/evaluation-logbook.md
-    - docs/code-governance/**
-    - logs/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Documentation-only correction. Fixed the C2 evidence inconsistency: the invariants.md
-    rejection-evidence note now lists call_id and requires the review.jsonl line to carry the
-    same call_id as its llm_calls record; the stale "no call_id, cannot be joined" sentence
-    was removed while keeping the statement that the rejection line does not duplicate the
-    input text. RP-003/RP-005/RP-006 Evidence now state the review line includes the relevant
-    call_id, with policy:amount / policy:category / policy:budget unchanged. Added a formal
-    RP-007 Storage write failure entry (independent StorageError, policy:* reserved, never
-    rewritten as policy:*, no partial state required but not yet verified, no policy review
-    line) and a precedence step; RP-007 later expanded to cover storage read/validation
-    failures as well. The storage-failure evidence record was marked pending rather than
-    invented. The four newly approved metadata fields and C2 generation/carriage contract
-    were not changed. The then-pending NFR-006 three-location proposal was later replaced
-    by path-specific evidence pairs. No source, test or measurement was run.
+  - src/**
+  - test/**
+  - .opencode/permissions.jsonc
+  - docs/architecture/permission-model.md
+  - docs/architecture/evaluation-logbook.md
+  - docs/code-governance/**
+  - logs/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Documentation-only correction. Fixed the C2 evidence inconsistency: the invariants.md rejection-evidence note now lists call_id and requires the review.jsonl line to carry the same call_id as its llm_calls record; the stale "no call_id, cannot be joined" sentence was removed while keeping the statement that the rejection line does not duplicate the input text. RP-003/RP-005/RP-006 Evidence now state the review line includes the relevant call_id, with policy:amount / policy:category / policy:budget unchanged. Added a formal RP-007 Storage write failure entry (independent StorageError, policy:* reserved, never rewritten as policy:*, no partial state required but not yet verified, no policy review line) and a precedence step; RP-007 later expanded to cover storage read/validation failures as well. The storage-failure evidence record was marked pending rather than invented. The four newly approved metadata fields and C2 generation/carriage contract were not changed. The then-pending
+    NFR-006 three-location proposal was later replaced by path-specific evidence pairs. No source, test or measurement was run.
+
+    '
   human_review:
-    - required the stale "review line has no call_id" statement to be removed, not kept
-    - required the rejection line to share call_id with its llm_calls record
-    - required the no-duplicated-input statement to stay
-    - required RP-007 as a formal numbered policy with a precedence position
-    - required storage-failure evidence detail to be marked pending, not invented
-    - required the four new metadata fields and NFR-006 mapping to stay unchanged
+  - required the stale "review line has no call_id" statement to be removed, not kept
+  - required the rejection line to share call_id with its llm_calls record
+  - required the no-duplicated-input statement to stay
+  - required RP-007 as a formal numbered policy with a precedence position
+  - required storage-failure evidence detail to be marked pending, not invented
+  - required the four new metadata fields and NFR-006 mapping to stay unchanged
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
-
-- date: "2026-11-13"
+- date: '2026-11-13'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 11
   topic: align C contracts with confirmed D implementation and approved storage validation
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/evaluation-logbook.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/evaluation-logbook.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - .opencode/permissions.jsonc
-    - docs/architecture/invariants.md
-    - docs/architecture/permission-model.md
-    - docs/code-governance/**
-    - logs/**
-    - data/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Documentation-only alignment with the latest D clarification and the approved NFR-002
-    definition. api_call_count counts attempted HTTP calls (request_made=true rows), not
-    distinct user requests; no separate user_request_count requirement was added. NFR-002
-    token aggregates are descriptive statistics only, with no pass/fail threshold. Reports
-    may show gateway, partial, missing and derived not_called, while the stored
-    usage_source enum remains gateway/partial/missing.
-    NFR-006's Phase 2 call-id supplement uses path-specific joins: accepted llm_calls↔storage and rejected
-    llm_calls↔review; a decision does not need all three evidence records. call_id is recorded
-    as uuid4().hex (32 hex characters). The approved storage design, not implemented in D's
-    current code, is append_validated(record, expected_spent=None), requiring total ==
-    expected_spent + amount and expected_spent not below persisted cumulative spend. D's
-    actual signature is append_validated(record). D's unrelated test-count
+  - src/**
+  - test/**
+  - .opencode/permissions.jsonc
+  - docs/architecture/invariants.md
+  - docs/architecture/permission-model.md
+  - docs/code-governance/**
+  - logs/**
+  - data/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Documentation-only alignment with the latest D clarification and the approved NFR-002 definition. api_call_count counts attempted HTTP calls (request_made=true rows), not distinct user requests; no separate user_request_count requirement was added. NFR-002 token aggregates are descriptive statistics only, with no pass/fail threshold. Reports may show gateway, partial, missing and derived not_called, while the stored usage_source enum remains gateway/partial/missing. NFR-006''s Phase 2 call-id supplement uses path-specific joins: accepted llm_calls↔storage and rejected llm_calls↔review; a decision does not need all three evidence records. call_id is recorded as uuid4().hex (32 hex characters). The approved storage design, not implemented in D''s current code, is append_validated(record, expected_spent=None), requiring total == expected_spent + amount and expected_spent not below persisted cumulative spend. D''s actual signature is append_validated(record). D''s unrelated test-count
     discrepancy was not changed.
+
+    '
   human_review:
-    - confirmed that user_request_count is optional and is not required for C's contract
-    - confirmed the NFR-002 image's statistics-only treatment for token aggregates
-    - required D's four reporting categories without making not_called a fourth usage_source enum
-    - approved path-specific NFR-006 evidence joins
-    - approved the numeric expected_spent storage validation rule
-    - approved the 32-hex call_id format
-    - required no source, test, measurement, or unrelated test-count changes
+  - confirmed that user_request_count is optional and is not required for C's contract
+  - confirmed the NFR-002 image's statistics-only treatment for token aggregates
+  - required D's four reporting categories without making not_called a fourth usage_source enum
+  - approved path-specific NFR-006 evidence joins
+  - approved the numeric expected_spent storage validation rule
+  - approved the 32-hex call_id format
+  - required no source, test, measurement, or unrelated test-count changes
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
-
-- date: "2026-11-13"
+- date: '2026-11-13'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 12
   topic: match confirmed D logging, token and storage clarifications
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/evaluation-logbook.md
-    - transcripts/60339160-QiangWanyun.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/evaluation-logbook.md
+  - transcripts/60339160-QiangWanyun.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - logs/**
-    - .env
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Documentation-only. Aligned C's contracts with the confirmed D behavior. The pre-HTTP
-    local-failure lifecycle is no longer pending: it writes exactly one llm_calls.jsonl line
-    with all ten schema keys present, 32-character uuid4().hex call_id/session_id/request_id,
-    usage_source=missing, tokens=null, raw/parsed=null, and request_made=false, the only
-    such path in D's current code. When usage is processed, tokens is an input/output/total
-    object with missing or non-integer counts normalized to null. Three integers -> gateway,
-    some integer and some null -> partial, tokens=null or all counts null -> missing; zero is
-    never substituted. not_called is documented as a derived reporting category from
-    request_made=false, not a fourth usage_source enum; request_made=false rows are excluded
-    from the usage-source distribution and missing-usage count, and api_call_count is the
-    count of request_made=true rows. RP-004 gained an explicit appended-fields statement
-    preserving input/raw/parsed/error and listing the additive Phase 2 fields. The approved
-    append_validated(record, expected_spent=None) design is documented but not implemented
-    (total == expected_spent + amount; expected_spent >= persisted cumulative spend;
-    expected_spent is a validation parameter, not a persisted field).
+  - src/**
+  - test/**
+  - logs/**
+  - .env
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Documentation-only. Aligned C''s contracts with the confirmed D behavior. The pre-HTTP local-failure lifecycle is no longer pending: it writes exactly one llm_calls.jsonl line with all ten schema keys present, 32-character uuid4().hex call_id/session_id/request_id, usage_source=missing, tokens=null, raw/parsed=null, and request_made=false, the only such path in D''s current code. When usage is processed, tokens is an input/output/total object with missing or non-integer counts normalized to null. Three integers -> gateway, some integer and some null -> partial, tokens=null or all counts null -> missing; zero is never substituted. not_called is documented as a derived reporting category from request_made=false, not a fourth usage_source enum; request_made=false rows are excluded from the usage-source distribution and missing-usage count, and api_call_count is the count of request_made=true rows. RP-004 gained an explicit appended-fields statement preserving input/raw/parsed/error
+    and listing the additive Phase 2 fields. The approved append_validated(record, expected_spent=None) design is documented but not implemented (total == expected_spent + amount; expected_spent >= persisted cumulative spend; expected_spent is a validation parameter, not a persisted field).
+
+    '
   human_review:
-    - required the pre-HTTP lifecycle to be confirmed, not left pending
-    - required all ten schema keys to be present; D uses tokens=null on pre-HTTP failure, while a processed usage object retains null values for missing counts
-    - required the exact token classification and that zero is never substituted
-    - required not_called to stay a derived category excluded from usage statistics
-    - required api_call_count to remain request_made=true rows with no user_request_count metric
-    - required RP-004 to state the additive fields while preserving the original four
-    - required the approved but unimplemented append_validated expected_spent design to use a validation input only
-    - required the historical 12-character proposal to remain identifiable as an earlier decision
+  - required the pre-HTTP lifecycle to be confirmed, not left pending
+  - required all ten schema keys to be present; D uses tokens=null on pre-HTTP failure, while a processed usage object retains null values for missing counts
+  - required the exact token classification and that zero is never substituted
+  - required not_called to stay a derived category excluded from usage statistics
+  - required api_call_count to remain request_made=true rows with no user_request_count metric
+  - required RP-004 to state the additive fields while preserving the original four
+  - required the approved but unimplemented append_validated expected_spent design to use a validation input only
+  - required the historical 12-character proposal to remain identifiable as an earlier decision
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
-
-- date: "2026-11-16"
+- date: '2026-11-16'
   role: C
-  student_id: "60339160"
+  student_id: '60339160'
   phase: 2
   session: 13
   topic: refresh D branch implementation status and reconcile Phase 2 records
   tool: opencode
   files_created: []
   files_modified:
-    - docs/architecture/runtime-policy-catalog.md
-    - docs/architecture/evaluation-logbook.md
-    - docs/architecture/phase2-c-handoff.md
-    - docs/ai-use-log.yaml
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/architecture/evaluation-logbook.md
+  - docs/architecture/phase2-c-handoff.md
+  - docs/ai-use-log.yaml
   files_not_modified:
-    - src/**
-    - test/**
-    - docs/req/**
-    - logs/**
-    - data/**
-    - .DS_Store
-    - docs/.DS_Store
-  summary: >
-    Updated the policy catalog, evaluation logbook and C handoff to match D's
-    df729a9 branch: expected_spent validation and request_id aggregation are implemented
-    on D but are not yet merged into main. Preserved the existing main history in the
-    AI-use log and appended this C session without rewriting earlier records.
+  - src/**
+  - test/**
+  - docs/req/**
+  - logs/**
+  - data/**
+  - .DS_Store
+  - docs/.DS_Store
+  summary: 'Updated the policy catalog, evaluation logbook and C handoff to match D''s df729a9 branch: expected_spent validation and request_id aggregation are implemented on D but are not yet merged into main. Preserved the existing main history in the AI-use log and appended this C session without rewriting earlier records.
+
+    '
   human_review:
-    - requested that D's expected_spent validation and request_id aggregation be marked as implemented but unmerged
-    - required the AI-use log to retain main's history and append C's new session
+  - requested that D's expected_spent validation and request_id aggregation be marked as implemented but unmerged
+  - required the AI-use log to retain main's history and append C's new session
   validation:
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no runtime behavior changed
+- date: '2026-11-12'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 4
+  topic: storage layer, call_id join, token-usage capture and the memory-design document
+  tool: opencode
+  files_created:
+  - src/storage.py
+  - src/report_tokens.py
+  - src/measure_latency.py
+  - test/offline/test_storage.py
+  - test/offline/test_token_usage.py
+  - test/offline/test_measurement_scripts.py
+  - pytest.ini
+  - docs/architecture/memory-design.md
+  files_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - test/offline/test_pipeline_seam.py
+  - test/offline/test_policy_core_smoke.py
+  - docs/code-governance/structural-constraints.md
+  - .gitignore
+  files_not_modified:
+  - src/policy_core.py
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  - docs/req/**
+  - .opencode/**
+  - .github/**
+  summary: 'Built the persistence layer (append_validated as the only write entry, duplicates refused, StorageError on write failure, only validated records persisted); threaded call_id from call_llm through pipeline into the call log, the rejection line and the stored record; renamed _append_review to _append_rejection so the original rejection code is never rewritten; added the -0.01 boundary smoke case; captured gateway token usage together with session_id, request_id, usage_source and request_made after the contract owner approved the four appended fields; added report_tokens and measure_latency; wrote docs/architecture/memory-design.md. pytest test/offline -q went from 39 to 105 passing.
+
+    '
+  human_review:
+  - rejected a ragged ten-key log schema; required one _line() builder plus a per-path test asserting set(line) == TEN
+  - rejected classifying configuration failures as "a call with missing usage"; asked for three designs before any code
+  - asked the contract owner to approve the four appended log fields instead of widening the contract unilaterally
+  - required request_made=false to be the only value for configuration, parameter and local pre-check failures
+  - required that rejections never reach storage, with a test that guards it
+  - required the ten-field schema to be written into the logging contract before the measurement work continued
+  - caught that memory-design.md numbered its sections 3.1-3.6 (inherited from the task sheet) and required 1-6
+  - required the renumbering to be proven by a guarded replace plus a diff, not asserted in prose
+  validation:
+    pytest_offline: 105 passed (39 existing + 66 new)
+    guard_removal: verified per rule (duplicate check, required fields, mkdir, unknown key, pop-before-validate, missing call_id)
+    log_schema: pass (exactly ten keys on all six paths)
+    rejection_not_persisted: pass (review line written, records.jsonl unchanged)
+    memory_design: 152 lines, six sections, one valid section-numbering pass
+- date: '2026-11-13'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 5
+  topic: resilient latency sampling, a varied-corpus token sampler and the NFR-001/002 measurements
+  tool: opencode
+  files_created:
+  - src/measure_tokens.py
+  - test/offline/test_evidence_join.py
+  files_modified:
+  - src/measure_latency.py
+  - test/offline/test_measurement_scripts.py
+  - transcripts/60915652-LiuWanyang.md
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - src/storage.py
+  - src/report_tokens.py
+  - docs/architecture/invariants.md
+  - docs/architecture/runtime-policy-catalog.md
+  summary: 'Fixed two defects found by running the measurement scripts once. Latency sampling no longer aborts on the first transport failure: every attempt is counted, the loop always runs n attempts, percentiles are computed over successful samples only and each prints its own (n=ok), failure labels are whitelisted so no URL, body or raw exception text reaches the summary, an explicit low-confidence line appears when fewer than five samples succeed, and the process exits 2 when nothing succeeded. Tokens are now sampled over a 20-sentence corpus instead of one fixed probe, so the call log contains a real distribution; the sampler reads and writes no log, and report_tokens remains the single interpreter. Also wrote the evidence-join test skeleton handed to role E. Measurements produced NFR-001 (p50 2356.7 ms, p95 4759.5 ms, n=20, 0 failures) and NFR-002 (three sessions: 1339* incomplete, 2154 complete, 2060 complete).
+
+    '
+  human_review:
+  - rejected the first token sample as evidence because all values were identical (91/12/103); required varied inputs
+  - required failed attempts to be counted rather than aborting the run, and percentiles to print (n=ok)
+  - required both LlmTransportError and JSONDecodeError to be treated as failed samples
+  - required failure labels to be a whitelist, after noting that str(exc) can carry the request URL
+  - required exit code 2 when no sample succeeded, and a low-confidence line below five samples
+  - rejected reading the call log from the token sampler; required the sampler to stay pure and report_tokens to remain the only interpreter
+  - caught that the proposed summary needed the log it had just been forbidden to read, and resolved it by dropping the derived lines
+  - refused to let the agent commit or revert the working tree; the agent correctly reported instead of acting
+  validation:
+    pytest_offline: 122 passed, 4 skipped
+    guard_removal: verified per rule (abort on failure, exception kinds, (n=), exit 2, low-confidence, whitelisted label, corpus cycling)
+    nfr001_latency: pass (n=20, p50 2356.7 ms, p95 4759.5 ms, max 5771.2 ms, 0 failures)
+    nfr002_tokens: pass (varied corpus produced 13 distinct totals across 20 calls; fixed probe produced exactly 103 x 20)
+    log_schema: unchanged (ten keys), report_tokens untouched
+- date: '2026-11-14'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 6
+  topic: closing the two blocking review findings, per-request token reporting, and merging the Phase 1 handoff
+  tool: opencode
+  files_created: []
+  files_modified:
+  - src/storage.py
+  - src/pipeline.py
+  - src/report_tokens.py
+  - src/measure_latency.py
+  - test/offline/test_storage.py
+  - test/offline/test_pipeline_seam.py
+  - test/offline/test_measurement_scripts.py
+  - docs/ai-use-log.yaml
+  - docs/code-governance/structural-constraints.md
+  - transcripts/60915652-LiuWanyang.md
+  files_not_modified:
+  - src/call_llm.py
+  - src/policy_core.py
+  - test/offline/test_invariants.py
+  summary: Closed the reviewer's two blocking findings. Storage now takes expected_spent and refuses under-reported prior spend, re-runs the three policy_core guards and compares total with Decimal after a float comparison wrongly rejected 0.1 + 0.2; malformed stored call_id and non-serialisable decided_at now raise StorageError. report_tokens is anchored to the repository root and the guard covers five constants, a relative-literal scan, a drift assertion and distinct owners. Also added the per-request_id block and corrected the NFR label, then merged the Phase 1 handoff and reconciled the AI-use log to 30 entries.
+  human_review:
+  - required the under-reported spend case to raise StorageError rather than PolicyError
+  - required Decimal comparison after the float version rejected a legitimate 0.1 + 0.2 record
+  - required the relative-literal scan to run with no allow-list and to report file:line
+  - required the duplicated log path string to be pinned equal across its two owners
+  validation:
+    pytest_offline: 152 passed, 4 skipped
+    report_output: byte-identical before and after the path change (sha256)
+    guard_removal: each new storage guard and each path guard reproduced its own failure when removed
+    ai_use_log_union: 30 entries, 0 duplicate keys
+- date: '2026-11-15'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 7
+  topic: clearing the four mypy errors that stopped Gate 2, and verifying the Python 3.9 target
+  tool: opencode
+  files_created: []
+  files_modified:
+  - src/storage.py
+  - src/measure_latency.py
+  - src/measure_tokens.py
+  - transcripts/60915652-LiuWanyang.md
+  files_not_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - src/policy_core.py
+  - src/report_tokens.py
+  - test/offline/test_invariants.py
+  summary: 'Diagnosed the four mypy findings before editing anything, then fixed them with annotations only: Set[str] for the empty id set, cast(float) after the existing _is_number guard, and Dict[str, int] for both failure tallies. mypy 2.4.1 has dropped --python-version 3.9, so a second interpreter (mypy 1.20.2) was installed to verify the 3.9 target; both runs report Success. Every annotation was removed once on a temporary copy to confirm the original error returns.'
+  human_review:
+  - 'refused # type: ignore and required the real element types'
+  - required the cast after the existing guard instead of replacing or moving it
+  - required the exact original mypy message for each of the four sites before any edit
+  - required a 3.9-target run because the default-only result would not prove compatibility
+  validation:
+    pytest_offline: 152 passed, 4 skipped
+    mypy_default: 'Success: no issues found in 8 source files'
+    mypy_python39: 'Success: no issues found in 8 source files (mypy 1.20.2)'
+    annotation_removal: M1-M4 each reproduced the original error
+- date: '2026-11-17'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 8
+  topic: 'merging role C''s permissions work into PR #18 and reconciling the AI-use log as a union'
+  tool: opencode
+  files_created: []
+  files_modified:
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - src/policy_core.py
+  - src/storage.py
+  - src/report_tokens.py
+  - test/offline/test_invariants.py
+  summary: 'Merged main (which now contains role C''s permissions work) into PR #18 and resolved the AI-use log conflict as a union: all 37 entries from main kept, D4/D5 appended, 39 entries with no duplicate keys. The 11-16 session (Phase 3 issue #25, gate workflow review, prompt diagnosis) changed no repository files, so it is folded into this entry. Also prepared the prompt-vocabulary task sheet; that implementation is not part of this session.'
+  human_review:
+  - required every entry from main to be kept, not just the newer ones
+  - required the union to be validated for duplicate keys before replacing the conflicted file
+  - 'refused to let the gate rules be assumed: the exemption is hardcoded to PR 20 and was read in the source'
+  validation:
+    ai_use_log_union: 39 entries, 0 duplicate keys, dates all strings
+    pytest_offline: 152 passed, 4 skipped before the merge
+    merge_conflicts: only docs/ai-use-log.yaml
