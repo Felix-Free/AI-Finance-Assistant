@@ -9,11 +9,13 @@ import subprocess
 import sys
 
 import pytest
+import yaml
 
 pytestmark = pytest.mark.offline
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 CI_CHECKS = REPO_ROOT / ".github" / "ci_checks.py"
+CI_YAML = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 INVARIANTS_NODE = (
     "test/offline/test_invariants.py::test_inv003_rejects_one_cent_over_budget"
@@ -235,3 +237,56 @@ def test_budget_regression_leaves_runtime_paths_unchanged(tmp_path):
     after = _snapshot(*runtime_roots)
     assert after == before
     assert set(after) == set(_SENTINELS)
+
+
+def test_gate1_pr20_waiver(tmp_path):
+    """PR #20 waiver: pinned ci.yml expression + real step shell (no expression engine emulation)."""
+    step = next(
+        step
+        for step in yaml.safe_load(CI_YAML.read_text(encoding="utf-8"))["jobs"][
+            "test-approval-loop"
+        ]["steps"]
+        if step.get("id") == "gate"
+    )
+    expression = step["env"]["FIRST_ROLLOUT_WAIVER"]
+    expected_expression = (
+        "${{ github.repository == 'Felix-Free/AI-Finance-Assistant' "
+        "&& github.event.pull_request.number == 20 "
+        "&& contains(github.event.pull_request.labels.*.name, 'skip-test-gate') }}"
+    )
+    assert " ".join(expression.split()) == " ".join(expected_expression.split())
+
+    if os.name == "nt":
+        exec_path = subprocess.run(
+            ["git", "--exec-path"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        bash = str(pathlib.Path(exec_path).parents[2] / "bin" / "bash.exe")
+    else:
+        bash = shutil.which("bash")
+    assert bash and pathlib.Path(bash).is_file(), "bash not found (WORKFLOWS REQUIRE A UNIX SHELL)"
+
+    waived = "Gate 1: Waived (one-time first rollout of PR #20)"
+    stub = "python() { printf '%s\\n' 'normal approval invoked'; return 7; }\n"
+    for flag, code, line in [("true", 0, waived), ("false", 7, "normal approval invoked")]:
+        summary = tmp_path / ("summary-" + flag)
+        summary.write_text("", encoding="utf-8")
+        env = dict(os.environ, BASH_ENV="", FIRST_ROLLOUT_WAIVER=flag,
+                   GITHUB_STEP_SUMMARY=summary.as_posix())
+        result = subprocess.run(
+            [bash, "--noprofile", "--norc", "-s"],
+            input=stub + step["run"] + "\n",
+            env=env,
+            cwd=str(REPO_ROOT),
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        diagnostic = (result.stdout or "") + (result.stderr or "")
+        assert result.returncode == code, diagnostic
+        assert (result.stdout or "").strip() == line, diagnostic
+        assert summary.read_text(encoding="utf-8").strip() == (
+            waived if flag == "true" else ""
+        )

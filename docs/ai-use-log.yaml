@@ -1179,3 +1179,23 @@
     negative_outcomes: "Five intentional failures: three wrong categories, one wrong amount and one non-expense returned as a record."
     offline_isolation: 204 offline passed with network blocked
     latest_github_run: 2 failed/3 passed on the prior version; a real rerun of the proposed change is pending
+
+- date: "2026-11-17"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 16
+  topic: PR #20 first-rollout waiver regression
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_ci_regressions.py
+    - docs/code-governance/verification-constraints.md
+    - docs/ai-use-log.yaml
+  summary: "Role A requested regression coverage for the approved PR #20 first-rollout waiver; Role E approved the narrow local follow-up. One offline test pins the actual ci.yml waiver expression and runs the actual step shell in both the waived and normal branches. Policy, src and workflows are unchanged."
+  human_review:
+    - Role A requested the waiver regression; Role E approved the narrow local follow-up.
+  validation:
+    target_file: 4 passed
+    offline_isolation: 205 offline passed, zero skipped
+    guard_mutations: remove label clause, always waive and never waive each failed the new test
+    pending: GitHub CI verification

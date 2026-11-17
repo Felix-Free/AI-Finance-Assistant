@@ -222,16 +222,20 @@ boundary negatives of §3.1 for guard-removal evidence.
 Offline token tests verify the **contract** (fields, `usage_source`, no fabrication); they
 do **not** measure NFR-002 token consumption against a live gateway.
 
-### 3.8 `test_ci_regressions.py` (2 test functions, 3 collected cases; present, targeted GitHub #20 review regressions)
+### 3.8 `test_ci_regressions.py` (3 test functions, 4 collected cases; present, targeted GitHub #20 review regressions)
 
 | Requirement / gap | Tests |
 |---|---|
 | QA gap — Gate 1 (BUG-01): docs-only approval rejected, test-only accepted | `test_gate1_rejects_docs_only_approval[docs-only-rejected]`; `test_gate1_rejects_docs_only_approval[test-only-accepted]` |
 | QA gap — offline isolation (BUG-02 / RP-004 fail-closed / §1.1 no runtime writes): budget node runs network-blocked and mutates no file under `logs/` or `data/` | `test_budget_regression_leaves_runtime_paths_unchanged` |
+| QA gap — Gate 1 PR #20 one-time waiver: real `ci.yml` approval step expression pins the repo + PR #20 + `skip-test-gate` conjunction, and the actual step shell is run (via `bash -s`) with a `python` stub | `test_gate1_pr20_waiver` |
 
 Each carries `pytestmark = pytest.mark.offline`. The Gate 1 node drives the real
 `gate_test_approval` in a synthetic repo: it verifies the **rule**, not a live GitHub PR, so
 it does not by itself verify real test-first approval or merge blocking (§2).
+`test_gate1_pr20_waiver` reads the step from the real `ci.yml` and runs its real shell body;
+it **pins the exact policy expression locally** and does **not** emulate GitHub's expression
+engine, PR metadata or hosted CI, and it makes no network call.
 
 ### 3.9 Inventory baseline and coverage notes
 
@@ -239,9 +243,9 @@ it does not by itself verify real test-first approval or merge blocking (§2).
   collect **201** offline cases = **51 marked** (`pytest.mark.offline`) + **150 unmarked**;
   `test_invariants` 39, `test_evidence_join` 12, `test_measurement_scripts` 36,
   `test_pipeline_seam` 20, `test_policy_core_smoke` 32, `test_storage` 42, `test_token_usage`
-  20. `test_ci_regressions` adds **3 new marked offline cases**. Total offline collected =
-  **204** (51 + 150 + 3). The **5 live cases** in `test/live/` are collected separately and
-  are not part of the 204. These are the published baseline at this phase, not a promised,
+  20. `test_ci_regressions` adds **4 new marked offline cases**. Total offline collected =
+  **205** (51 + 150 + 4). The **5 live cases** in `test/live/` are collected separately and
+  are not part of the 205. These are the published baseline at this phase, not a promised,
   frozen post-change number; counts move with parametrisation and future E tests.
 - **Marker enforcement:** `pytest.ini` sets `addopts = --strict-markers`, so an **unknown
   marker name is an error**, not a silent skip. `offline` and `live` are the registered
