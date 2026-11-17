@@ -703,3 +703,67 @@ observed to return — four mutations, four messages. The socket dropped three t
 reported; the evidence was completed on retry with a deliberately tiny output format. What matters for
 the record is not that the run was smooth, but that the claim "the annotation is what silences that
 error" is backed by having seen the error reappear.
+
+---
+
+## 2026-11-16 · Reading the gate code instead of trusting the chat summary
+
+**Context.** Role E's verification branch introduced six PR gates. The group chat described them in
+prose ("test-first, otherwise waive"), so the first step was to read `ci_checks.py` and the workflow
+rather than paraphrase the conversation.
+
+**What the code actually requires.** A commit qualifies as a "test-first commit" only if it is
+single-parent, changes tests and no implementation files, is an ancestor of every implementation
+commit, and carries an approval from a non-author member whose submission time is at or after the
+commit and strictly before the first implementation commit. One further condition is easy to miss: the
+test files must not change again between that commit and the head — otherwise the approval is void.
+A test-only commit pushed after an implementation commit can therefore never qualify, which is why the
+order matters more than the label. The waiver in the workflow is hardcoded to PR #20
+(`FIRST_ROLLOUT_WAIVER: ... pull_request.number == 20 ...`), so it is a one-time rollout switch, not a
+general exemption.
+
+**Decision.** Adopt test-first for our own PRs even while the gates are unmerged. The reason is not
+compliance theatre: an approval cannot be back-dated past an implementation commit, so if the gates
+land while our PR is open, the only remedies are rewriting history or asking for a waiver. Following
+the protocol early costs one extra review of a test commit; following it late costs the PR.
+
+**Also recorded that day.** Three mypy versions were in play: the environment's 2.4.1 rejects
+`--python-version 3.9`, so a second interpreter (1.20.2) was installed to check the 3.9 target; both
+runs report Success on the same eight files. The three-session timeline (mypy fix, 3.9 verification,
+gate reading) is why the AI-use log eventually gained D7 and D8 rather than a single catch-all entry.
+
+---
+
+## 2026-11-17 · A one-sentence prompt constraint, a union merge, and a migration that removed a coupling
+
+**The prompt.** Role A confirmed the diagnosis — the system prompt never listed the category vocabulary,
+so the model invented `transportation` and `groceries` and `policy_core` rejected them. The fix is one
+sentence, quoted verbatim from A, inserted as adjacent string literals; a test asserts the exact
+sentence, not just the presence of each word, because a reordered list or a missing comma is the failure
+mode that a per-word check would miss. Four tests now guard the prompt: every whitelisted category is
+named, inventing categories is forbidden, the `not_a_record` branch survives, and the constraint sentence
+matches character for character. The rule itself never moved: enforcement stays in `policy_core`.
+
+**The merge.** Main had moved twice (B's documentation PR, then C's permissions PR), so the branch was
+merged again and `docs/ai-use-log.yaml` was resolved as a union: 37 entries from main, D4/D5 appended,
+39 entries, zero duplicate keys. The log then gained D6–D8 so the Phase 2 sessions are traceable rather
+than stopping at 11-13.
+
+**The migration.** With `scripts/**` finally permitted, the two samplers moved out of `src/`. The files
+had to be moved with `git mv` by a human — the agent is not allowed to delete files — and the agent then
+did the three things that make a move real: it extracted `_failure_kind` into
+`scripts/failure_kind.py` so the two scripts no longer depend on each other, re-pointed the tests to
+`from scripts import ...`, and extended the relative-literal scan from `src/` to `src/` and `scripts/`.
+The storage docstring that role E flagged was corrected in the same commit: validation failures reject
+before any byte is written, while an interruption during the write can leave a partial final line that
+readers reject as a `StorageError`.
+
+**A small decision worth keeping.** Replacing a tautological assertion, the first instinct was an
+identity check (`measure_latency.failure_kind is shared.failure_kind`). The agent argued against it: a
+legitimate wrapper would fail that check while behaving correctly. It proposed a behavioural table over
+all five label shapes plus `not hasattr(module, "_failure_kind")` for both modules — which proves what
+the migration was for (one classifier, no private copy) without over-constraining how it is bound. The
+suite ends at 158 passed, 4 skipped; mypy is clean on the default and 3.9 targets.
+
+**Left to others.** Five documents still name the old `src/measure_*` paths. They are owned by roles C
+and B, so they were reported rather than edited — the same boundary that kept the migration reviewable.
