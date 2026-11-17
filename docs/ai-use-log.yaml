@@ -191,9 +191,11 @@
   files_not_modified:
   - src/policy_core.py
   - src/call_llm.py
-  - docs/**
   - AGENTS.md
   - requirements.txt
+  - docs/architecture/**
+  - docs/code-governance/**
+  - docs/req/**
   summary: 'Compared the implementation against every field of role C''s guard specification (Condition, Threshold, Exception, On failure, Boundary, Evidence). Condition, Threshold, Exception and Boundary conformed for all three invariants; Evidence did not. The call line in logs/llm_calls.jsonl is written inside call_llm.extract before validation, so it cannot carry a policy outcome, and RP-004 forbids a second line there. The specification owner chose option B: every policy rejection now appends exactly one line to logs/review.jsonl with error = policy:amount / policy:category / policy:budget and review = false / true / true, while logs/llm_calls.jsonl keeps exactly one line per model call. INV-001 previously left no trace at all and now does. Role C owns the matching edit to invariants.md (Evidence fields) and runtime-policy-catalog.md (RP-003/005/006 point at the file).
 
     '
@@ -914,3 +916,93 @@
     nfr001_latency: pass (n=20, p50 2356.7 ms, p95 4759.5 ms, max 5771.2 ms, 0 failures)
     nfr002_tokens: pass (varied corpus produced 13 distinct totals across 20 calls; fixed probe produced exactly 103 x 20)
     log_schema: unchanged (ten keys), report_tokens untouched
+- date: '2026-11-14'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 6
+  topic: closing the two blocking review findings, per-request token reporting, and merging the Phase 1 handoff
+  tool: opencode
+  files_created: []
+  files_modified:
+  - src/storage.py
+  - src/pipeline.py
+  - src/report_tokens.py
+  - src/measure_latency.py
+  - test/offline/test_storage.py
+  - test/offline/test_pipeline_seam.py
+  - test/offline/test_measurement_scripts.py
+  - docs/ai-use-log.yaml
+  - docs/code-governance/structural-constraints.md
+  - transcripts/60915652-LiuWanyang.md
+  files_not_modified:
+  - src/call_llm.py
+  - src/policy_core.py
+  - test/offline/test_invariants.py
+  summary: Closed the reviewer's two blocking findings. Storage now takes expected_spent and refuses under-reported prior spend, re-runs the three policy_core guards and compares total with Decimal after a float comparison wrongly rejected 0.1 + 0.2; malformed stored call_id and non-serialisable decided_at now raise StorageError. report_tokens is anchored to the repository root and the guard covers five constants, a relative-literal scan, a drift assertion and distinct owners. Also added the per-request_id block and corrected the NFR label, then merged the Phase 1 handoff and reconciled the AI-use log to 30 entries.
+  human_review:
+  - required the under-reported spend case to raise StorageError rather than PolicyError
+  - required Decimal comparison after the float version rejected a legitimate 0.1 + 0.2 record
+  - required the relative-literal scan to run with no allow-list and to report file:line
+  - required the duplicated log path string to be pinned equal across its two owners
+  validation:
+    pytest_offline: 152 passed, 4 skipped
+    report_output: byte-identical before and after the path change (sha256)
+    guard_removal: each new storage guard and each path guard reproduced its own failure when removed
+    ai_use_log_union: 30 entries, 0 duplicate keys
+- date: '2026-11-15'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 7
+  topic: clearing the four mypy errors that stopped Gate 2, and verifying the Python 3.9 target
+  tool: opencode
+  files_created: []
+  files_modified:
+  - src/storage.py
+  - src/measure_latency.py
+  - src/measure_tokens.py
+  - transcripts/60915652-LiuWanyang.md
+  files_not_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - src/policy_core.py
+  - src/report_tokens.py
+  - test/offline/test_invariants.py
+  summary: 'Diagnosed the four mypy findings before editing anything, then fixed them with annotations only: Set[str] for the empty id set, cast(float) after the existing _is_number guard, and Dict[str, int] for both failure tallies. mypy 2.4.1 has dropped --python-version 3.9, so a second interpreter (mypy 1.20.2) was installed to verify the 3.9 target; both runs report Success. Every annotation was removed once on a temporary copy to confirm the original error returns.'
+  human_review:
+  - 'refused # type: ignore and required the real element types'
+  - required the cast after the existing guard instead of replacing or moving it
+  - required the exact original mypy message for each of the four sites before any edit
+  - required a 3.9-target run because the default-only result would not prove compatibility
+  validation:
+    pytest_offline: 152 passed, 4 skipped
+    mypy_default: 'Success: no issues found in 8 source files'
+    mypy_python39: 'Success: no issues found in 8 source files (mypy 1.20.2)'
+    annotation_removal: M1-M4 each reproduced the original error
+- date: '2026-11-17'
+  role: D
+  student_id: '60915652'
+  phase: 2
+  session: 8
+  topic: 'merging role C''s permissions work into PR #18 and reconciling the AI-use log as a union'
+  tool: opencode
+  files_created: []
+  files_modified:
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/call_llm.py
+  - src/pipeline.py
+  - src/policy_core.py
+  - src/storage.py
+  - src/report_tokens.py
+  - test/offline/test_invariants.py
+  summary: 'Merged main (which now contains role C''s permissions work) into PR #18 and resolved the AI-use log conflict as a union: all 37 entries from main kept, D4/D5 appended, 39 entries with no duplicate keys. The 11-16 session (Phase 3 issue #25, gate workflow review, prompt diagnosis) changed no repository files, so it is folded into this entry. Also prepared the prompt-vocabulary task sheet; that implementation is not part of this session.'
+  human_review:
+  - required every entry from main to be kept, not just the newer ones
+  - required the union to be validated for duplicate keys before replacing the conflicted file
+  - 'refused to let the gate rules be assumed: the exemption is hardcoded to PR 20 and was read in the source'
+  validation:
+    ai_use_log_union: 39 entries, 0 duplicate keys, dates all strings
+    pytest_offline: 152 passed, 4 skipped before the merge
+    merge_conflicts: only docs/ai-use-log.yaml
