@@ -1,0 +1,163 @@
+schema_version: "1.0"
+file: prompts/prompt_v1.1.yaml
+purpose: >
+  Version history for the LLM extraction prompt used by the AI Finance Assistant.
+  The model proposes a structured spending record; src/policy_core.py disposes.
+  Prompts are documentation only - every rule below is still enforced in code
+  (INV-001 amount, INV-002 category whitelist, INV-003 budget).
+
+model:
+  requested_name: deepseek-v4-flash
+  configured_id: CS5351/DeepSeek-V4-Flash
+  note: >
+    Known difference between the requirement text and the configured model id.
+    Recorded here for traceability; do not change the model or gateway from this
+    file - that is a human decision (AGENTS.md section 1).
+
+prompts:
+  - version: "1.0"
+    status: superseded
+    created_for: initial extraction of amount and category from one sentence
+    system_prompt: |
+      You are a helpful assistant for a personal finance app.
+      Extract the purchase amount and its category from the user's sentence.
+      Respond with a JSON object containing "amount" and "category".
+    user_prompt_template: |
+      {{ user_text }}
+    output_contract: json_object_with_amount_and_category
+    known_issues:
+      - id: HALLUCINATED_CATEGORY
+        description: >
+          The model freely invents category labels, e.g. "transportation" instead
+          of "transport" and "groceries" instead of "food".
+        consequence: >
+          src/policy_core.py::enforce_category rejects any label outside
+          CATEGORY_WHITELIST, so these outputs fail INV-002 and are routed to
+          review, wasting a model round-trip.
+      - id: SCHEMA_DRIFT
+        description: >
+          No explicit JSON schema is given, so the model sometimes adds extra
+          keys, uses strings for amount, or wraps the object in prose.
+        consequence: >
+          Downstream parsing/validation can fail before policy checks even run,
+          forcing error-handling retries.
+      - id: NO_REJECTION_CONVENTION
+        description: >
+          The prompt never says what to do with non-spending text, so the model
+          invents a record instead of signalling that none exists.
+
+  - version: "1.1"
+    status: current
+    created_for: eliminate category hallucination and pin the output shape
+    system_prompt: |
+      You extract exactly one spending record from the user's sentence.
+      Reply with ONLY a single JSON object and nothing else (no prose, no markdown,
+      no code fences).
+
+      Rules:
+      1. "amount" must be a positive number with at most two decimal places
+         (INV-001). Never return a string, boolean, or negative/zero value.
+      2. "category" must be EXACTLY one of this closed whitelist, lowercase,
+         case-sensitive (INV-002):
+         ["food", "transport", "shopping", "entertainment",
+          "housing", "utilities", "health", "other"]
+         Do not invent synonyms. Use "transport" (not "transportation"),
+         "food" (not "groceries"/"dining"), "shopping" (not "clothes"),
+         "utilities" (not "bills"). If nothing fits, use "other".
+      3. Do not add any keys other than "amount" and "category".
+      4. If the sentence is not a spending record, return exactly
+         {"error": "not_a_record"}.
+
+      Follow this JSON schema exactly:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amount", "category"],
+        "properties": {
+          "amount":   { "type": "number", "exclusiveMinimum": 0 },
+          "category": {
+            "type": "string",
+            "enum": ["food", "transport", "shopping", "entertainment",
+                     "housing", "utilities", "health", "other"]
+          }
+        }
+      }
+
+      Example valid output:
+      {"amount": 12.50, "category": "food"}
+    user_prompt_template: |
+      {{ user_text }}
+    output_contract: json_object_matching_inline_schema
+    category_whitelist:
+      - food
+      - transport
+      - shopping
+      - entertainment
+      - housing
+      - utilities
+      - health
+      - other
+    compatibility:
+      enforced_by: src/policy_core.py
+      invariants:
+        - INV-001
+        - INV-002
+        - INV-003
+      note: >
+        The whitelist above mirrors CATEGORY_WHITELIST in src/policy_core.py.
+        The prompt is a hint, not the enforcement: if it ever drifts from the
+        code, the code still rejects the record.
+
+comparison:
+  summary: >
+    v1.1 constrains the same task with a closed vocabulary and an explicit JSON
+    schema, while v1.0 left both open. The result is fewer rejected records,
+    fewer retries, and a prompt that speaks the same language as policy_core.py.
+
+  dimensions:
+    - dimension: category_hallucination
+      v1.0: >
+        Free-form labels such as "transportation" and "groceries".
+      v1.1: >
+        Closed whitelist plus explicit synonym mappings so the model picks
+        "transport" and "food"; unknown fits fall back to "other".
+      impact: >
+        Outputs now satisfy INV-002 on the first attempt instead of being
+        rejected and re-requested.
+
+    - dimension: boundary_compatibility
+      v1.0: >
+        Shape and vocabulary were implicit; model output often needed
+        translation before reaching the deterministic boundary.
+      v1.1: >
+        Inline JSON schema and enum match enforce_amount/enforce_category
+        expectations (number, positive, <=2 decimals; case-sensitive enum).
+      impact: >
+        What the model proposes lands inside the contract that
+        src/policy_core.py validates, keeping "model proposes, code disposes"
+        intact with fewer false rejections.
+
+    - dimension: token_usage_and_retries
+      v1.0: >
+        Failed validation triggered downstream error-handling retries, each a
+        full model round-trip.
+      v1.1: >
+        A slightly longer system prompt removes the retry loop by making the
+        first response valid.
+      impact: >
+        Net token reduction per accepted record: the one-time cost of the
+        richer prompt is smaller than the repeated cost of retried calls.
+
+    - dimension: non_spending_input
+      v1.0: >
+        No rule for non-spending text; the model tended to invent a record.
+      v1.1: >
+        Explicit {"error": "not_a_record"} convention.
+      impact: >
+        Clean, predictable rejection path instead of a fabricated record.
+
+  tradeoffs:
+    - v1.1 uses a longer system prompt than v1.0.
+    - The whitelist in this file must be kept in sync with
+      src/policy_core.py::CATEGORY_WHITELIST; the code remains authoritative.
+    - Prompt text is advisory only; no business rule is enforced by prompt wording.
