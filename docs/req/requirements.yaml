@@ -225,7 +225,7 @@ nonfunctional_requirements:
     name: Model API response time
     metric: "wall-clock latency per model call (extract round-trip)"
     threshold: null
-    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95. Measurement method provided by D's scripts/measure_latency.py (nearest-rank; reports attempted/ok/failed/failure_rate and p50/p95 with n=ok) on branch feat/D-phase2-measurement (UNMERGED, not on main). No committed run-evidence file exists (logs/ is a runtime artifact, not in the repo); the figures reported by D are self-reported and are NOT independent verification. Do not treat them as an acceptance threshold."
+    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95. Measurement method provided by D's scripts/measure_latency.py (nearest-rank; reports attempted/ok/failed/failure_rate and p50/p95 with n=ok) on branch feat/D-phase2-measurement (merged into main via PR #18, commit a420987). No committed run-evidence file exists (logs/ is a runtime artifact, not in the repo); the figures reported by D are self-reported and are NOT independent verification. Do not treat them as an acceptance threshold."
     priority: medium
     status: pending_confirmation
     owner: B
