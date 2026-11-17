@@ -124,8 +124,10 @@ def append_validated(record: dict, expected_spent=None) -> None:
 
     Rejections keep role C's error semantics: a rule violation raises
     ``PolicyError`` with the original ``policy:*`` code; under-reported spend,
-    arithmetic inconsistency and IO failures raise ``StorageError``. On any
-    failure the file is left unchanged.
+    arithmetic inconsistency and IO failures raise ``StorageError``. Every
+    validation failure rejects before any byte is written, so the file is
+    unchanged; an interruption during the write itself can leave a partial final
+    line, which readers reject as a ``StorageError`` (fail-closed).
     """
     _validate_record(record)
     if record["call_id"] in _existing_call_ids():

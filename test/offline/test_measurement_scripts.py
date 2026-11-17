@@ -13,8 +13,9 @@ from contextlib import redirect_stdout
 
 import pytest
 
-from src import (call_llm, measure_latency, measure_tokens, pipeline,
-                 report_tokens, storage)
+from scripts import measure_latency, measure_tokens
+from scripts import failure_kind as failure_kind_mod
+from src import call_llm, pipeline, report_tokens, storage
 
 
 def _write_log(tmp_path, records):
@@ -317,16 +318,16 @@ def test_failure_kind_whitelist_shapes():
 
     http = call_llm.LlmTransportError("http 503: secret body", status_code=503,
                                       body="sk-secret and https://host/x")
-    assert measure_latency._failure_kind(http) == "http 503 (LlmTransportError)"
+    assert failure_kind_mod.failure_kind(http) == "http 503 (LlmTransportError)"
     refused = call_llm.LlmTransportError("transport: refused https://h/sk-secret")
-    assert measure_latency._failure_kind(refused) == "transport: other (LlmTransportError)"
+    assert failure_kind_mod.failure_kind(refused) == "transport: other (LlmTransportError)"
     resolved = call_llm.LlmTransportError(
         "transport: temporary failure in name resolution"
     )
-    assert measure_latency._failure_kind(resolved) == \
+    assert failure_kind_mod.failure_kind(resolved) == \
         "transport: name resolution (LlmTransportError)"
     not_json = json.JSONDecodeError("x", "sk-secret", 0)
-    assert measure_latency._failure_kind(not_json) == "not_json"
+    assert failure_kind_mod.failure_kind(not_json) == "not_json"
 
 
 def test_latency_dry_run_does_not_call_extract(tmp_path, monkeypatch):
@@ -414,11 +415,30 @@ def test_failure_kind_label_never_carries_secrets():
     err = call_llm.LlmTransportError(
         "transport: read timed out to https://gw.example/v1?key=sk-secret"
     )
-    label = measure_tokens._failure_kind(err)
+    label = failure_kind_mod.failure_kind(err)
     assert label == "transport: read timeout (LlmTransportError)"
     assert "sk-secret" not in label
     assert "https://" not in label
-    assert label == measure_latency._failure_kind(err)
+
+
+def test_failure_classifier_is_shared_and_behaviourally_identical():
+    rows = [
+        (json.JSONDecodeError("bad", "", 0), "not_json"),
+        (call_llm.LlmTransportError("boom", status_code=503),
+         "http 503 (LlmTransportError)"),
+        (call_llm.LlmTransportError("transport: read timed out"),
+         "transport: read timeout (LlmTransportError)"),
+        (call_llm.LlmTransportError(
+            "transport: temporary failure in name resolution"),
+         "transport: name resolution (LlmTransportError)"),
+        (call_llm.LlmTransportError("transport: refused"),
+         "transport: other (LlmTransportError)"),
+    ]
+    for exc, expected in rows:
+        assert measure_latency.failure_kind(exc) == expected
+        assert measure_tokens.failure_kind(exc) == expected
+    assert not hasattr(measure_latency, "_failure_kind")
+    assert not hasattr(measure_tokens, "_failure_kind")
 
 
 def _evidence_paths():
@@ -455,7 +475,8 @@ def test_evidence_paths_are_absolute_and_inside_repo():
 def test_evidence_paths_follow_the_module_not_the_cwd(tmp_path):
     repo = pathlib.Path(__file__).resolve().parents[2]
     code = (
-        "from src import call_llm, pipeline, storage, measure_latency, report_tokens;"
+        "from src import call_llm, pipeline, storage, report_tokens; "
+        "from scripts import measure_latency; "
         "print(call_llm.LOG_PATH); print(pipeline.REVIEW_PATH);"
         "print(storage.DATA_PATH); print(measure_latency.LATENCY_PATH);"
         "print(report_tokens.LOG_PATH)"
@@ -481,16 +502,18 @@ _RELATIVE_EVIDENCE_LITERALS = tuple(
 
 
 def test_no_relative_evidence_path_literal_in_src():
-    """No src module may build an evidence path from a cwd-relative literal.
+    """No src/ or scripts/ module may build an evidence path from a cwd-relative literal.
 
     Every owning module is anchored (_REPO_ROOT / ...), so a relative literal is
     illegal everywhere and there is no allow-list. Scope, honestly: this catches
     relative literals for "logs"/"data" only; a future Path("prompts/...") would
     not be caught — adding such a prefix here is a deliberate test change.
     """
-    src = pathlib.Path(__file__).resolve().parents[2] / "src"
+    root = pathlib.Path(__file__).resolve().parents[2]
     offenders = []
-    for path in sorted(src.glob("*.py")):
+    sources = sorted(root.joinpath("src").glob("*.py")) + \
+        sorted(root.joinpath("scripts").glob("*.py"))
+    for path in sources:
         for lineno, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
@@ -498,6 +521,11 @@ def test_no_relative_evidence_path_literal_in_src():
                 offenders.append("%s:%d: relative evidence path literal"
                                  % (path.name, lineno))
     assert not offenders, "\n".join(offenders)
+
+
+def test_failure_kind_is_available_from_the_shared_module():
+    err = call_llm.LlmTransportError("transport: read timed out (read timeout=30)")
+    assert failure_kind_mod.failure_kind(err).startswith("transport:")
 
 
 def test_report_tokens_log_path_matches_call_llm():
