@@ -36,6 +36,9 @@ _SESSION_ID = uuid.uuid4().hex
 SYSTEM_PROMPT = (
     "You extract a spending record from one sentence. "
     'Return ONLY a JSON object with keys: "amount" (number), "category" (string). '
+    "The category MUST be strictly chosen from this exact list: "
+    "[food, transport, shopping, entertainment, housing, utilities, health, other]. "
+    "Do not invent new categories. "
     'If the sentence is not a spending record, return {"error": "not_a_record"}. '
     "Do not explain. Do not add keys."
 )
