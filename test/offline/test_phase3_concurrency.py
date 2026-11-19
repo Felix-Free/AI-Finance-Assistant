@@ -66,10 +66,12 @@ def test_concurrent_appends_keep_both_records(data_path, monkeypatch):
         name = threading.current_thread().name
         if name == "A":
             a_at_replace.set()
-            release_a.wait(2.0)
+            if not release_a.wait(2.0):
+                raise AssertionError("test coordination failed: A was not released")
         elif name == "B":
             b_at_replace.set()
-            release_b.wait(2.0)
+            if not release_b.wait(2.0):
+                raise AssertionError("test coordination failed: B was not released")
         return real_replace(src, dst)
 
     # Point the wrapper at the exact object the writer will call. On the fixed
@@ -95,10 +97,11 @@ def test_concurrent_appends_keep_both_records(data_path, monkeypatch):
 
     outcomes = {}
 
-    def _worker(call_id, expected_spent=None):
+    def _worker(call_id, amount, total, expected_spent=None):
         try:
             storage.append_validated(
-                _record(call_id=call_id), expected_spent=expected_spent
+                _record(call_id=call_id, amount=amount, total=total),
+                expected_spent=expected_spent,
             )
             outcomes[call_id] = "ok"
         except Exception as exc:  # noqa: BLE001 - record the class for the verdict
@@ -107,8 +110,8 @@ def test_concurrent_appends_keep_both_records(data_path, monkeypatch):
     # B needs expected_spent=400 so it reaches os.replace on BOTH the no-lock
     # build (persisted 350 -> 400 >= 350 allowed) and the locked build (persisted
     # 400 -> 400 == 400). total=420 == 400 + 20 in both.
-    thread_a = threading.Thread(target=_worker, args=("a",), name="A")
-    thread_b = threading.Thread(target=_worker, args=("b", 400), name="B")
+    thread_a = threading.Thread(target=_worker, args=("a", 50, 400), name="A")
+    thread_b = threading.Thread(target=_worker, args=("b", 20, 420, 400), name="B")
 
     try:
         thread_a.start()
@@ -118,9 +121,15 @@ def test_concurrent_appends_keep_both_records(data_path, monkeypatch):
         thread_b.start()
         # Wait for B to either reach the replace wrapper (no-lock path) or block
         # on the lock (locked path). Anti-hang timeout only.
+        reached = False
         for _ in range(200):
             if b_at_replace.wait(0.005) or b_lock_attempt.wait(0.005):
+                reached = True
                 break
+        if not reached and not (b_at_replace.is_set() or b_lock_attempt.is_set()):
+            raise AssertionError(
+                "test coordination failed: B did not reach the lock or replace"
+            )
         release_a.set()
         thread_a.join(2.0)
         if not b_at_replace.is_set():
@@ -135,6 +144,8 @@ def test_concurrent_appends_keep_both_records(data_path, monkeypatch):
         if thread_b.ident is not None:
             thread_b.join(2.0)
 
+    assert not thread_a.is_alive(), "test coordination failed: thread A did not finish"
+    assert not thread_b.is_alive(), "test coordination failed: thread B did not finish"
     assert outcomes == {"a": "ok", "b": "ok"}, outcomes
     ids = [r["call_id"] for r in storage.iter_records()]
     assert sorted(ids) == sorted(["seed", "a", "b"]), ids
