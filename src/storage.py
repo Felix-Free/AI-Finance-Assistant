@@ -10,7 +10,9 @@ Fail-closed: a record that cannot be validated or written raises
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import shutil
 from decimal import Decimal
 from typing import Iterator, Set, cast
 
@@ -126,8 +128,10 @@ def append_validated(record: dict, expected_spent=None) -> None:
     ``PolicyError`` with the original ``policy:*`` code; under-reported spend,
     arithmetic inconsistency and IO failures raise ``StorageError``. Every
     validation failure rejects before any byte is written, so the file is
-    unchanged; an interruption during the write itself can leave a partial final
-    line, which readers reject as a ``StorageError`` (fail-closed).
+    unchanged. The append itself is atomic: the existing bytes and the new line
+    are written to a same-directory temporary file, flushed and ``fsync``-ed,
+    then committed with ``os.replace``. A failed commit leaves the original
+    file byte-identical; readers therefore never see a partially written line.
     """
     _validate_record(record)
     if record["call_id"] in _existing_call_ids():
@@ -164,11 +168,22 @@ def append_validated(record: dict, expected_spent=None) -> None:
             "record is not JSON-serialisable: field %r has type %r"
             % (field, type(record.get(field)).__name__)
         ) from None
+    tmp = DATA_PATH.with_name(DATA_PATH.name + ".tmp")
     try:
         DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DATA_PATH.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
+        with tmp.open("wb") as fh:
+            if DATA_PATH.exists():
+                with DATA_PATH.open("rb") as src:
+                    shutil.copyfileobj(src, fh)
+            fh.write((line + "\n").encode("utf-8"))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, DATA_PATH)
     except OSError as exc:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise StorageError("cannot write %s: %s" % (DATA_PATH, exc)) from exc
 
 
