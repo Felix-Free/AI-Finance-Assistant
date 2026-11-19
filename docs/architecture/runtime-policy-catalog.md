@@ -413,11 +413,11 @@ process working directory. This is **confirmed** in:
 - `src/call_llm.py` — `LOG_PATH` (`logs/llm_calls.jsonl`)
 - `src/pipeline.py` — `REVIEW_PATH` (`logs/review.jsonl`)
 - `src/storage.py` — `DATA_PATH` (`data/records.jsonl`)
-- `src/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
+- `scripts/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
 
 It is **not** used everywhere: `src/report_tokens.py` still defaults to a **relative**
 `LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")` (working-directory dependent, overridable
-by an argument), and `src/measure_tokens.py` defines no path of its own. The anchoring
+by an argument), and `scripts/measure_tokens.py` defines no path of its own. The anchoring
 claim applies only to the four modules listed above.
 
 #### D-02 — error logging short-code rule (unresolved implementation debt)
