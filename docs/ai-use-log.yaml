@@ -1013,3 +1013,209 @@
     yaml_parse: pass
     git_diff_check: pass
     tests: not run (documentation-only session); no measurement claimed
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 8
+  topic: Merge-gate helper, invariant and evidence tests
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/ci_checks.py
+  files_modified:
+    - test/offline/test_invariants.py
+    - test/offline/test_evidence_join.py
+    - test/offline/test_pipeline_seam.py
+  summary: "Added CI checks for approvals, security and log updates, plus invariant and evidence-join tests."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+  validation:
+    pytest_offline: 201 passed with network blocked
+    gate1_simulated_reviews: Passed in local QA
+    guard_removal: All three tests failed with their guard disabled
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 9
+  topic: CI workflows and live test suite
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - .github/workflows/branch-ci.yml
+    - test/live/test_live_model.py
+  files_modified:
+    - .github/workflows/ci.yml
+  summary: "Added six PR jobs, separate push checks and live model tests."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+  validation:
+    mock_model: 5 cases passed per prompt variant; 4 incorrect-amount replies were rejected.
+
+- date: "2026-11-14"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 10
+  topic: Phase 2 documentation
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - docs/code-governance/verification-constraints.md
+    - docs/review-memo.md
+    - docs/bug-diary.md
+    - docs/debt-register.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/measurements/phase2-qa-evidence.md
+  files_modified:
+    - README.md
+    - docs/architecture/evaluation-logbook.md
+  summary: "Added four QA documents, the CI ADR and QA evidence. Updated the README and evaluation logbook."
+  human_review:
+    - Role E requested the OpenCode rebuild and the work was scoped to the listed paths
+
+- date: "2026-11-15"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 11
+  topic: Gate 2 contract tightening and evidence refresh
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/ci_checks.py
+    - .github/workflows/ci.yml
+    - README.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/measurements/phase2-qa-evidence.md
+    - docs/ai-use-log.yaml
+  summary: "Tightened Gate 2 and refreshed main 94b0ec4 with D #18 and C #19 snapshots. Enabled CI on the temporary review base."
+  human_review:
+    - Approved the review-base trigger as an E-owned workflow exception.
+  validation:
+    offline_isolation: 201 tests passed in separate local QA with network blocked and no logs or data written
+    pending: Real gateway, GitHub approval and merge enforcement
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 12
+  topic: QA docs refresh on D #18
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/measurements/phase2-qa-evidence.md
+    - docs/review-memo.md
+    - docs/debt-register.md
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  summary: "Refreshed the QA documentation against D #18 (df729a9). The earlier four mypy errors are now cleared in E local QA. 201 offline tests passed with network blocked, and both open faults were reproduced. GitHub revalidation is pending at authoring time."
+  human_review:
+    - Role E approved an append to the AI use log only, scoped to this entry.
+  validation:
+    offline_isolation: 201 tests passed with network blocked
+    mypy: earlier four errors cleared in E local QA
+    open_faults: both reproduced
+    pending: GitHub revalidation
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 13
+  topic: Review feedback follow-up
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+    - test/offline/test_ci_regressions.py
+  files_modified:
+    - pytest.ini
+    - docs/code-governance/verification-constraints.md
+    - docs/bug-diary.md
+    - docs/ai-use-log.yaml
+  summary: "Added the requirements-to-test matrix, strict pytest markers and offline regressions for BUG-01 and BUG-02."
+  human_review:
+    - Role E approved appending this single session row and scoping the edits to the listed paths.
+  validation:
+    offline_isolation: 204 offline tests passed with network blocked in local QA
+    collection: all original 206 collected nodes still present, including 5 live collected only
+    strict_markers: a typo marker fails at collection
+    bug_regression: both new negative tests detected an injected regression
+    pending: GitHub revalidation
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 14
+  topic: One-time PR #20 rollout authorization
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+    - docs/architecture/adr/phase2-ci-verification.md
+    - docs/ai-use-log.yaml
+  summary: "Recorded role A's 2026-11-16 authorization to use skip-test-gate for the first rollout of #20 only, distinct from test-first evidence. #20 carrying the label logs Waived, the existing test-first check runs for all nonmatching PRs, and Gate 4 keeps its configured environment and real-run requirement. The ADR stays Proposed; no GitHub run or course exemption is claimed verified."
+  human_review:
+    - Role E approved this single session row scoped to the listed paths.
+  validation:
+    local_bash: passed for labeled #20; unlabeled #20, labeled #21, and another repository followed normal Gate 1
+    actionlint: passed
+    pending: GitHub CI verification
+
+- date: "2026-11-16"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 15
+  topic: Case-specific transport and grocery aliases in live extraction checks
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/live/test_live_model.py
+    - docs/ai-use-log.yaml
+  summary: "Allowed case-specific transport and grocery aliases in the live extraction checks while retaining amount, JSON and non-expense assertions. The aliases apply only to the bus-fare and groceries test cases; production category validation is unchanged and still rejects those alias strings."
+  human_review:
+    - Role A requested synonym-tolerant live assertions.
+  validation:
+    local_replay: canonical 5 passed and alias 5 passed
+    negative_outcomes: "Five intentional failures: three wrong categories, one wrong amount and one non-expense returned as a record."
+    offline_isolation: 204 offline passed with network blocked
+    latest_github_run: 2 failed/3 passed on the prior version; a real rerun of the proposed change is pending
+
+- date: "2026-11-17"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 16
+  topic: PR #20 first-rollout waiver regression
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_ci_regressions.py
+    - docs/code-governance/verification-constraints.md
+    - docs/ai-use-log.yaml
+  summary: "Role A requested regression coverage for the approved PR #20 first-rollout waiver; Role E approved the narrow local follow-up. One offline test pins the actual ci.yml waiver expression and runs the actual step shell in both the waived and normal branches. Policy, src and workflows are unchanged."
+  human_review:
+    - Role A requested the waiver regression; Role E approved the narrow local follow-up.
+  validation:
+    target_file: 4 passed
+    offline_isolation: 205 offline passed, zero skipped
+    guard_mutations: remove label clause, always waive and never waive each failed the new test
+    pending: GitHub CI verification
+
+- date: "2026-11-19"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 17
+  topic: PR #20 runner pin to Ubuntu 22.04
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+    - .github/workflows/branch-ci.yml
+    - docs/ai-use-log.yaml
+  summary: "PR #30 CI could not install Python 3.9 on Ubuntu 26.04. In a read-only session the workflow patch was produced, then applied under the authorized Role E scope; the six PR jobs and two branch jobs now pin ubuntu-22.04 and keep Python 3.9. The workflows were not edited directly in the read-only session."
+  human_review:
+    - Role E authorized the scoped runner fix before #20 merge.
+  validation:
+    runs_on_replacements: exact eight replacements
+    actionlint: passes both workflows
+    local_ci_regressions: 4 passed
+    pending: hosted rerun
