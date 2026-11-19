@@ -9,14 +9,31 @@ Fail-closed: a record that cannot be validated or written raises
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import pathlib
 import shutil
+import tempfile
+import threading
 from decimal import Decimal
-from typing import Iterator, Set, cast
+from typing import Any, Iterator, Optional, Set, cast
 
 from src import policy_core
+
+_fcntl: Optional[Any]
+try:  # POSIX advisory file lock (cross-process)
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    _fcntl = None
+
+_msvcrt: Optional[Any]
+try:  # Windows file lock (cross-process)
+    import msvcrt as _msvcrt
+except ImportError:
+    _msvcrt = None
+
+_THREAD_LOCK = threading.Lock()
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA_PATH = _REPO_ROOT / "data" / "records.jsonl"
@@ -114,6 +131,46 @@ def _existing_call_ids() -> set:
     return ids
 
 
+def _acquire(fh) -> None:
+    """Take an exclusive lock on an open lock file (blocking)."""
+    if _fcntl is not None:
+        _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
+    elif _msvcrt is not None:  # pragma: no cover - Windows
+        _msvcrt.locking(fh.fileno(), _msvcrt.LK_LOCK, 1)
+    else:  # pragma: no cover - no OS lock available
+        _THREAD_LOCK.acquire()
+
+
+def _release(fh) -> None:
+    """Release the exclusive lock taken by ``_acquire``."""
+    if _fcntl is not None:
+        _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
+    elif _msvcrt is not None:  # pragma: no cover - Windows
+        _msvcrt.locking(fh.fileno(), _msvcrt.LK_UNLCK, 1)
+    else:  # pragma: no cover - no OS lock available
+        _THREAD_LOCK.release()
+
+
+@contextlib.contextmanager
+def _locked():
+    """Exclusive lock across read -> duplicate check -> budget check -> write -> replace.
+
+    Uses a same-directory sidecar lock file ``<data>.lock`` so writers in other
+    processes are serialised too (POSIX ``flock`` / Windows ``msvcrt.locking``,
+    both blocking). When neither OS lock is available the module-level
+    ``_THREAD_LOCK`` fallback is used; it is PROCESS-LOCAL ONLY and does not
+    protect against other processes.
+    """
+    lock_path = DATA_PATH.with_name(DATA_PATH.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as fh:
+        _acquire(fh)
+        try:
+            yield
+        finally:
+            _release(fh)
+
+
 def append_validated(record: dict, expected_spent=None) -> None:
     """Re-check the record against the persisted state, then append one JSON line.
 
@@ -134,57 +191,63 @@ def append_validated(record: dict, expected_spent=None) -> None:
     file byte-identical; readers therefore never see a partially written line.
     """
     _validate_record(record)
-    if record["call_id"] in _existing_call_ids():
-        raise StorageError("duplicate call_id")
-    if expected_spent is not None and not _is_number(expected_spent):
-        raise StorageError(
-            "expected_spent must be a number, got %r"
-            % type(expected_spent).__name__
-        )
-    persisted = current_total()
-    if expected_spent is None:
-        effective = persisted
-    else:
-        effective = expected_spent
-        if effective < persisted:
+    with _locked():
+        if record["call_id"] in _existing_call_ids():
+            raise StorageError("duplicate call_id")
+        if expected_spent is not None and not _is_number(expected_spent):
             raise StorageError(
-                "expected_spent below persisted cumulative spend: %r < %r"
-                % (effective, persisted)
+                "expected_spent must be a number, got %r"
+                % type(expected_spent).__name__
             )
-    policy_core.enforce_amount(record["amount"])
-    policy_core.enforce_category(record["category"])
-    policy_core.enforce_budget(effective, record["amount"], record["budget_limit"])
-    if (Decimal(str(record["total"]))
-            != Decimal(str(effective)) + Decimal(str(record["amount"]))):
-        raise StorageError(
-            "total inconsistent with expected_spent + amount: %r != %r + %r"
-            % (record["total"], effective, record["amount"])
-        )
-    try:
-        line = json.dumps(record, ensure_ascii=False)
-    except TypeError:
-        field = _non_serialisable_field(record)
-        raise StorageError(
-            "record is not JSON-serialisable: field %r has type %r"
-            % (field, type(record.get(field)).__name__)
-        ) from None
-    tmp = DATA_PATH.with_name(DATA_PATH.name + ".tmp")
-    try:
-        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with tmp.open("wb") as fh:
-            if DATA_PATH.exists():
-                with DATA_PATH.open("rb") as src:
-                    shutil.copyfileobj(src, fh)
-            fh.write((line + "\n").encode("utf-8"))
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, DATA_PATH)
-    except OSError as exc:
+        persisted = current_total()
+        if expected_spent is None:
+            effective = persisted
+        else:
+            effective = expected_spent
+            if effective < persisted:
+                raise StorageError(
+                    "expected_spent below persisted cumulative spend: %r < %r"
+                    % (effective, persisted)
+                )
+        policy_core.enforce_amount(record["amount"])
+        policy_core.enforce_category(record["category"])
+        policy_core.enforce_budget(effective, record["amount"], record["budget_limit"])
+        if (Decimal(str(record["total"]))
+                != Decimal(str(effective)) + Decimal(str(record["amount"]))):
+            raise StorageError(
+                "total inconsistent with expected_spent + amount: %r != %r + %r"
+                % (record["total"], effective, record["amount"])
+            )
         try:
-            tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
-        raise StorageError("cannot write %s: %s" % (DATA_PATH, exc)) from exc
+            line = json.dumps(record, ensure_ascii=False)
+        except TypeError:
+            field = _non_serialisable_field(record)
+            raise StorageError(
+                "record is not JSON-serialisable: field %r has type %r"
+                % (field, type(record.get(field)).__name__)
+            ) from None
+        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(DATA_PATH.parent),
+            prefix=DATA_PATH.name + ".",
+            suffix=".tmp",
+        )
+        tmp = pathlib.Path(tmp_name)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                if DATA_PATH.exists():
+                    with DATA_PATH.open("rb") as src:
+                        shutil.copyfileobj(src, fh)
+                fh.write((line + "\n").encode("utf-8"))
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, DATA_PATH)
+        except OSError as exc:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise StorageError("cannot write %s: %s" % (DATA_PATH, exc)) from exc
 
 
 def current_total() -> float:
