@@ -1006,3 +1006,34 @@
     ai_use_log_union: 39 entries, 0 duplicate keys, dates all strings
     pytest_offline: 152 passed, 4 skipped before the merge
     merge_conflicts: only docs/ai-use-log.yaml
+- date: '2026-11-19'
+  role: D
+  student_id: '60915652'
+  phase: 3
+  session: 9
+  topic: 'atomic storage append, short secret-safe error codes, and the #27 implementation round'
+  tool: opencode
+  files_created:
+  - src/failure_kind.py
+  files_modified:
+  - src/storage.py
+  - src/call_llm.py
+  - scripts/failure_kind.py
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/pipeline.py
+  - src/policy_core.py
+  - src/report_tokens.py
+  - test/offline/test_phase3_hardening.py
+  summary: 'Made storage appends atomic (same-directory temp file, fsync, os.replace; a failed commit leaves the original bytes untouched, and tmp is bound before the try so a failing mkdir becomes StorageError rather than UnboundLocalError), moved the failure classifier into src/ so call_llm can use it without importing scripts/, and reduced the log error field to the closed short-code vocabulary. The four red tests from the approved test-first commits now pass; tests were not modified in this round.'
+  human_review:
+  - required the test commit to be approved before any implementation commit
+  - required the classifier to move into src/ rather than src importing scripts/
+  - required the atomic write to keep the existing StorageError/PolicyError split
+  - required tmp to be assigned before the try so cleanup never hits an unbound name
+  validation:
+    pytest_offline: 165 passed, 4 skipped
+    phase3_hardening: 7 passed (4 former red + 3 anchors)
+    mypy_default: 'Success: no issues found in 11 source files'
+    mypy_python39: 'Success: no issues found in 11 source files (mypy 1.20.2)'
+    mutation_checks: M1-M4 each reproduced the matching red test, restored afterwards
