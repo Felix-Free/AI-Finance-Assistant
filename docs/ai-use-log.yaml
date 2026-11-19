@@ -1199,3 +1199,23 @@
     offline_isolation: 205 offline passed, zero skipped
     guard_mutations: remove label clause, always waive and never waive each failed the new test
     pending: GitHub CI verification
+
+- date: "2026-11-19"
+  role: E
+  student_id: "61049313"
+  phase: 2
+  session: 17
+  topic: PR #20 runner pin to Ubuntu 22.04
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/workflows/ci.yml
+    - .github/workflows/branch-ci.yml
+    - docs/ai-use-log.yaml
+  summary: "PR #30 CI could not install Python 3.9 on Ubuntu 26.04. In a read-only session the workflow patch was produced, then applied under the authorized Role E scope; the six PR jobs and two branch jobs now pin ubuntu-22.04 and keep Python 3.9. The workflows were not edited directly in the read-only session."
+  human_review:
+    - Role E authorized the scoped runner fix before #20 merge.
+  validation:
+    runs_on_replacements: exact eight replacements
+    actionlint: passes both workflows
+    local_ci_regressions: 4 passed
+    pending: hosted rerun

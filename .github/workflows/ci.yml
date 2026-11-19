@@ -46,7 +46,7 @@ jobs:
   # ---------------------------------------------------------------------------
   test-approval-loop:
     name: Gate 1 · test-approval
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       pull-requests: read
@@ -102,7 +102,7 @@ jobs:
   # ---------------------------------------------------------------------------
   static-analysis:
     name: Gate 2 · static-analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -150,7 +150,7 @@ jobs:
   # ---------------------------------------------------------------------------
   schema-validation:
     name: Gate 3 · schema-validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -212,7 +212,7 @@ jobs:
     name: Gate 4 · semantic-eval
     needs: test-approval-loop
     if: ${{ needs.test-approval-loop.result == 'success' && needs.test-approval-loop.outputs.semantic_required == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     environment: semantic-eval
     permissions:
       contents: read
@@ -263,7 +263,7 @@ jobs:
   # ---------------------------------------------------------------------------
   offline-regression:
     name: Gate 5 · offline-regression
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -289,7 +289,7 @@ jobs:
   # ---------------------------------------------------------------------------
   ai-use-log:
     name: Gate 6 · ai-use-log
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
