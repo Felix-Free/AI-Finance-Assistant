@@ -15,7 +15,9 @@
 >
 > Code references below are to the real files. All referenced code (`src/call_llm.py`,
 > `src/policy_core.py`, `src/pipeline.py`) is merged on `main` as of PR #9. Tests live in
-> `test/offline/`. CI is not yet set up.
+> `test/offline/`. The GitHub Actions CI workflow is configured in `.github/workflows/ci.yml` on
+> `main`; its actual workflow execution and latest success status have **not** been independently
+> verified in this review.
 
 ---
 
@@ -62,7 +64,8 @@ deterministic code decides.
 - **Persistence / storage** of accepted records.
 - **Budget limit storage/configuration** (`budget_limit` is passed in by the caller today).
 - Full boundary test suite `test/offline/test_invariants.py` (role E).
-- CI pipeline (`.github/workflows/` contains only `.gitkeep`).
+- CI pipeline: `.github/workflows/ci.yml` is configured on `main` (offline pytest, Ruff, AI-use-log
+  checks); actual run history / latest success is **not** independently verified in this review.
 - Externalised / configurable prompt file (`Prompt.md` is still a TODO; the prompt lives
   only in the `SYSTEM_PROMPT` constant).
 
@@ -173,7 +176,7 @@ flowchart TD
 | Persistence | Store accepted records | record | stored | — | — | **not implemented** |
 | Budget store | Provide `budget_limit` | — | limit | — | — | **not implemented** |
 | Full boundary tests | Exhaustive INV boundary suite | — | tests | `pytest` | E | **planned** |
-| CI | Run `pytest test/offline` on PRs | — | pass/fail | GitHub Actions | E | **not implemented** |
+| CI | Run `pytest test/offline` on PRs | — | pass/fail | GitHub Actions | E | **configured** (`.github/workflows/ci.yml` on `main`); run status not verified |
 
 > The `Parser` in the requirement wording is `call_llm.extract` (envelope→JSON) plus the
 > inlined field extraction in `validate_record`; there is no separate parser module.
@@ -406,7 +409,7 @@ Grounded in `requirements.yaml` (role B) and the real code.
 | Persistence | — | — | not implemented |
 | Budget store | — | INV-003 source | not implemented |
 | Full boundary tests | — | INV-001/002/003 | planned (E) |
-| CI | — | — | not implemented (E) |
+| CI | `.github/workflows/ci.yml` on `main` | — | configured (run status not verified) |
 
 ## Appendix B — Open questions handed to others
 
@@ -422,7 +425,8 @@ Grounded in `requirements.yaml` (role B) and the real code.
 - `feat/D-policy-core` merged into `main` as PR #9 (PD-005, resolved).
 
 **To E (tests/CI):**
-- Build `test/offline/test_invariants.py` full boundary suite and CI (NFR-007).
+- Build `test/offline/test_invariants.py` full boundary suite (NFR-007); CI workflow is configured
+  on `main` — extend/adjust as needed, and confirm execution status on GitHub.
 
 **Token budget (owner A/B):** per-request ceiling, per-session budget, max history, at-limit
 behaviour — all `pending_confirmation`.

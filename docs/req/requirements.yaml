@@ -225,23 +225,23 @@ nonfunctional_requirements:
     name: Model API response time
     metric: "wall-clock latency per model call (extract round-trip)"
     threshold: null
-    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95."
+    verification: "measure extract() latency against the live gateway in test/live with an approved key; report p50/p95. Measurement method provided by D's scripts/measure_latency.py (nearest-rank; reports attempted/ok/failed/failure_rate and p50/p95 with n=ok) on branch feat/D-phase2-measurement (merged into main via PR #18, commit a420987). No committed run-evidence file exists (logs/ is a runtime artifact, not in the repo); the figures reported by D are self-reported and are NOT independent verification. Do not treat them as an acceptance threshold."
     priority: medium
     status: pending_confirmation
     owner: B
     # NEEDS CONFIRMATION (owner: B) -> PD-007
-    notes: "No approved latency budget exists. Threshold to be set by B with D/E; do not invent a number."
+    notes: "No approved latency budget exists. Threshold to be set by B with D/E; do not invent a number. Evidence status: measurement code is merged into main (via PR #18); independent, committed measurement evidence is still pending (E)."
 
   - id: NFR-002
     name: Token consumption budget
     metric: "tokens per request and per session"
     threshold: null
-    verification: "read token usage from gateway response/logs if available; aggregate per session."
+    verification: "read token usage from the gateway response/logs and aggregate. Source: the gateway response usage object, mapped to {input: prompt_tokens, output: completion_tokens, total: total_tokens}. Aggregation implemented by D's src/report_tokens.py, now merged into main (via PR #18): per-request (grouped by request_id), per-session (grouped by session_id), api_call_count (rows with request_made=true), usage_source three-state distribution (gateway/partial/missing), and missing-usage count. Missing values are never zero-filled or estimated; a session with any incomplete/missing call is marked incomplete. All IDs are 32-hex. user_request_count is NOT implemented (tracked here as a pending gap; no new metric is added)."
     priority: medium
     status: pending_confirmation
     owner: B
     # NEEDS CONFIRMATION (owner: B) -> PD-007
-    notes: "No token budget defined; gateway may not expose usage. To be decided by B with the course/team."
+    notes: "No token budget defined; gateway may not expose usage. To be decided by B with the course/team. Evidence status: aggregation code is merged into main (via PR #18) and is statistics-only; independent, committed token-run evidence is still pending (E). user_request_count remains unimplemented (confirm with D before adding)."
 
   - id: NFR-003
     name: API call failure handling
@@ -277,12 +277,12 @@ nonfunctional_requirements:
     name: Log traceability
     metric: "percentage of model calls and policy rejections with a corresponding log line"
     threshold: null
-    verification: "count calls vs llm_calls.jsonl lines; count rejections vs review.jsonl lines in tests."
+    verification: "count calls vs llm_calls.jsonl lines; count rejections vs review.jsonl lines in tests. call_id correlation is implemented by D and merged into main (via PR #18): accepted path joins logs/llm_calls.jsonl.call_id == data/records.jsonl.call_id; rejected path joins logs/llm_calls.jsonl.call_id == logs/review.jsonl.call_id, and a rejected record never enters storage (records.jsonl). The end-to-end join test test/offline/test_evidence_join.py is on main but its 4 test functions are all skipped (module-level pytestmark skip + per-test pytest.skip); it is NOT a passing test, and the join has no passing-test evidence on main yet."
     priority: high
     status: pending_confirmation
     owner: C
     # NEEDS CONFIRMATION (owner: C) -> PD-008
-    notes: "Logging contract is defined (RP-004) and enforced fail-closed; a numeric coverage threshold is pending C."
+    notes: "Logging contract is defined (RP-004) and enforced fail-closed; a numeric coverage threshold is pending C. Evidence status: call_id join code is merged into main (via PR #18); the evidence-join test on main is skipped (E to complete). Runtime log/record files are runtime artifacts, not committed evidence."
 
   - id: NFR-007
     name: Testability
@@ -551,7 +551,7 @@ traceability:
     - requirement: FR-008
       invariant: null
       runtime_policy: RP-004
-      code: "src/call_llm.py::_append_log; src/pipeline.py::_append_review"
+      code: "src/call_llm.py::_append_log; src/pipeline.py::_append_rejection"
       tests: ["test_seam_returns_parsed_object_and_logs_once", "test_policy_rejection_writes_one_review_line"]
 
 # =============================================================================
@@ -592,8 +592,8 @@ pending_decisions:
     question: "When will src/policy_core.py and src/pipeline.py be merged into main?"
     status: pending_confirmation
     owner: A
-    verification: "Factually satisfied: main (0dda36b, PR #9) contains src/call_llm.py, src/policy_core.py and src/pipeline.py; offline tests exist at test/offline/test_policy_core_smoke.py and test/offline/test_pipeline_seam.py and pass. CI is NOT yet on main (a separate, unmerged deliverable on feat/e-ci-skeleton)."
-    notes: "The merge condition is factually satisfied. Historical branch feat/D-policy-core was merged into main via PR #9 (commit 0dda36b); the three core modules and their offline tests are on main. The 'CI passes' sub-clause is still unmet because CI has not been merged. Administrative closure confirmation by owner A remains pending."
+    verification: "Factually satisfied: main (0dda36b, PR #9) contains src/call_llm.py, src/policy_core.py and src/pipeline.py; offline tests exist at test/offline/test_policy_core_smoke.py and test/offline/test_pipeline_seam.py and pass. The CI workflow is now on main (`.github/workflows/ci.yml`, merged via PR #11); whether its latest GitHub Actions run succeeded has NOT been independently verified."
+    notes: "The merge condition is factually satisfied. Historical branch feat/D-policy-core was merged into main via PR #9 (commit 0dda36b); the three core modules and their offline tests are on main. The CI workflow is now on main (PR #11); a successful GitHub Actions run is not independently verified. Administrative closure confirmation by owner A remains pending."
   - id: PD-006
     topic: "Python version baseline"
     question: "Is the baseline Python 3.9.7 (as documented) or the 3.14.4 observed in the venv?"

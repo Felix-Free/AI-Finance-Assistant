@@ -8,7 +8,7 @@ writes no log line and prints no token values. The call log written by
 
 A failed attempt (``LlmTransportError`` or ``JSONDecodeError``) is counted and
 never fatal: all ``n`` sentences are attempted, so the failure rate is knowable.
-Failure labels are whitelisted by ``measure_latency._failure_kind`` and never
+Failure labels are whitelisted by ``scripts.failure_kind`` and never
 carry a response body, URL or raw exception text.
 
 Corpus choice (invariant this module serves): token cost must be measured across
@@ -27,7 +27,7 @@ import pathlib
 import sys
 from typing import Dict
 
-from src.measure_latency import _failure_kind
+from scripts.failure_kind import failure_kind
 
 CORPUS = (
     "coffee 12",
@@ -77,7 +77,7 @@ def measure(sentences, n: int) -> int:
             call_llm.extract(sentence)
         except (call_llm.LlmTransportError, json.JSONDecodeError) as exc:
             failed += 1
-            kind = _failure_kind(exc)
+            kind = failure_kind(exc)
             tally[kind] = tally.get(kind, 0) + 1
             print("attempt %d/%d: failed (%s)" % (index, n, kind))
             continue

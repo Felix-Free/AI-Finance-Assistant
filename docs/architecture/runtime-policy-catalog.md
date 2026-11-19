@@ -383,9 +383,9 @@ threshold.
   so the review line and the routing decision agree. Each rejection line carries both
   `call_id` (join key) and `request_id` (grouping).
 
-#### Approved design not yet implemented — validated storage spend
+#### Validated storage spend — implemented on D's branch, not merged
 
-- **Intended boundary (approved by C, not implemented in D's current code):**
+- **Approved boundary:**
   `append_validated(record, expected_spent=None)` with
   - `total == expected_spent + amount`, and
   - `expected_spent >= already persisted cumulative spend`.
@@ -393,23 +393,16 @@ threshold.
   `expected_spent` would be a **numeric validation parameter, not a persisted record
   field**. Its purpose is to prevent **under-reporting prior spending**, which would
   otherwise let a record slip past the budget guard (`C-INV-003` / `RP-005`).
-- **Current implementation (verified):** `src/storage.py::append_validated(record)` takes a
-  **single `record` argument** and has no `expected_spent`; it validates the record's
-  field names and basic types and rejects a duplicate `call_id`, but it does **not** run
-  `policy_core` or compare the record against persisted cumulative spend. Direct callers
-  can therefore pass a negative amount, an out-of-vocabulary category, or a total above
-  the budget if the fields have acceptable types. The safety contract requires callers to
-  use `pipeline.process` and not bypass `policy_core`; the storage entry point itself does
-  **not** enforce that contract. A repository-wide search finds no `expected_spent` in D's
-  tree.
-- **Consequence — budget-bypass gap (not secured):** `src/pipeline.py::process(spent=None,
-  budget_limit=...)` reads `storage.current_total()` **only when `spent is None`**. When a
-  caller supplies `spent`, that value is trusted and is passed straight to
-  `policy_core.validate_record`. Because neither `process` nor `append_validated` checks the
-  caller-supplied `spent` against the persisted cumulative total, a **lower
-  caller-supplied `spent` can weaken the cumulative budget check** (`C-INV-003` /
-  `RP-005`). This is a **known gap**, not a secured property; closing it requires
-  implementing the `expected_spent` boundary above.
+- **D-branch implementation (verified at `df729a9`, not merged):**
+  `src/storage.py::append_validated(record, expected_spent=None)` validates the
+  numeric parameter, rejects an `expected_spent` below persisted cumulative spend,
+  re-runs the policy guards, and checks `total == expected_spent + amount` before
+  appending. `src/pipeline.py::process` passes its effective `spent` value into this
+  parameter. The implementation and its offline tests exist on D's branch only.
+- **Main-branch status:** The current `main` snapshot still has the older
+  `append_validated(record)` boundary, so the budget-bypass gap remains open on `main`
+  until D's branch is merged. The D implementation must not be described as present on
+  `main` before that merge.
 
 #### Repository-root anchoring of evidence paths (verified per module)
 

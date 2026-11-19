@@ -10,7 +10,7 @@ A failed attempt (``LlmTransportError`` or ``JSONDecodeError``) is counted,
 never fatal: the loop always runs all ``n`` attempts and only successful samples
 feed the percentiles, each of which prints its own ``(n=ok)``. A failure is not
 written to logs/latency.jsonl; its evidence is already in logs/llm_calls.jsonl.
-Failure labels are whitelisted (``_failure_kind``) and never carry a response
+Failure labels are whitelisted (``failure_kind``) and never carry a response
 body, URL or raw exception text.
 
 Percentile method: nearest-rank. For n sorted samples, the p-th percentile is
@@ -29,6 +29,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from typing import Dict
+
+from scripts.failure_kind import failure_kind
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 LATENCY_PATH = _REPO_ROOT / "logs" / "latency.jsonl"
@@ -49,32 +51,6 @@ def _append_sample(sample: dict) -> None:
         fh.write(json.dumps(sample, ensure_ascii=False) + "\n")
 
 
-_TIMEOUT_MARKERS = ("timeout", "timed out")
-_RESOLUTION_MARKERS = ("name resolution", "name or service not known",
-                       "nodename nor servname", "temporary failure in name")
-
-
-def _failure_kind(exc) -> str:
-    """Whitelisted failure label; never carries a body, URL or raw repr (M4).
-
-    Allowed shapes: ``http <status> (<Class>)``, ``transport: read timeout
-    (<Class>)``, ``transport: name resolution (<Class>)``, ``transport: other
-    (<Class>)``, ``not_json``.
-    """
-    name = type(exc).__name__
-    if isinstance(exc, json.JSONDecodeError):
-        return "not_json"
-    status_code = getattr(exc, "status_code", None)
-    if isinstance(status_code, int) and not isinstance(status_code, bool):
-        return "http %d (%s)" % (status_code, name)
-    text = str(exc).lower()
-    if any(marker in text for marker in _TIMEOUT_MARKERS):
-        return "transport: read timeout (%s)" % name
-    if any(marker in text for marker in _RESOLUTION_MARKERS):
-        return "transport: name resolution (%s)" % name
-    return "transport: other (%s)" % name
-
-
 def measure(n: int) -> int:
     from src import call_llm
 
@@ -87,7 +63,7 @@ def measure(n: int) -> int:
             call_llm.extract(PROBE_TEXT)
         except (call_llm.LlmTransportError, json.JSONDecodeError) as exc:
             failed += 1
-            kind = _failure_kind(exc)
+            kind = failure_kind(exc)
             tally[kind] = tally.get(kind, 0) + 1
             print("attempt %d/%d: failed (%s)" % (index, n, kind))
             continue
