@@ -5,14 +5,36 @@
 > record, or an unwritable log. Distinct from `invariants.md`, which defines the business
 > rules that must never be violated.
 >
-> Status: **Phase 1 · C-Security (transcript 60339160); extended in Phase 2 (§5).**
+> Status: **Phase 1 · C-Security (transcript 60339160); extended in Phase 2 (§5);
+> re-structured in Phase 3 (§2, §6).**
 > Role C defines the trigger, action and degradation; role D implements; role E verifies.
 > Phase 1 policy ids RP-001..RP-006 are retained. Phase 2 clarifies RP-001/002 against
 > D's implemented failure classification and adds **RP-007 (storage boundary failure)**
-> plus the `call_id`, token, storage-failure and NFR-006 evidence contracts.
+> plus the `call_id`, token, storage-failure and NFR-006 evidence contracts. Phase 3 keeps
+> every Phase 1/Phase 2 statement, restates each policy in the same seven-field structure
+> (Trigger / Action / Execution order / State-change guarantee / Evidence and logging /
+> Implementation seam / Test-evidence status), and tags each field with its provenance.
+
+### Provenance tags (Phase 3)
+
+Every sub-field below carries one of these tags so a reader can tell *how far* a claim is
+backed on the current branch:
+
+| Tag | Meaning |
+|---|---|
+| `code-confirmed` | Verified by reading the code that is **identical to `origin/main`** on this branch (`src/` and `test/` are byte-identical to `origin/main` `6997cef`; `git diff origin/main -- src test` is empty). |
+| `doc-only (unmerged)` | Defined here as the contract, but the implementing code lives only on an **unmerged** D branch; it is **not present** on this branch or on `origin/main`. |
+| `pending D` | Behaviour the implementation must provide but that C has **not** yet confirmed with D; not asserted as implemented. |
+
+> **Branch reality (read this before RP-007).** This branch and `origin/main` contain only
+> `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py` (plus `src/__init__.py`).
+> There is **no `src/storage.py`** on this branch. Any sentence in this catalog that names
+> `src/storage.py`, a stored `data/records.jsonl`, `call_id` / `request_id` / `session_id`,
+> `tokens` / `usage_source` / `request_made`, or `expected_spent` describes an **unmerged
+> design**, not code you can run here. Those sentences are retained for history and are
+> tagged `doc-only (unmerged)` or `pending D`; they must not be read as implemented.
 
 ---
-
 ## 1. Action vocabulary
 
 | Action | Meaning |
@@ -23,68 +45,79 @@
 | `retry` | the call may be repeated, bounded; never on an invariant violation |
 | `quarantine` | record is set aside for audit but cannot be used to change state |
 
-A rejected record must never partially affect state: validation happens **before** any
-write (`structural-constraints.md §4`).
+A rejected record must never partially affect normal business state or storage writes:
+validation happens **before** any write to normal business data or storage
+(`structural-constraints.md §4`). Writing the raw model-output audit line to
+`logs/llm_calls.jsonl` happens **before** policy validation; this is intentional audit
+logging and is **not** a business-state mutation, so it is out of scope for this rule.
 
 ---
 
 ## 2. Policies
 
+> **Structure (Phase 3).** Each policy is listed with the same seven fields. The normative
+> Phase 1/Phase 2 text is preserved inside those fields; each field is tagged with its
+> provenance (`code-confirmed` / `doc-only (unmerged)` / `pending D`) so branch reality is
+> explicit. When a field mixes provenances, the mixed parts are called out inline.
+
 ### RP-001 — Model returns invalid JSON
 
-- **Trigger:** the model's content cannot be parsed by `json.loads` (invalid JSON syntax).
-- **Action:** surface `JSONDecodeError`; do not retry.
-- **Degradation:** log `error="not_json"` with the raw text; do not use the result.
-  `call_llm.py` re-raises the `JSONDecodeError`.
-- **Evidence:** one `logs/llm_calls.jsonl` line: `input`, `raw`, `parsed=null`, `error`.
+- **Trigger** — `code-confirmed`: the model's content cannot be parsed by `json.loads` (invalid JSON syntax). `src/call_llm.py::extract` calls `json.loads(raw)` at `src/call_llm.py:149`.
+- **Action** — `code-confirmed`: surface `JSONDecodeError`; do not retry. `extract` re-raises the `JSONDecodeError` (`src/call_llm.py:148-154`).
+- **Execution order** — `code-confirmed`: parse attempt → on failure, append one call-log line → re-raise. No invariant check runs for non-JSON content.
+- **State-change guarantee** — `code-confirmed`: no record is produced; no `review.jsonl` line; on this branch nothing is persisted (there is no storage write path).
+- **Evidence and logging** — `code-confirmed` (partial): one `logs/llm_calls.jsonl` line `{input, raw, parsed=null, error="not_json"}` is written (`src/call_llm.py:152-153`). This path **does** emit all four required fields. The "four fields on every path" guarantee is a separate RP-004 gap (see RP-004).
+- **Implementation seam** — `code-confirmed`: `src/call_llm.py::extract` (`json.loads` block).
+- **Test-evidence status** — `code-confirmed`: covered by `test/offline/test_pipeline_seam.py::test_seam_non_json_is_logged_then_reraised` (asserts one line and `error=="not_json"`).
 
-> **Valid JSON that is not an object (current D behavior).** A JSON array, string or
-> number parses successfully, so it does **not** trigger RP-001 or `not_json`.
-> `call_llm.extract` logs the parsed value with `error=null` and returns it without
-> `__call_id__`. In the normal `pipeline.process` path, the missing id raises
-> `StorageError("missing call_id from model client")` before `policy_core` runs; no
-> policy review line or stored record is produced. Calling `policy_core.validate_record`
-> directly with a non-object instead raises `PolicyError(code="policy:amount")`.
-> This difference in failure classification is an **unresolved D implementation gap**;
-> `StorageError` here does not mean a storage write was attempted.
+> **Valid JSON that is not an object (doc-only / unmerged + branch note).** A JSON array,
+> string or number parses successfully, so it does **not** trigger RP-001 or `not_json`.
+> On **this branch** (`origin/main`-identical code) `call_llm.extract` logs the parsed
+> value with no `error` key and returns it; it adds **no** `__call_id__` because `call_id`
+> does not exist on this branch (`doc-only (unmerged)`). In the normal `pipeline.process`
+> path on this branch, the returned non-object flows straight to
+> `policy_core.validate_record`, which raises `PolicyError(code="policy:amount")` for a
+> non-dict (`src/policy_core.py:97-99`) — so a valid-but-non-object JSON is classified as a
+> **policy rejection**, not a `StorageError`. The Phase 2 text's claim that a
+> `StorageError("missing call_id from model client")` is raised before `policy_core` is
+> **`doc-only (unmerged)`** (it describes D's unmerged branch, which adds `call_id`) and is
+> **not** what this branch does. The difference in failure classification remains an
+> **unresolved D implementation gap**; `pending D`.
 
 ### RP-002 — Model-client configuration / transport / response-protocol failure
 
-- **Trigger:** missing base URL or API key before HTTP; network error, timeout, auth
-  failure, non-200 status, or an HTTP 200 response
-  whose envelope is not valid JSON, lacks the expected `choices[0].message.content`, or
-  has a non-string `content`.
-- **Action:** surface `LlmTransportError`; do not persist anything.
-- **Retry:** no automatic retry for configuration, transport, HTTP-status or response-envelope
-  failure. D's `extract` makes at most one HTTP attempt per invocation and propagates the
-  failure after writing its call log when that log is writable.
-- **Degradation:** distinct from a policy rejection so tests can tell "correctly refused"
-  from "crashed" (`structural-constraints.md §4`). A protocol error concerns the HTTP
-  response envelope; invalid JSON inside a valid string `content` follows RP-001 instead.
-- **Evidence:** one `logs/llm_calls.jsonl` line. For missing configuration, `error` is
-  `config: missing base url or key` and `request_made` is `false`. For HTTP-attempt failures,
-  `error` begins `transport:`, `http <code>` or `protocol:` and `request_made` is `true`.
-  In both cases `raw`, `parsed` and `tokens` are `null`. D-02 (§5) tracks the unresolved
-  risk that some error text includes raw exception or response details.
+- **Trigger** — `code-confirmed`: missing base URL or API key before HTTP (`src/call_llm.py:123`); network error, timeout, auth failure, non-200 status (`src/call_llm.py:75-83`), or an HTTP 200 response whose envelope is not valid JSON, lacks `choices[0].message.content`, or has a non-string `content` (`src/call_llm.py:85-102`).
+- **Action** — `code-confirmed`: surface `LlmTransportError`; do not persist anything.
+- **Execution order** — `code-confirmed`: configuration check first (before HTTP); otherwise attempt HTTP once, parse the envelope, then classify. No automatic retry for configuration, transport, HTTP-status or response-envelope failure — `extract` makes at most one HTTP attempt per invocation and propagates the failure after writing its call log when that log is writable.
+- **State-change guarantee** — `code-confirmed`: distinct from a policy rejection so tests can tell "correctly refused" from "crashed" (`structural-constraints.md §4`). No record is produced.
+- **Evidence and logging** — mixed: `code-confirmed` — on this branch the call-log line is written but **not** with the full field set: the configuration-failure path writes only `{input, error="config: missing base url or key"}` (`src/call_llm.py:124`, no `raw`/`parsed`), and the HTTP-attempts failure path writes `{input, error=..., [body]}` (`src/call_llm.py:140-145`, no `raw`/`parsed`). The Phase 2 fields `request_made`, `tokens`, `raw`, `parsed=null` on these paths are **`doc-only (unmerged)`** and **not** emitted on this branch. D-02 (§5) still tracks the unresolved risk that some error text includes raw exception or response details — `code-confirmed` that `str(exc)` is used on this branch (`src/call_llm.py:76,89,96`).
+- **Implementation seam** — `code-confirmed`: `src/call_llm.py::_post`, `src/call_llm.py::extract`.
+- **Test-evidence status** — `code-confirmed`: `test_seam_transport_error_logs_once`, `test_config_error_logs_once`, `test_post_raises_on_malformed_envelope`. (These assert one line and the raised error; they do not assert a full four-field schema.)
 
 ### RP-003 — Invariant violation
 
-- **Trigger:** any of `C-INV-001`, `C-INV-002`, `C-INV-003` fails.
-- **Action:** `reject`; raise `PolicyError`.
-- **Degradation:** stored data and running totals stay unchanged; the record is not
-  applied. `C-INV-002` and `C-INV-003` additionally flag `REVIEW`.
-- **Evidence:** log `error="policy:<subject>"` with the offending field and value in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
+- **Trigger** — `code-confirmed`: any of `C-INV-001`, `C-INV-002`, `C-INV-003` fails, raised by `src/policy_core.py::validate_record` → `enforce_amount`/`enforce_category`/`enforce_budget`.
+- **Action** — `code-confirmed`: `reject`; raise `PolicyError`.
+- **Execution order** — `code-confirmed`: `pipeline.process` calls `call_llm.extract` → `policy_core.validate_record` (amount → category → budget); on `PolicyError`, append one `logs/review.jsonl` line, then re-raise (`src/pipeline.py:49-66`).
+- **State-change guarantee** — `code-confirmed`: validation runs before any write to normal business data or storage — that is the state this guarantee covers; on this branch there is no storage write, so the record cannot be applied. The raw model-output audit line is written to `logs/llm_calls.jsonl` **before** policy validation by design (in `call_llm.extract`); that audit logging is not a business-state mutation and is not what this guarantee governs. `C-INV-002` and `C-INV-003` flag `REVIEW`; `C-INV-001` does not.
+- **Evidence and logging** — `code-confirmed` (partial): one `logs/review.jsonl` line with `{error="policy:<subject>", amount, category, spent, total, review}` (`src/pipeline.py:58-65`). The Phase 2 wording "carrying the relevant `call_id` … and its `request_id`" is **`doc-only (unmerged)`**: this branch's review line has **no** `call_id`/`request_id` (the test asserts the exact key set `{error, amount, category, spent, total, review}`).
+- **Implementation seam** — `code-confirmed`: `src/policy_core.py::validate_record`; `src/pipeline.py::process`, `_append_review`.
+- **Test-evidence status** — `code-confirmed`: `test_policy_core_smoke.py::test_validate_record_stops_at_first_failure`, `test_validate_record_rejects_non_dict`; `test_pipeline_seam.py::test_policy_rejection_writes_one_review_line` (three invariants). Review-write-failure behaviour is untested (see RP-004/RP-007).
 
 ### RP-004 — Logging integrity (fail-closed)
 
-- **Trigger:** the per-call audit line cannot be written, or a call would produce zero or
-  more than one line, or the four required fields (`input`, `raw`, `parsed`, `error`)
-  are renamed/dropped.
-- **Action:** the result of that call **must not be used**. Effectively `reject`.
-- **Degradation:** raise rather than proceed; the HTTP attempt may already have happened,
-  but its unlogged result cannot be used or reach storage. This is a **runtime policy**, not a
-  business invariant, because it protects the audit trail rather than a spend outcome.
-- **Evidence:** the failure is surfaced to the caller; no unlogged result reaches storage.
+- **Trigger** — mixed: `code-confirmed` that the per-call audit line cannot be written (`_append_log` `OSError` → `LlmTransportError`, `src/call_llm.py:45-52`), and that the four required fields (`input`, `raw`, `parsed`, `error`) are **not consistently emitted** (see Evidence). `doc-only (unmerged)`/"would produce zero or more than one line, or the fields are renamed/dropped" — the one-line-per-attempt guarantee and field-name protection are contract statements, not separately enforced here.
+- **Action** — `code-confirmed`: the result of a call whose log cannot be written **must not be used** — `_append_log` raises `LlmTransportError` and `extract` propagates it, so the result is never returned. Effectively `reject`.
+- **Execution order** — `code-confirmed`: log write happens **before** any return or re-raise on each path (`src/call_llm.py:124, 145, 152, 156`).
+- **State-change guarantee** — `code-confirmed`: an unwritable call log prevents the result from being returned; no unlogged result can reach a caller (and there is no storage on this branch).
+- **Evidence and logging** — **`code-confirmed` gap (D-dependent):** the three paths do **not** emit the same four fields on this branch:
+  - success path writes `{input, raw, parsed}` and **omits `error`** (`src/call_llm.py:156`);
+  - configuration-failure path writes `{input, error}` and **omits `raw`, `parsed`** (`src/call_llm.py:124`);
+  - transport/HTTP/protocol-failure path writes `{input, error[, body]}` and **omits `raw`, `parsed`** (`src/call_llm.py:140-145`).
+
+  So RP-004's "four required fields on every path" is **not satisfied** by the current code. This is recorded as a **D-dependent implementation gap, not a completed invariant.** The Phase 2 statement that the four fields are "never renamed or removed" and that Phase 2 fields (`call_id`, `tokens`, `session_id`, `request_id`, `usage_source`, `request_made`) are additive is **`doc-only (unmerged)`** — none of those fields exist on this branch.
+- **Implementation seam** — `code-confirmed`: `src/call_llm.py::_append_log`; call sites in `extract`.
+- **Test-evidence status** — mixed: the fail-closed `OSError`→`LlmTransportError` branch is **not exercised by any test** (`# pragma: no cover`, `src/call_llm.py:51`); the field-schema gap has no test. `test-evidence: none` for both. Do **not** cite the passing smoke suite as proof of fail-closed behaviour.
 
 > Note: `call_llm.py::_append_log` already implements the fail-closed write
 > (`AGENTS.md §3`, `structural-constraints.md §5`). RP-004 records it as a policy and
@@ -94,47 +127,47 @@ write (`structural-constraints.md §4`).
 > `error` — are never renamed or removed. The Phase 2 fields are **additive**:
 > `call_id`, `tokens`, `session_id`, `request_id`, `usage_source`, `request_made`. A
 > reader that ignores them still sees the four original fields unchanged.
+> *Provenance:* this additive-field contract is `doc-only (unmerged)`; those fields are
+> absent on this branch, and even the original four are not consistently emitted (see the
+> Evidence field above).
 
 ### RP-005 — Budget exceeded (guard for C-INV-003)
 
-- **Trigger:** accepted total + new amount > `budget_limit`.
-- **Action:** `reject` + `REVIEW`.
-- **Degradation:** previous total is authoritative; the new record is never applied.
-- **Evidence:** log `error="policy:budget"` with amount and running total in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
+- **Trigger** — `code-confirmed`: accepted total + new amount > `budget_limit` (`src/policy_core.py::enforce_budget`, strictly greater; equality allowed).
+- **Action** — `code-confirmed`: `reject` + `REVIEW` (`PolicyError(code="policy:budget", review=True)`, `src/policy_core.py:84-87`).
+- **Execution order** — `code-confirmed`: after amount/category pass, `enforce_budget` runs; a failure produces one `logs/review.jsonl` line then re-raises.
+- **State-change guarantee** — `code-confirmed`: the previous total is authoritative; the new record is never applied (no storage write on this branch).
+- **Evidence and logging** — `code-confirmed` (partial): `error="policy:budget"` with amount and running total in `logs/review.jsonl`. The "carrying the relevant `call_id` … `request_id`" wording is **`doc-only (unmerged)`** (no such fields on this branch).
+- **Implementation seam** — `code-confirmed`: `src/policy_core.py::enforce_budget`; `src/pipeline.py::process`.
+- **Test-evidence status** — `code-confirmed`: `test_policy_core_smoke.py::test_inv003_equality_is_allowed`, `test_inv003_over_budget_rejected_with_review`; `test_policy_rejection_writes_one_review_line[inv003-budget]`.
 
 ### RP-006 — Category out of vocabulary (guard for C-INV-002)
 
-- **Trigger:** category not in the closed whitelist.
-- **Action:** `reject` + `REVIEW`.
-- **Degradation:** never coerce, never fuzzy-match, never ask the model to fix it.
-- **Evidence:** log `error="policy:category"` with the rejected value in `logs/review.jsonl`, carrying the relevant `call_id` (the evidence-join key) and its `request_id` (user-request grouping) so the line joins to its `llm_calls` record.
+- **Trigger** — `code-confirmed`: category not in the closed whitelist (`src/policy_core.py::CATEGORY_WHITELIST`, case-sensitive exact match).
+- **Action** — `code-confirmed`: `reject` + `REVIEW` (`PolicyError(code="policy:category", review=True)`).
+- **Execution order** — `code-confirmed`: after amount passes, `enforce_category` runs; a failure produces one `logs/review.jsonl` line then re-raises.
+- **State-change guarantee** — `code-confirmed`: never coerce, never fuzzy-match, never ask the model to fix it; the record is discarded (no storage write on this branch).
+- **Evidence and logging** — `code-confirmed` (partial): `error="policy:category"` with the rejected value in `logs/review.jsonl`. The "carrying the relevant `call_id` … `request_id`" wording is **`doc-only (unmerged)`**.
+- **Implementation seam** — `code-confirmed`: `src/policy_core.py::enforce_category`; `src/pipeline.py::process`.
+- **Test-evidence status** — `code-confirmed`: `test_inv002_rejects_out_of_vocabulary`, `test_inv002_accepts_every_whitelisted_category`; `test_policy_rejection_writes_one_review_line[inv002-category]`.
 
 ### RP-007 — Storage boundary failure
 
-- **Trigger:** storage rejects a new record's shape or duplicate `call_id`, cannot read
-  existing records (including malformed JSON or a nonnumeric stored amount when computing
-  the current total), or cannot write a validated record (I/O error or unwritable path).
-  The uncaught type/serialization cases below are required to follow RP-007 but do not
-  currently raise `StorageError`.
-- **Action:** raise an **independent `StorageError`**. It is an infrastructure failure, not
-  a rule decision.
-- **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
-  rejection (RP-003/005/006). A storage failure **must not** be rewritten as `policy:*`.
-- **No partial state (C's required boundary — implementation verification pending):** no
-  partial state change is allowed; the previous stored state remains authoritative (the
-  write either completes or the prior state stands). **Current status:** D's
-  `storage.append_validated` uses an append-mode write that raises `StorageError` on
-  `OSError`, but the code does **not** demonstrate rollback of bytes written before the
-  error. The boundary is therefore **required by C and not yet verified by the
-  implementation**; it must not be read as confirmed.
-- **Not a policy rejection:** a storage failure is **not** a normal policy rejection and
-  **must not** create a policy review line (`logs/review.jsonl`).
-- **Evidence:** the required failure signal is `StorageError` to the caller. A read or
-  validation failure stops before a new storage record is appended. A write failure has
-  the separate no-partial-state requirement above, which is not yet verified. The two
-  uncaught `TypeError` paths below do not yet meet this signal contract.
+> **`pending D` — no storage module exists on this branch.** This branch and `origin/main`
+> contain no `src/storage.py`, no `data/records.jsonl`, and no `call_id`. Every statement
+> below that references storage behaviour describes an **unmerged design** and is *not*
+> code you can run on this branch. RP-007 remains a **required policy**; its implementation
+> is pending D and is not asserted as implemented anywhere here.
 
-**Unresolved D exception paths (code review, not test-verified).** In
+- **Trigger** — `doc-only (unmerged)` / `pending D`: storage rejects a new record's shape or duplicate `call_id`, cannot read existing records (including malformed JSON or a nonnumeric stored amount when computing the current total), or cannot write a validated record (I/O error or unwritable path). The uncaught type/serialization cases recorded from D's branch are required to follow RP-007 but (on that branch) do not currently raise `StorageError`.
+- **Action** — `pending D`: raise an **independent `StorageError`**. It is an infrastructure failure, not a rule decision.
+- **Execution order** — `pending D`: (read current total → validate → append) is the intended order; it is defined only on D's unmerged branch and is **not** present on this branch.
+- **State-change guarantee** — `pending D`: **No partial state** is allowed — the previous stored state remains authoritative (the write either completes or the prior state stands). *Reserved prefix:* `policy:*` is reserved **only** for deterministic policy/rule rejection (RP-003/005/006); a storage failure **must not** be rewritten as `policy:*`. *Not a policy rejection:* a storage failure must not create a policy review line (`logs/review.jsonl`). No part of this is demonstrated on this branch.
+- **Evidence and logging** — `pending D`: the required failure signal is `StorageError` to the caller; a read or validation failure stops before a new record is appended; a write failure has the separate no-partial-state requirement. The exact storage-failure evidence detail is **not defined** (see below) and must not be invented.
+- **Implementation seam** — `doc-only (unmerged)`: `src/storage.py` (absent here). `src/pipeline.py::process` on this branch has **no** storage call.
+- **Test-evidence status** — `pending D`: no test on this branch; the storage tests and the skipped `test_evidence_join.py` live only on D's unmerged branch. **No test run on this branch proves RP-007.**
+
+**Unresolved D exception paths (code review of D's branch, not test-verified, not on this branch).** In
 `src/storage.py::_existing_call_ids`, a persisted JSON object with an unhashable
 `call_id` (for example a list) reaches `ids.add(...)` and raises `TypeError`; the read
 path does not convert it to `StorageError`. Missing stored `call_id` values are skipped,
@@ -151,12 +184,18 @@ operation and surface as `StorageError` under RP-007; this conversion is **not i
 > absence of a `policy` review line; it does not invent a new log format. The precise
 > evidence record remains pending until the implementation/spec fixes it.
 
-**Rejection-evidence write failure (current D behavior).** If `pipeline._append_rejection`
+**Rejection-evidence write-failure (current *branch* behavior differs from D's branch).**
+The Phase 2 text records that on D's unmerged branch, if `pipeline._append_rejection`
 cannot append to `logs/review.jsonl`, D raises `storage.StorageError("evidence write
-failure: ...")` instead of returning the original `PolicyError`. No rejected record is
-persisted. This is an evidence-write failure, not an RP-007 record-storage write, and it
-does not create a successful review line. C's required behavior is fail-closed; atomicity
-of a partially written review line is not demonstrated by D's append-mode writer.
+failure: ...")` instead of returning the original `PolicyError` — that is *not* this
+branch's code and is `doc-only (unmerged)`. **On this branch** (`origin/main`-identical),
+`src/pipeline.py::_append_review` does **not** map the review-write `OSError` to a
+`StorageError`; it raises `PolicyError("cannot write review log: ...", code="policy:budget",
+review=True)` (`src/pipeline.py:27-31`). That means a **review evidence-write failure is
+currently misclassified as a budget policy rejection** — a genuine error-classification
+defect. No rejected record is persisted (there is no storage on this branch), but the
+misclassification is wrong: an infrastructure failure must not masquerade as `policy:budget`.
+This is recorded for D to fix (`pending D`); it is not fixed by this documentation task.
 
 ---
 
@@ -181,6 +220,15 @@ of a partially written review line is not demonstrated by D's append-mode writer
 After a failure is detected, no later result is accepted or stored. The call log is
 written after classification of model-client outcomes, including failure paths.
 
+> **Current-branch reconciliation (Phase 3, `code-confirmed`).** Steps 3 and 5 above, and
+> the `StorageError` half of step 4, are `doc-only (unmerged)` — they describe D's unmerged
+> branch. On **this branch** (`origin/main`-identical) the real order is:
+> (1) RP-002/001 model-client classification inside `extract`; (2) RP-004 call-log write,
+> then return/raise; (3) RP-003/005/006 via `policy_core.validate_record`; on `PolicyError`
+> a single `logs/review.jsonl` line is attempted. There is **no** storage read or append
+> (no `src/storage.py`), **no** `call_id` metadata step, and a review-write failure raises
+> `PolicyError(code="policy:budget")` (misclassified — see RP-007), not `StorageError`.
+
 ---
 
 ## 4. Definition of done for each policy
@@ -197,6 +245,17 @@ written after classification of model-client outcomes, including failure paths.
 
 ## 5. Phase 2 additions
 
+> **HISTORICAL / UNMERGED CONTRACT — NOT CURRENT-BRANCH IMPLEMENTATION.**
+> Everything in §5 (`call_id` / `request_id` / `session_id`, `tokens` / `usage_source` /
+> `request_made`, the ten-key logging schema, the pre-HTTP local-failure lifecycle, the
+> storage-failure contract, and the `call_id` evidence joins) describes **D's unmerged
+> branch**. **None of these exist on the current branch** (`feat/c-phase3-policy-60339160`,
+> `src/`/`test/` byte-identical to `origin/main` `6997cef`): `src/call_llm.py` here logs only
+> `{input, raw, parsed}` (success) or `{input, error[, body]}` (failures), and there is no
+> `uuid4`/`call_id`/`session_id`, no `tokens`/`usage_source`/`request_made`, and no
+> `src/storage.py`. These sections are recorded as the agreed Phase 2 **contract** for D to
+> implement; they must not be read as properties the current branch possesses.
+
 > **Scope.** Phase 2 introduces a `call_id` that joins a model call to its downstream
 > evidence, optional token accounting, an independent storage-failure error, and the
 > Phase 2 evidence-join contract supplementing NFR-006 log traceability. This section
@@ -208,6 +267,7 @@ written after classification of model-client outcomes, including failure paths.
 > measurements are E's. C defines the contracts only.
 
 ### Call identifiers
+*(historical / unmerged contract — `call_id` is absent on the current branch)*
 
 - **Generation.** `call_id` is generated **inside `src/call_llm.py`** as
   `uuid4().hex` — a 32-hex-character string for each `extract` attempt, including a
@@ -225,6 +285,7 @@ written after classification of model-client outcomes, including failure paths.
   `call_id` never rescues an unlogged call.
 
 ### LLM call logging
+*(historical / unmerged contract — the current branch does not emit these fields/schema)*
 
 - **Required fields, unchanged.** `input`, `raw`, `parsed` and `error` keep their names and
   meaning (RP-004). They are never renamed, dropped or reinterpreted.
@@ -255,6 +316,8 @@ written after classification of model-client outcomes, including failure paths.
   (RP-003/RP-005/RP-006), not here.
 
 #### 5.2.1 Approved additional metadata fields
+*(historical / unmerged contract — none of `session_id`, `request_id`, `usage_source`,
+`request_made`, `call_id`, or `tokens` exist on the current branch)*
 
 The user approved four further logging fields for Phase 2. They are **additive** next to
 the required four (`input`, `raw`, `parsed`, `error`) and the additional fields (`call_id`,
@@ -300,7 +363,7 @@ Preserved requirements (unchanged by these fields):
 - `usage_source` must stay consistent with `tokens`: `gateway`/`partial` imply token data
   exists, `missing` implies it does not.
 
-#### 5.2.2 Pre-HTTP local failures (confirmed)
+#### 5.2.2 Pre-HTTP local failures (confirmed on D's branch; historical / unmerged here)
 
 A missing base URL or API key stops the call before the HTTP attempt but **still writes
 exactly one `llm_calls.jsonl` line**. The record uses the same ten-key schema as a normal
@@ -320,6 +383,7 @@ configuration stops before the HTTP attempt. Any path that attempts the call rec
 `request_made = true`, even if the connection fails before the gateway receives it.
 
 ### Storage failure is not a policy rejection
+*(historical / unmerged contract — no `src/storage.py` exists on the current branch)*
 
 > This section is the contract rationale; the formal policy entry is **RP-007** (§2).
 
@@ -340,6 +404,7 @@ configuration stops before the HTTP attempt. Any path that attempts the call rec
   `review.jsonl` policy line.
 
 ### Evidence linkage by `call_id`
+*(historical / unmerged contract — `call_id` and `data/records.jsonl` are absent on the current branch)*
 
 Main's NFR-006 measures **log coverage**: the percentage of model calls with a
 `llm_calls.jsonl` line and policy rejections with a `review.jsonl` line. Its numeric
@@ -420,6 +485,13 @@ It is **not** used everywhere: `src/report_tokens.py` still defaults to a **rela
 by an argument), and `src/measure_tokens.py` defines no path of its own. The anchoring
 claim applies only to the four modules listed above.
 
+> **Branch caveat (Phase 3).** Only `src/call_llm.py` and `src/pipeline.py` exist on this
+> branch, and **neither** anchors its path: `LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")`
+> (`src/call_llm.py:22`) and `REVIEW_PATH = pathlib.Path("logs/review.jsonl")`
+> (`src/pipeline.py:18`) are **relative** and therefore working-directory dependent. The
+> `parents[1]` anchoring and the `src/storage.py` / `src/measure_latency.py` / D-branch
+> modules named above are `doc-only (unmerged)`.
+
 #### D-02 — error logging short-code rule (unresolved implementation debt)
 
 Short, **secret-safe** error information in logs is a **security requirement** (Phase 1,
@@ -429,5 +501,153 @@ current `src/call_llm.py::extract` constructs `error` using full `str(exc)` for 
 and protocol failures; `_append_log` then writes that record. This is an **unresolved D
 implementation debt (D-02)**: the security requirement stands and the implementation
 has not yet been brought into line with it.
+
+---
+
+## 6. Phase 3 C audit summary (branch reality)
+
+> Scope: `feat/c-phase3-policy-60339160`. `src/` and `test/` are byte-identical to
+> `origin/main` (`6997cef`); `git diff origin/main -- src test` is empty. This section maps
+> each policy to *what the code shows* vs *what tests prove* vs *what is unverified*. It
+> does not add new policy ids or invariants; no new RP-### was found necessary because no
+> new runtime failure path was identified beyond those already catalogued.
+
+| Policy | Code-confirmed on this branch? | Proven by a test on this branch? | Unverified / pending |
+|---|---|---|---|
+| RP-001 invalid JSON → log + re-raise, no retry | Yes (`extract`) | Yes (`test_seam_non_json_is_logged_then_reraised`) | — |
+| RP-002 config/transport/HTTP/envelope → `LlmTransportError`, no retry | Yes (`_post`, `extract`) | Yes (three seam tests) | Error text uses `str(exc)` (D-02, secret-leak risk) |
+| RP-003 invariant violation → `PolicyError` | Yes (`validate_record`) | Yes (smoke + seam) | Review-write-failure classification (below) |
+| RP-004 fail-closed call log | Yes, fail-closed on `OSError`→`LlmTransportError`; **field schema incomplete** | **No** (OSError branch `# pragma: no cover`; no schema test) | Full four-field emission on all paths (D gap); fail-closed test |
+| RP-005 budget exceeded → reject + REVIEW | Yes (`enforce_budget`) | Yes | `call_id`/`request_id` on review line are doc-only |
+| RP-006 category out of vocab → reject + REVIEW | Yes (`enforce_category`) | Yes | `call_id`/`request_id` on review line are doc-only |
+| RP-007 storage boundary → `StorageError` | **No** (no `src/storage.py` on this branch) | **No** | Entire policy pending D |
+
+**Findings recorded for D (not fixed here, `pending D`):**
+
+1. **Logging-schema gap (RP-004).** Success / config-failure / transport-failure paths do
+   not all emit the four required fields `input`, `raw`, `parsed`, `error`
+   (`src/call_llm.py:124, 140-145, 156`). Four-field coverage is a requirement, not a met
+   invariant. This is a D-dependent implementation gap.
+2. **Review-write misclassification (RP-003/RP-007).** `pipeline._append_review` maps a
+   review-write `OSError` to `PolicyError(code="policy:budget", review=True)`
+   (`src/pipeline.py:27-31`) instead of an independent infrastructure error. An evidence
+   write failure must not be reported as a business-rule rejection.
+3. **Relative evidence paths.** `LOG_PATH`/`REVIEW_PATH` are working-directory-relative
+   (`src/call_llm.py:22`, `src/pipeline.py:18`); not repository-root anchored on this branch.
+4. **Valid-JSON-not-object classification (RP-001).** On this branch a JSON array/string/
+   number reaches `validate_record` and is rejected as `policy:amount`; the unmerged design
+   would raise `StorageError` earlier. Either way it must not become a valid record; the
+   classification is left to D to confirm.
+
+**Security principles preserved (explicit):** **No model output may affect normal business
+data or storage before passing through `policy_core`; audit logging of raw model output
+occurs before policy validation by design.** Prompts are never the enforcement mechanism;
+no hidden retry, unsafe default, fuzzy match or silent coercion is introduced by this
+catalog; system-generated audit metadata (`call_id`) must never be trusted from model output
+(doc-only, since `call_id` is absent on this branch); unlogged/unvalidated/partially written
+results fail closed.
+
+---
+
+## 7. Phase 3 D design confirmation — design-confirmed, implementation-unmerged
+
+> **Banner — read first.**
+> This section records **D's confirmed target design** from D's reply. It is
+> **design-confirmed but implementation-unmerged**. **`src/storage.py` is absent on the current
+> C branch** (`feat/c-phase3-policy-60339160`; `src/`/`test/` byte-identical to `origin/main`
+> `6997cef`). **None of the behaviour below is `code-confirmed` on this branch.** It must not
+> be promoted to code-confirmed here, and the current branch still contains the known
+> review-write misclassification (see §6 finding 2 and RP-007) that **this documentation
+> update does not fix**.
+>
+> **D-reported references (not independently verified):** branch `feat/D-phase3-hardening`;
+> interim implementation commit `1332483`; log commit `4281ea3`. Labelled
+> *D-reported / interim / not independently verified*. The final commit after the concurrency
+> fix and ADR-003 is still pending; E's regression results are still pending.
+
+The existing **§6 branch-reality table is preserved unchanged and still governs what the
+current branch actually does.** This §7 is the confirmed *target*; §6 is *current reality*.
+Where they differ (e.g. review-write failure, logging schema), §6 wins for this branch.
+
+### 7.1 Process path and model boundary (design-confirmed)
+
+- `pipeline.process()` is the **only** business entry point.
+- `call_llm.extract()` returns **unvalidated** parsed output and only adds system metadata
+  (e.g. `call_id`); it never trusts model content.
+- `src/call_llm.py` is the **only** model-network entry point.
+- Normal business-data and storage writes happen **only after** `policy_core` validation.
+
+### 7.2 PolicyError vs StorageError boundary (design-confirmed)
+
+- **Storage performs defense-in-depth validation.** Direct storage invariant failures for
+  amount / category / budget remain **`PolicyError(policy:*)`**, *not* `StorageError`, so an
+  illegal record cannot enter via a future direct caller.
+- **Storage I/O, record shape, duplicate `call_id`, arithmetic-consistency, and persistence
+  failures raise an independent `StorageError`.**
+- `policy:*` stays reserved for deterministic rule rejection; a storage failure must never be
+  rewritten as `policy:*`, and an invariant failure must never be reported as `StorageError`.
+
+### 7.3 Review evidence: direct storage vs pipeline (design-confirmed)
+
+- **Direct storage calls do not write review evidence.**
+- **Pipeline-originated policy rejection** attempts exactly **one** `logs/review.jsonl`
+  line; if that write fails, raise **`StorageError`** and produce no normal data.
+- This supersedes the current branch's misclassification (`pipeline._append_review` raising
+  `PolicyError(code="policy:budget")`, `src/pipeline.py:27-31`), which remains unfixed pending
+  D's implementation.
+
+### 7.4 Persisted spend authority and `expected_spent` (design-confirmed)
+
+- **Persisted storage cumulative spend is authoritative.**
+- **`expected_spent` is a validation parameter, not a persisted field.**
+- `expected_spent` **below** persisted cumulative spend → **`StorageError`**; a **higher**
+  value is allowed and stricter (`total == expected_spent + amount` must hold).
+- **Equality at the budget limit is allowed**; **over-budget** raises
+  `PolicyError(code="policy:budget", review=True)`.
+
+### 7.5 Fail-closed, no hidden retry (design-confirmed)
+
+- **Hidden retry is forbidden.**
+- **No catch-all conversion** may collapse distinct failure classes (config/transport/HTTP/
+  envelope vs policy vs storage).
+
+### 7.6 `call_id` semantics (design-confirmed; unverified here)
+
+- `call_id` is **system-generated**, cannot be overridden by model output, and is **removed
+  before `policy_core`**.
+- `request_id` = one user request; `call_id` = one model call; `session_id` = one process run.
+- Evidence joins: accepted `llm_calls.call_id == storage.call_id`; rejected
+  `llm_calls.call_id == review.call_id`.
+- These are **design-confirmed but remain unverified on the current C branch** (no `call_id`
+  here).
+
+### 7.7 Atomicity target (design-confirmed; not implemented/verified)
+
+- Target: **unique temporary file + a file lock** around read/check/write/replace, replacing
+  append-mode, so no partial state is ever visible. **Concurrency implementation, the
+  concurrency regression, ADR-003, and E's regression evidence remain pending.**
+
+### 7.8 Privacy / redaction (pending, not approved)
+
+- **Unredacted `input` / `raw` logging is NOT approved as the final design.** The four-field
+  logging schema is not an approval of unredacted content. `input`/`raw` may contain personal
+  financial data.
+- Two candidate paths for a later decision: (a) **minimization/redaction before persistence**,
+  or (b) an **enforceable synthetic-data-only runtime constraint**.
+- `StorageError` messages and evidence logs **must not** contain raw exception strings, URLs,
+  HTTP bodies, credentials, or sensitive data; a **safe short policy code** may be retained
+  separately if needed.
+
+### 7.9 Whitelist finality (pending B/C)
+
+- The **eight current categories are unchanged**. Final whitelist ownership/finality remains
+  **pending B/C confirmation**; **D must not change the whitelist independently.**
+
+### 7.10 What stays pending
+
+Concurrency implementation + regression, ADR-003, final commit, final merge, E's reproducible
+regression results, storage atomicity/no-partial-state proof, `call_id` joins, fail-closed
+tests, no-bypass tests, complete logging-schema tests, privacy/redaction policy, and final
+whitelist confirmation. **No item here is code-confirmed on the current branch.**
 
 ---

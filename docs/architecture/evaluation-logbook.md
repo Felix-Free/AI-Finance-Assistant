@@ -161,6 +161,14 @@ separate requirement.
 
 ### C-side storage security review
 
+> **HISTORICAL / UNMERGED — NOT CURRENT-BRANCH EVIDENCE.**
+> This review describes **D's unmerged branch** (`src/storage.py`, `data/records.jsonl`,
+> `call_id`). **`src/storage.py` does not exist on the current branch**
+> (`feat/c-phase3-policy-60339160`, `src/`/`test/` byte-identical to `origin/main` `6997cef`).
+> Nothing in this table is evidence from the current branch; it is retained for history and
+> must not be read as a property the current code possesses. Where this table says "what the
+> code shows", it means what D's unmerged branch showed, not this branch.
+
 A C review of the storage boundary, separated into **what the code shows** and **what tests
 have verified**. D has committed offline storage tests, but no committed test-run or
 measurement output proves these checks passed in the reviewed branch. The evidence-join
@@ -223,3 +231,141 @@ tests are skipped, so the join remains unverified.
   `usage_source`, missing-usage counts) are computed from the same `llm_calls` records;
   `gateway` usage is never treated as zero when usage is `missing`. The token aggregates are
   descriptive statistics only and do not receive a pass/fail threshold.
+
+---
+
+## 5. Phase 3 C audit and evidence
+
+> Scope: `feat/c-phase3-policy-60339160`. On this branch `src/` and `test/` are
+> **byte-identical to `origin/main`** (`6997cef`): `git diff origin/main -- src test` is
+> empty and the `git ls-tree` blob hashes match. There is **no `src/storage.py`**, no
+> `call_id` / `request_id` / `session_id`, no `tokens` / `usage_source` / `request_made` on
+> this branch. The evidence below is what a reader can re-check on this branch; it is
+> **not** a measurement of NFR-001/002/005/006, which stay `pending`.
+
+### 5.1 How this evidence was produced
+
+- **Static inspection** (`rg`, `git ls-tree`, `git diff origin/main -- src test`, `ast` import
+  scan) of `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py`, `test/offline/*.py`.
+- **One offline test run:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q`
+  at commit `4624bb7` → **41 passed, 1 warning** (`urllib3 v2 only supports OpenSSL 1.1.1+`
+  `NotOpenSSLWarning`), interpreter `Python 3.9.6` (`/usr/bin/python3`). A 41-test smoke pass
+  is **not** proof of fail-closed logging, `call_id` joins, storage atomicity, or no-bypass.
+
+### 5.2 Evidence table (description / policy → code path → test → command → result → status)
+
+| Item | Code path | Test(s) | Command | Result | Status |
+|---|---|---|---|---|---|
+| Deterministic policy-core authority | `src/policy_core.py:91` `validate_record` → `enforce_amount/category/budget` | `test_validate_record_stops_at_first_failure`, `test_validate_record_rejects_non_dict`, `test_validate_record_returns_normalised_record` | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q` | pass (within 41) | code + test observed |
+| Rejection routing `review` flag | `src/policy_core.py:40-69,84-87` | `test_inv002_rejects_out_of_vocabulary` (`review is True`), `test_inv001_rejects_invalid_amount` (`review is False`) | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q` | pass | code + test observed |
+| Fail-closed call log | `src/call_llm.py:45-52` `_append_log` raises `LlmTransportError` on `OSError` | **none** (`# pragma: no cover`) | — | not exercised | **gap** (matches trace-matrix ERR-004) |
+| Logging field-schema (four fields on all paths) | `src/call_llm.py:124,140-145,156` | **none** | — | success omits `error`; config/transport omit `raw`,`parsed` | **D gap** (see 5.3 #1) |
+| Default-deny permissions | `.opencode/permissions.jsonc` `"*":"deny"` | n/a (config) | read + diff vs `permission-model.md` | **consistent, no mismatch found** | reviewed |
+| Model-call boundary (only `call_llm` imports `requests`) | `src/call_llm.py:13`; `rg` shows no other `requests`/`urllib`/`httpx` in `src/` | `test_policy_core_has_no_io_imports` | `rg` + `pytest` | pass | code + test observed |
+| `call_id` / `request_id` / `session_id` | absent on this branch | — | `git ls-tree`, `rg` | absent | doc-only/unmerged |
+| Rejection evidence line | `src/pipeline.py:21-31,58-65` `_append_review`; fields `{error, amount, category, spent, total, review}` | `test_policy_rejection_writes_one_review_line` (3 params) | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q` | pass; exact key set asserted (no `call_id`) | code + test observed |
+| Review-write failure classification | `src/pipeline.py:27-31` raises `PolicyError(code="policy:budget")` on `OSError` | **none** | — | misclassified | **D gap** (see 5.3 #2) |
+| Storage boundary (RP-007) | no `src/storage.py` | none on branch | `git ls-tree origin/main` | absent | pending D |
+| Rejected records not persisted | on this branch there is no storage write at all; rejection re-raises after the review line | inferred from `src/pipeline.py:49-66` (no storage call) | — | code path shows no persistence | code only (trivially holds: no storage) |
+| Secret scanning (NFR-004) | tracked files | — | `git grep -E 'sk-[A-Za-z0-9]{16,}|Bearer [A-Za-z0-9]{20,}…'` this pass | no match | partial scan, not a full tooled scan |
+
+### 5.3 Remaining evidence gaps (must not be read as satisfied)
+
+1. **Logging field-schema (RP-004 / FR-008).** The success path (`extract` at
+   `src/call_llm.py:156`) omits `error`; the config-failure path (`:124`) and the
+   transport/HTTP/protocol path (`:140-145`) omit `raw` and `parsed`. The contract requires
+   all four fields (`input`, `raw`, `parsed`, `error`); the current code does not meet it on
+   every path. D-dependent implementation gap.
+2. **Review-write error classification.** `pipeline._append_review`
+   (`src/pipeline.py:27-31`) collapses an `OSError` into
+   `PolicyError(code="policy:budget", review=True)`. An infrastructure/evidence-write
+   failure must be independent of `policy:*`. D-dependent defect.
+3. **Fail-closed logging not tested.** No test triggers the `_append_log` `OSError` branch;
+   "if it cannot be logged, the result is not used" is code-reviewed, not verified by a test.
+4. **Complete no-bypass proof.** Only code review + `test_policy_core_has_no_io_imports`
+   support the scoped rule "no model output may affect normal business data or storage before
+   passing through `policy_core`; audit logging of raw model output occurs before policy
+   validation by design". No end-to-end test proves that no other caller can consume `extract`
+   output or write it without `validate_record` (there is no storage on this branch to test
+   against).
+5. **`call_id` evidence joins.** Absent on this branch (`doc-only/unmerged`); the
+   `test_evidence_join.py` referenced in Phase 2 is not present here and would be skipped on
+   D's branch. Not verified anywhere on this branch.
+6. **Storage atomicity / no partial state / direct-call protection / `spent` source of truth.**
+   Entirely `pending D` — no `src/storage.py` to review or test.
+7. **Secret scan.** Only an ad-hoc `git grep` pattern scan was run this session; no dedicated
+   secret-scanning tool/result is recorded, so NFR-004 stays `pending`.
+8. **Review of `(call_id)` joins on unmerged branch.** Not verified; see #5.
+
+### 5.4 Permission consistency check (this pass — no edit)
+
+`permission-model.md` §2 (rows and §3.1) and `.opencode/permissions.jsonc` were compared
+directly. Every §2 ✅/❌/⚠️ row maps to an `allow`/`deny`/`ask` entry (default `"*":"deny"`;
+`docs/req/**`, `.opencode/**`, `.agent/**`, `.github/**`, `transcripts/**`, `logs/**`
+denied for edit; `.env` denied read+write; `data/**`, `scripts/**`, `docs/measurements/**`
+and the three bash patterns present per §3.1; `git push/commit/reset --hard/clean` and
+`rm -rf` denied). **No mismatch was found.** No correction is proposed. (`.opencode` is
+inspect-only for C; it was not modified.)
+
+### 5.5 Status of NFRs after this audit (unchanged)
+
+NFR-001/002/003/005/006 remain `pending` (no independent measurement on this branch);
+NFR-004 remains `pending` (no tooled scan); NFR-007 remains `pending` (guard-removal
+mapping is E's, not run here). This section records **audit evidence and gaps**, not
+measurements, and does not promote any NFR.
+
+### 5.6 D design confirmation — coordination evidence (not runtime evidence)
+
+> **This subsection records D's latest design confirmation. It is coordination evidence, not
+> runtime or test evidence.** Nothing here was run or observed on the current C branch.
+
+**(A) Distinguish the three evidence sources.**
+- **Historical evidence from earlier D snapshots** — the "C-side storage security review"
+  table earlier in this logbook. It describes an **earlier / unmerged** snapshot and is
+  **retained for history**. Where it appears to conflict with the design below, the older
+  table is simply an older snapshot, not a current property; see (B).
+- **D's latest design confirmation** — reference `1332483` (D-reported intermediate
+  implementation commit), design only. Labelled *D-reported / interim / not independently
+  verified*. Branch `feat/D-phase3-hardening`; log commit `4281ea3`.
+- **Runtime/test evidence on the current C branch** — the §5.2 smoke run (41 passed) only. It
+  proves **none** of the storage/`call_id`/fail-closed/no-bypass claims below.
+
+**(B) Reconciliation with the historical storage review.** The earlier
+"C-side storage security review" table describes an **earlier/unmerged snapshot** and is
+retained for history. This subsection records the **latest target design only**; it does not
+retro-edit the older table and does not turn the older snapshot into current evidence.
+
+**(C) Confirmed design points (design-only; not code-confirmed on this branch).**
+- `pipeline.process()` sole business entry; `call_llm.py` sole model-network entry;
+  `extract()` returns unvalidated output + system metadata.
+- Normal business/storage writes only after `policy_core` validation; storage adds
+  defense-in-depth validation.
+- Direct storage invariant failures remain `PolicyError(policy:*)`; storage I/O / shape /
+  duplicate-`call_id` / arithmetic-consistency / persistence → independent `StorageError`.
+- Direct storage calls write no review evidence; pipeline policy rejection attempts exactly one
+  review line, and a review-write failure raises `StorageError` (no normal data).
+- Persisted cumulative spend authoritative; `expected_spent` is a validation parameter (not
+  persisted), below persisted → `StorageError`, higher allowed but stricter.
+- Budget equality accepted; over-budget → `PolicyError(code="policy:budget", review=True)`.
+- No hidden retry; no catch-all collapse of failure classes.
+- `call_id` system-generated, not model-overridable, removed before `policy_core`;
+  `request_id`/`session_id`/`call_id` semantics and joins design-confirmed but
+  **unverified here**.
+- Atomicity target: unique temp file + file lock (read/check/write/replace).
+- Eight categories unchanged; final whitelist **pending B/C**; D must not change independently.
+- **Unredacted `input`/`raw` logging NOT approved**; privacy/redaction pending.
+
+**(D) Privacy requirement (pending).** `input`/`raw` may contain personal financial data;
+unredacted logging remains **pending and unapproved**, and the four-field schema is **not**
+approval of unredacted content. Candidate paths for later decision: minimization/redaction
+before persistence, or an enforceable synthetic-data-only runtime constraint. `StorageError`
+messages/evidence must not contain raw exception strings, URLs, HTTP bodies, credentials, or
+sensitive data; a safe short policy code may be kept separately.
+
+**(E) Still pending (do not read as satisfied).** atomicity/no-partial-state proof;
+concurrency regression; ADR-003; `call_id` joins; fail-closed tests; no-bypass tests; complete
+logging-schema tests; privacy/redaction policy; final whitelist confirmation; final D commit;
+E's reproducible regression results.
+
+**No NFR is promoted from `pending` to `measured` by this subsection, and no D-branch test is
+presented as current-branch evidence.**
