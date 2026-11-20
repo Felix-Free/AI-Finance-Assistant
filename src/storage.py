@@ -11,15 +11,17 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import pathlib
 import shutil
 import tempfile
-import threading
 from decimal import Decimal
 from typing import Any, Iterator, Optional, Set, cast
 
 from src import policy_core
+
+logger = logging.getLogger(__name__)
 
 _fcntl: Optional[Any]
 try:  # POSIX advisory file lock (cross-process)
@@ -32,8 +34,6 @@ try:  # Windows file lock (cross-process)
     import msvcrt as _msvcrt
 except ImportError:
     _msvcrt = None
-
-_THREAD_LOCK = threading.Lock()
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA_PATH = _REPO_ROOT / "data" / "records.jsonl"
@@ -138,7 +138,9 @@ def _acquire(fh) -> None:
     elif _msvcrt is not None:  # pragma: no cover - Windows
         _msvcrt.locking(fh.fileno(), _msvcrt.LK_LOCK, 1)
     else:  # pragma: no cover - no OS lock available
-        _THREAD_LOCK.acquire()
+        raise StorageError(
+            "no OS file lock available (fcntl/msvcrt); refusing an unsafe append"
+        )
 
 
 def _release(fh) -> None:
@@ -147,8 +149,8 @@ def _release(fh) -> None:
         _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
     elif _msvcrt is not None:  # pragma: no cover - Windows
         _msvcrt.locking(fh.fileno(), _msvcrt.LK_UNLCK, 1)
-    else:  # pragma: no cover - no OS lock available
-        _THREAD_LOCK.release()
+    else:  # pragma: no cover - unreachable: _acquire refuses without an OS lock
+        return
 
 
 @contextlib.contextmanager
@@ -157,18 +159,41 @@ def _locked():
 
     Uses a same-directory sidecar lock file ``<data>.lock`` so writers in other
     processes are serialised too (POSIX ``flock`` / Windows ``msvcrt.locking``,
-    both blocking). When neither OS lock is available the module-level
-    ``_THREAD_LOCK`` fallback is used; it is PROCESS-LOCAL ONLY and does not
-    protect against other processes.
+    both blocking). There is no process-local fallback: if neither OS lock is
+    available the append fails closed with ``StorageError`` before any temp file
+    is created.
     """
     lock_path = DATA_PATH.with_name(DATA_PATH.name + ".lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+b") as fh:
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = lock_path.open("a+b")
+    except OSError as exc:
+        raise StorageError("cannot acquire storage lock: %s" % exc) from exc
+    try:
         _acquire(fh)
+    except StorageError:
         try:
-            yield
-        finally:
+            fh.close()
+        except OSError:
+            pass
+        raise
+    except OSError as exc:
+        try:
+            fh.close()
+        except OSError:
+            pass
+        raise StorageError("cannot acquire storage lock: %s" % exc) from exc
+    try:
+        yield
+    finally:
+        try:
             _release(fh)
+        except OSError:
+            logger.warning("storage lock release failed after commit")
+        try:
+            fh.close()
+        except OSError:
+            logger.warning("storage lock release failed after commit")
 
 
 def append_validated(record: dict, expected_spent=None) -> None:
@@ -226,12 +251,17 @@ def append_validated(record: dict, expected_spent=None) -> None:
                 "record is not JSON-serialisable: field %r has type %r"
                 % (field, type(record.get(field)).__name__)
             ) from None
-        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(
-            dir=str(DATA_PATH.parent),
-            prefix=DATA_PATH.name + ".",
-            suffix=".tmp",
-        )
+        try:
+            DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(
+                dir=str(DATA_PATH.parent),
+                prefix=DATA_PATH.name + ".",
+                suffix=".tmp",
+            )
+        except OSError as exc:
+            raise StorageError(
+                "cannot create temporary file: %s" % exc
+            ) from exc
         tmp = pathlib.Path(tmp_name)
         try:
             with os.fdopen(fd, "wb") as fh:
