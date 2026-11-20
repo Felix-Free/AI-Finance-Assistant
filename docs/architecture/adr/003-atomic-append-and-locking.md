@@ -1,7 +1,7 @@
 # ADR-003 — Atomic Append and Locking for Validated Records
 
-- **Status:** **Proposed — pending confirmation by role C** (code-governance / architecture).
-  Drafted by role D after issue #27. **Not yet accepted; do not merge without C's confirmation.**
+- **Status:** Accepted — role C confirmed the two open questions on 2026-11-19
+  (lock-file location acceptable; no silent fallback).
 - **Owner after review:** Role C (with B) — `docs/architecture/` is C/B-owned.
 - **Date:** Phase 3 (Issue #27), 2026-11-19.
 - **Related:** `docs/architecture/runtime-policy-catalog.md` (RP-004 fail-closed logging);
@@ -59,8 +59,16 @@ then commits with `os.replace(tmp, DATA_PATH)`. On any `OSError` the temp is unl
 (POSIX `fcntl.flock(LOCK_EX)`; Windows `msvcrt.locking(LK_LOCK)`). The lock is held across
 **read → duplicate check → budget check → write → replace**. `_existing_call_ids()` and
 `current_total()` run inside the lock, so the budget guard uses the value read under the same
-lock. If neither OS lock is available, a module-level `threading.Lock` is used as a
-**process-local-only** fallback (documented as such).
+lock. When neither OS lock is available the append **fails closed with `StorageError`** before
+any temp file is created; there is no silent process-local fallback.
+
+### Commit point
+
+A successful `os.replace(tmp, DATA_PATH)` is the commit point. Failures before it (lock acquisition,
+temp creation, copy, write, fsync, replace) surface as `StorageError` and leave the original file
+untouched. A failure to release the lock **after** a successful replace is not an append failure: the
+record is durable, the caller sees success, the OS releases the lock when the file closes, and the
+release error is recorded by the module logger at WARNING with a fixed short message.
 
 ---
 
@@ -83,8 +91,8 @@ lock. If neither OS lock is available, a module-level `threading.Lock` is used a
 
 ### Neutral / out of scope
 - No change to the record schema, the log schema, or `report_tokens`.
-- The process-local `threading.Lock` fallback does **not** protect across processes; it exists
-  only for platforms with neither `fcntl` nor `msvcrt`.
+- When no OS lock is available the append fails closed with `StorageError` (no silent
+  process-local fallback); such a platform cannot append until an OS lock is provided.
 
 ---
 
@@ -94,7 +102,7 @@ lock. If neither OS lock is available, a module-level `threading.Lock` is used a
 |---|---|---|
 | Fixed `.tmp` | One shared temp name (the earlier code). | Collision: concurrent writers clobber each other's temp → lost record (E's reproduction). |
 | Write-lock only | Lock around `os.replace` but not the read/check. | Duplicate/budget race remains: two writers both pass checks on stale state. |
-| Process-local lock only, silently | `threading.Lock` and nothing else. | No cross-process protection; two processes still lose updates. Not silent — any fallback is documented as process-local. |
+| Process-local lock only, silently | `threading.Lock` and nothing else. | No cross-process protection; two processes still lose updates. Rejected **and now removed**: no silent fallback — the append fails closed with `StorageError` when no OS lock exists. |
 | `O_EXCL` spin lock | Try to `O_EXCL`-create a lock file, spin on failure. | Stale lock after a crash needs manual cleanup; `flock`/`msvcrt` are released by the OS. |
 | No lock | Rely on `os.replace` atomicity alone. | `os.replace` is atomic per-file but does not serialise the read/check/write sequence → lost update. |
 
@@ -108,14 +116,19 @@ lock. If neither OS lock is available, a module-level `threading.Lock` is used a
 - E's three-run reproduction of the two failure modes motivated this decision.
 - Atomicity (a failed commit leaves the original bytes untouched) is covered by
   `test/offline/test_phase3_hardening.py`.
+- **E's two fault points** (fault-injection scenarios): (1) an invalid parent directory (the parent
+  path is a regular file) surfaces as `StorageError`, not a raw `FileExistsError`/`OSError`, with the
+  original bytes untouched; (2) a lock `_release` that raises `OSError` **after** a successful
+  `os.replace` does not fail the append — the record is present and the module logger emits one
+  WARNING with the fixed short message.
 - `mypy` clean on the default target and on `--python-version 3.9`.
 
 ---
 
 ## 6. Open questions / pending confirmations
 
-- **Pending C:** confirm the sidecar lock-file location and that a runtime `*.lock` artifact is
-  acceptable (and gitignored) rather than embedding the lock in `data/`.
-- **Pending C:** confirm the process-local `threading.Lock` fallback is acceptable for the
-  supported platforms, or require an explicit failure when no OS lock exists.
-- **Pending C/B:** confirm this ADR's acceptance status and merge; docs/architecture is C/B-owned.
+None — both questions were resolved by role C on 2026-11-19:
+
+- **Resolved:** the sidecar lock-file location under `data/` is acceptable.
+- **Resolved:** no silent process-local fallback; when neither `fcntl` nor `msvcrt` is available
+  the append fails closed with `StorageError`.
