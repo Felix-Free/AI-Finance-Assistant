@@ -4,6 +4,9 @@
 > during Phase 2 QA. A bug with no fix says so; it is not closed by being described.
 >
 > Baseline: `main f73e9b4` + D #18 `eec1724` + C #19 `6808d7e`.
+>
+> Refreshed 2026-11-20 for Phase 3, rebaselined to `main 35f580d`. The 2026-11-17 PR #20
+> (`b82ac6d` on `review/e-phase2-base`) evidence is retained below as historical E evidence.
 
 ---
 
@@ -47,10 +50,10 @@
 - **Reproduction.** Interrupt the append path; a partial write of 16 bytes remains.
 - **Root cause.** Append-mode writing has no demonstrated rollback of bytes written before
   the error.
-- **Fix.** **Not fixed.**
-- **Rule gap.** The "no partial state" requirement (RP-007) is stated but not satisfied in
+- **Fix.** PR #30 made ledger appends atomic. `c1c29be` performs atomic replacement, `a0a6044` adds a writer lock and unique temp file, and `d8bf37d` provides cleanup. Verified by `test_a1_failed_commit_leaves_original_bytes` and `test_concurrent_appends_keep_both_records`.
+- **Rule gap (original implementation).** The "no partial state" requirement (RP-007) is stated but not satisfied in
   this writer.
-- **Status.** Open.
+- **Status.** Verified on #30 head `571564d`; main integration and rerun are still pending.
 
 ## BUG-04 — Uncleaned HTTP error body (with a synthetic sensitive marker) leaks into the call log
 
@@ -60,8 +63,42 @@
   inspect the call log.
 - **Root cause.** The error log field records an uncleaned response body instead of a
   sanitised/whitelisted value.
-- **Fix.** **Not fixed.**
-- **Rule gap.** The persistent rule is general: **an error log field must never record an
+- **Fix.** PR #30 commit `c1c29be` writes short, secret-safe codes to the persisted error field. Verified by `test_b1_transport_failure_short_label_no_credential` and `test_b2_http_failure_short_label_body_not_copied`.
+- **Rule gap (original implementation).** The persistent rule is general: **an error log field must never record an
   uncleaned response body that may contain sensitive information** — this applies to any
   real response, not only to simulation. The marker merely made the violation visible.
-- **Status.** Open.
+- **Status.** Verified on #30 head `571564d`; main integration and rerun are still pending.
+
+---
+
+## Phase 3 #25 status (2026-11-17)
+
+Recorded against PR #20 head `b82ac6d` on `review/e-phase2-base`. This is the observed
+hosted evidence at this date; it is not a Phase 3 sign-off.
+
+- **Gate 4 failure (fixed).** The prior strict expected labels `transport`/`food` disagreed
+  with the real model output `transportation`/`groceries`
+  ([job 133210199706](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/43837986916/job/133210199706)).
+- **Fix — scoped aliases only.** `test/live/test_live_model.py` now accepts
+  `("transport", "transportation")` and `("food", "groceries")` for those two cases only.
+  Exact-amount, the `{"amount", "category"}` shape and the non-expense case (fixture asserts
+  `{"error": "not_a_record"}`, [test_live_model.py:117](../test/live/test_live_model.py#L117))
+  are unchanged; the production `policy_core` category whitelist is unchanged.
+- **Gate 4 result.** The protected `semantic-eval` job ran in the real #20 PR path: **5 passed
+  in 9.35 s**
+  ([job 133284009010](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/43862856085/job/133284009010)),
+  CI green against `review/e-phase2-base`
+  ([run 43862856085](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/43862856085)).
+  The environment is therefore **exercised**; manual approval enforcement and merge-time
+  execution remain unverified.
+- **Gate 1 waiver.** The first-rollout waiver applied to **#20 only**
+  ([job 133283820698](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/43862856085/job/133283820698));
+  a waiver is not test-first evidence.
+- **Local offline.** 204 passed, 0 skipped, network disabled.
+
+## Phase 3 evidence — 2026-11-20
+
+- On main `35f580d`, all 211 offline tests passed and static analysis passed: [CI run](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/44677721024).
+- Test review at `22cdf96`: [approval](https://github.com/Felix-Free/AI-Finance-Assistant/pull/30#pullrequestreview-5972571059). Implementation reviewed at head `571564d`: [approval](https://github.com/Felix-Free/AI-Finance-Assistant/pull/30#pullrequestreview-5988044292).
+- The #30 branch reported 166 passed and 4 skipped, with three concurrency passes, and both mypy targets passed.
+- #32 merged after Gate 1 failed and Gate 4 was skipped. Proof of enforced six required checks and of a real blocked PR is still pending: [CI run](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/44561573231).

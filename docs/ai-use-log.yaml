@@ -1212,3 +1212,38 @@
     actionlint: passes both workflows
     local_ci_regressions: 4 passed
     pending: hosted rerun
+
+- date: "2026-11-17"
+  role: E
+  student_id: "61049313"
+  phase: 3
+  session: 1
+  topic: Phase 3 #25 QA evidence refresh
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/bug-diary.md
+    - docs/debt-register.md
+    - docs/ai-use-log.yaml
+  summary: "Refreshed the Role E QA docs against PR #20 (b82ac6d). Verified Gate 4 passed 5/5 on the real PR path in the protected semantic-eval environment, recorded the one-time Gate 1 first-rollout waiver for #20 only, and kept the append partial-write and uncleaned-error-body fixes open. Offline baseline 204 passed with network blocked. Expected final main checks and rules remain pending."
+  human_review:
+    - Role E authorized the local documentation evidence refresh and selected the scope.
+  validation:
+    gate4_pr_evidence: 5 passed in 9.35s (job 133284009010)
+    gate1_waiver: "First rollout of #20 only (job 133283820698); a waiver is not test-first evidence"
+    open_debts: "BUG-03 / DEBT-01 and BUG-04 / DEBT-02 stay open; D issue #27 awaiting #18"
+    offline_isolation: 204 offline passed with network blocked
+    pending: "Expected final main checks and rules; merge-time live execution"
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 2
+  topic: 'Phase 3 verification evidence for #25'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/bug-diary.md
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'After E reviewed the test-first and implementation records, OpenCode drafted updates
+    to the two QA docs, keeping #30 verification separate from the final main evidence.'
