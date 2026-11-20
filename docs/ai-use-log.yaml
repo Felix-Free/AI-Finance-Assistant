@@ -1247,3 +1247,23 @@
   - docs/ai-use-log.yaml
   summary: 'After E reviewed the test-first and implementation records, OpenCode drafted updates
     to the two QA docs, keeping #30 verification separate from the final main evidence.'
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 4
+  topic: 'Record team-lead operating decision on Gate 1'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'On the team lead''s direction, updated DEBT-04 and the outstanding bullet to record
+    that Gate 1 reports test-first evidence (evidenced at 22cdf96) but is not a hard merge block,
+    and that a team-permitted admin override for mixed test/implementation histories with a green
+    local suite is not a passing result. Making Gate 1 a required hard check is tracked as follow-up.
+    No workflow changes; the six required checks are not claimed enforced.'
+  human_review:
+    - Team lead directed the Gate 1 operating decision and the override scope.
+  validation:
+    scope: 'docs/debt-register.md and docs/ai-use-log.yaml only; no tests run and none claimed'
