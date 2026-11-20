@@ -1267,3 +1267,22 @@
     - Team lead directed the Gate 1 operating decision and the override scope.
   validation:
     scope: 'docs/debt-register.md and docs/ai-use-log.yaml only; no tests run and none claimed'
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 5
+  topic: 'Apply maintainer review to PR #34 (DEBT-08)'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'Following maintainer GitHub feedback, added DEBT-08 (owner A configuration / E verification,
+    open) for unverified required-check enforcement of the six PR gates, narrowed DEBT-04 to human
+    test-first evidence at 22cdf96 on #30, and removed the non-required / blanket-override wording.
+    This supersedes the session 4 wording. No workflow changes; no tests run or claimed.'
+  human_review:
+    - Maintainer review on PR #34 directed the DEBT-08 split and wording.
+  validation:
+    scope: 'docs/debt-register.md and docs/ai-use-log.yaml only; no tests run and none claimed'

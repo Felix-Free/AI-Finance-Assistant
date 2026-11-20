@@ -32,10 +32,11 @@ is reproduced yet (kept visible, not claimed clean).
 | DEBT-01 | Guardrail debt | Append interruption leaves a 16-byte partial write; no atomicity, so a guard boundary is stated but not enforced by this writer | D | verified on #30; pending main | BUG-03 was fixed on PR 30, branch `571564d` only. |
 | DEBT-02 | Guardrail debt | An unredacted synthetic HTTP error body reaches `logs/llm_calls.jsonl`; an error log field must not carry an uncleaned response body that may contain sensitive data | D | verified on #30; pending main | BUG-04 was fixed on PR 30, branch `571564d` only. |
 | DEBT-03 | Evaluation debt | Three guard-removal negatives observed only locally, not yet run in GitHub CI | E | open | local runs only; #20 green CI does not run these negatives |
-| DEBT-04 | Evaluation debt | Test-first approval is reported but not a hard merge block | E | partially verified | Test-first approval is evidenced at `22cdf96`; Gate 1 reports test-first evidence without blocking merges. Team lead permits an admin override for mixed test/implementation histories with a green local pytest suite (not a passing result). Making Gate 1 a required hard check is follow-up. |
+| DEBT-04 | Evaluation debt | Human test-first evidence on #30 | E | partially verified | Test-first approval evidenced at `22cdf96` on #30. Enforcement tracked separately in DEBT-08. |
 | DEBT-05 | Evaluation debt | Merge-time live execution against the protected environment not yet run | E | pending | On #20 the protected Gate 4 passed 5/5, but actual merge-time live execution remains unverified. |
 | DEBT-06 | Evaluation debt | PR #19 permissions / runtime-contract / performance backed only by local review, no independent online evidence | C | pending | local review only |
 | DEBT-07 | Untouchable code | mypy reported 4 failures in the fixed integration (PR #18) on `eec1724`; D fixed them in `959ac97` and E's local rerun on `df729a9` (mypy 1.8, Python 3.11) is clean across eight source files, so the affected code is now typed | D | closed | closed on `df729a9` after local rerun; historical: reproduced locally on `eec1724` |
+| DEBT-08 | Evaluation debt | Required-check enforcement of the six PR gates | A (configuration) / E (verification) | open | Enforced required-check status of the six PR gates is unverified; a real blocked-PR proof is still pending. Proposal: configure Gate 1 as a hard merge block in Phase 3. #32 was admin merged while Gate 1 was red ([PR #32](https://github.com/Felix-Free/AI-Finance-Assistant/pull/32)); the six checks are intended required on main per `docs/architecture/adr/phase2-ci-verification.md`. The #32 exception does not establish general non-required status. |
 
 ---
 
@@ -50,7 +51,7 @@ is reproduced yet (kept visible, not claimed clean).
 | Agent-induced bloat | monitored | no reproduced item |
 | Evaluation debt | active | On #20 the protected Gate 4 passed 5/5, but actual merge-time live execution remains unverified. |
 | Guardrail debt | active | DEBT-01/02: Verified on #30 head `571564d`; main integration and rerun are still pending. |
-| Human/cognitive debt | active | Test-first approval is evidenced at `22cdf96`; Gate 1 reports evidence but is not a hard merge block, and an admin override is not a passing result. |
+| Human/cognitive debt | active | Test-first approval is evidenced at `22cdf96` on #30. |
 
 ---
 
@@ -61,11 +62,11 @@ The protected `semantic-eval` environment (repository variables `LLM_BASE_URL`, 
 role E**. The protected `semantic-eval` job was **exercised** on the real #20 PR path
 (job 133284009010, 5 passed in 9.35 s), so the environment is no longer "never exercised".
 Manual approval enforcement, merge-time execution and the main-required gate checks remain
-unverified (DEBT-04, DEBT-05).
+unverified (DEBT-05, DEBT-08).
 
 ## Outstanding as of 2026-11-20
 
 - On main `35f580d`, all 211 offline tests passed and static analysis passed: [CI run](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/44677721024).
-- Test-first approval is evidenced at `22cdf96`; Gate 1 reports evidence but is not a hard merge block. The team-permitted admin override for mixed histories is not a passing result. Making Gate 1 a required hard check is follow-up.
-- #32 merged after Gate 1 failed and Gate 4 was skipped. Proof of enforced six required checks and of a real blocked PR is still pending: [CI run](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/44561573231).
+- Test-first approval is evidenced at `22cdf96` on #30. Enforced required-check status of the six PR gates is unverified; a real blocked-PR proof is still pending (DEBT-08).
+- #32 was admin merged while Gate 1 was red. The #32 exception does not establish general non-required status; the six checks are intended required on main per `docs/architecture/adr/phase2-ci-verification.md`: [CI run](https://github.com/Felix-Free/AI-Finance-Assistant/actions/runs/44561573231).
 - On #20 the protected Gate 4 passed 5/5, but actual merge-time live execution remains unverified.
