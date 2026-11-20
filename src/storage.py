@@ -153,6 +153,14 @@ def _release(fh) -> None:
         return
 
 
+def _best_effort_warning(message: str) -> None:
+    """Log a teardown problem without ever letting logging failure escape."""
+    try:
+        logger.warning(message)
+    except Exception:  # pragma: no cover - logging must never mask the result
+        pass
+
+
 @contextlib.contextmanager
 def _locked():
     """Exclusive lock across read -> duplicate check -> budget check -> write -> replace.
@@ -174,26 +182,28 @@ def _locked():
     except StorageError:
         try:
             fh.close()
-        except OSError:
+        except Exception:
             pass
         raise
     except OSError as exc:
         try:
             fh.close()
-        except OSError:
+        except Exception:
             pass
         raise StorageError("cannot acquire storage lock: %s" % exc) from exc
     try:
         yield
     finally:
         try:
-            _release(fh)
-        except OSError:
-            logger.warning("storage lock release failed after commit")
-        try:
-            fh.close()
-        except OSError:
-            logger.warning("storage lock release failed after commit")
+            try:
+                _release(fh)
+            except Exception:
+                _best_effort_warning("storage lock release failed")
+        finally:
+            try:
+                fh.close()
+            except Exception:
+                _best_effort_warning("storage lock close failed")
 
 
 def append_validated(record: dict, expected_spent=None) -> None:
@@ -264,7 +274,21 @@ def append_validated(record: dict, expected_spent=None) -> None:
             ) from exc
         tmp = pathlib.Path(tmp_name)
         try:
-            with os.fdopen(fd, "wb") as fh:
+            fh = os.fdopen(fd, "wb")
+        except Exception as exc:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise StorageError(
+                "cannot open temporary file: %s" % exc
+            ) from exc
+        try:
+            with fh:
                 if DATA_PATH.exists():
                     with DATA_PATH.open("rb") as src:
                         shutil.copyfileobj(src, fh)

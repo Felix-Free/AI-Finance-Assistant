@@ -70,6 +70,23 @@ untouched. A failure to release the lock **after** a successful replace is not a
 record is durable, the caller sees success, the OS releases the lock when the file closes, and the
 release error is recorded by the module logger at WARNING with a fixed short message.
 
+Teardown after the commit point is best-effort and self-contained:
+
+- **Close is unconditional.** `fh.close()` runs in an independent `finally`, so it executes even if the
+  lock release fails or the warning itself raises.
+- **Teardown warnings are best-effort and distinguish the two failures** — `"storage lock release
+  failed"` and `"storage lock close failed"`.
+- **A logging failure is swallowed.** If the logger raises, it never propagates; the caller still sees
+  the commit result (on success) or the original pre-commit exception (on failure), never a teardown or
+  logging error.
+
+### Known limitations
+
+- The verified platform is POSIX with `fcntl.flock`; the Windows `msvcrt.locking` path exists but is not
+  exercised by CI.
+- The lock is blocking and has no timeout; a process that hangs while holding it blocks later writers.
+- The sidecar lock file must not be deleted while writers may be active; the code never deletes it.
+
 ---
 
 ## 3. Consequences
