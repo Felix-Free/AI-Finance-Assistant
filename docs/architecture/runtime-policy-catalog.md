@@ -38,16 +38,6 @@ write (`structural-constraints.md §4`).
   `call_llm.py` re-raises the `JSONDecodeError`.
 - **Evidence:** one `logs/llm_calls.jsonl` line: `input`, `raw`, `parsed=null`, `error`.
 
-> **Valid JSON that is not an object (current D behavior).** A JSON array, string or
-> number parses successfully, so it does **not** trigger RP-001 or `not_json`.
-> `call_llm.extract` logs the parsed value with `error=null` and returns it without
-> `__call_id__`. In the normal `pipeline.process` path, the missing id raises
-> `StorageError("missing call_id from model client")` before `policy_core` runs; no
-> policy review line or stored record is produced. Calling `policy_core.validate_record`
-> directly with a non-object instead raises `PolicyError(code="policy:amount")`.
-> This difference in failure classification is an **unresolved D implementation gap**;
-> `StorageError` here does not mean a storage write was attempted.
-
 ### RP-002 — Model-client configuration / transport / response-protocol failure
 
 - **Trigger:** missing base URL or API key before HTTP; network error, timeout, auth
@@ -64,8 +54,7 @@ write (`structural-constraints.md §4`).
 - **Evidence:** one `logs/llm_calls.jsonl` line. For missing configuration, `error` is
   `config: missing base url or key` and `request_made` is `false`. For HTTP-attempt failures,
   `error` begins `transport:`, `http <code>` or `protocol:` and `request_made` is `true`.
-  In both cases `raw`, `parsed` and `tokens` are `null`. D-02 (§5) tracks the unresolved
-  risk that some error text includes raw exception or response details.
+  In both cases `raw`, `parsed` and `tokens` are `null`.
 
 ### RP-003 — Invariant violation
 
@@ -85,10 +74,6 @@ write (`structural-constraints.md §4`).
   but its unlogged result cannot be used or reach storage. This is a **runtime policy**, not a
   business invariant, because it protects the audit trail rather than a spend outcome.
 - **Evidence:** the failure is surfaced to the caller; no unlogged result reaches storage.
-
-> Note: `call_llm.py::_append_log` already implements the fail-closed write
-> (`AGENTS.md §3`, `structural-constraints.md §5`). RP-004 records it as a policy and
-> tells D/E what must stay true when the module is extended.
 
 > **Appended fields (Phase 2).** The original four fields — `input`, `raw`, `parsed`,
 > `error` — are never renamed or removed. The Phase 2 fields are **additive**:
@@ -114,49 +99,18 @@ write (`structural-constraints.md §4`).
 - **Trigger:** storage rejects a new record's shape or duplicate `call_id`, cannot read
   existing records (including malformed JSON or a nonnumeric stored amount when computing
   the current total), or cannot write a validated record (I/O error or unwritable path).
-  The uncaught type/serialization cases below are required to follow RP-007 but do not
-  currently raise `StorageError`.
 - **Action:** raise an **independent `StorageError`**. It is an infrastructure failure, not
   a rule decision.
 - **Reserved prefix:** `policy:*` is reserved **only** for deterministic policy/rule
   rejection (RP-003/005/006). A storage failure **must not** be rewritten as `policy:*`.
-- **No partial state (C's required boundary — implementation verification pending):** no
-  partial state change is allowed; the previous stored state remains authoritative (the
-  write either completes or the prior state stands). **Current status:** D's
-  `storage.append_validated` uses an append-mode write that raises `StorageError` on
-  `OSError`, but the code does **not** demonstrate rollback of bytes written before the
-  error. The boundary is therefore **required by C and not yet verified by the
-  implementation**; it must not be read as confirmed.
+- **No partial state:** no partial state change is allowed; the previous stored state
+  remains authoritative (the write either completes or the prior state stands).
 - **Not a policy rejection:** a storage failure is **not** a normal policy rejection and
   **must not** create a policy review line (`logs/review.jsonl`).
 - **Evidence:** the required failure signal is `StorageError` to the caller. A read or
   validation failure stops before a new storage record is appended. A write failure has
-  the separate no-partial-state requirement above, which is not yet verified. The two
-  uncaught `TypeError` paths below do not yet meet this signal contract.
-
-**Unresolved D exception paths (code review, not test-verified).** In
-`src/storage.py::_existing_call_ids`, a persisted JSON object with an unhashable
-`call_id` (for example a list) reaches `ids.add(...)` and raises `TypeError`; the read
-path does not convert it to `StorageError`. Missing stored `call_id` values are skipped,
-and empty strings are added without validation; neither is reported as an invalid
-stored ID. In `append_validated(record)`, structural
-checks do not validate `decided_at` for JSON serializability. A direct caller can pass a
-nonserializable value (for example a date/time object); `json.dumps(record)` then raises
-`TypeError`, while the write handler catches only `OSError`. Both failures must stop the
-operation and surface as `StorageError` under RP-007; this conversion is **not implemented**.
-
-> **Pending clarification.** The exact storage-failure evidence detail (whether it is
-> logged at all and, if so, in what record and format) is **not** defined by D's current
-> implementation. RP-007 requires only `StorageError`, no `policy:*` conversion, and the
-> absence of a `policy` review line; it does not invent a new log format. The precise
-> evidence record remains pending until the implementation/spec fixes it.
-
-**Rejection-evidence write failure (current D behavior).** If `pipeline._append_rejection`
-cannot append to `logs/review.jsonl`, D raises `storage.StorageError("evidence write
-failure: ...")` instead of returning the original `PolicyError`. No rejected record is
-persisted. This is an evidence-write failure, not an RP-007 record-storage write, and it
-does not create a successful review line. C's required behavior is fail-closed; atomicity
-of a partially written review line is not demonstrated by D's append-mode writer.
+  the separate no-partial-state requirement above. RP-007 does not prescribe a separate
+  storage-failure log format.
 
 ---
 
@@ -165,9 +119,9 @@ of a partially written review line is not demonstrated by D's append-mode writer
 1. **Model-client failures (RP-002/001).** Check configuration, then attempt HTTP and
    parse its response envelope, then parse the model's JSON content. A failure stops
    before business validation.
-2. **Call-log integrity (RP-004).** D writes the call line after the attempt or failure
-   is known, before returning a result or raising it. If logging fails, no result is
-   usable; the HTTP attempt and response parsing may already have occurred.
+2. **Call-log integrity (RP-004).** Write the call line after the attempt or failure is
+   known and before returning a result or raising the failure. If logging fails, the
+   result is unusable.
 3. **Pipeline metadata and storage read.** After `extract` returns, a missing `call_id`
    raises `StorageError` (the valid-nonobject gap under RP-001). If `spent is None`,
    `storage.current_total()` reads persisted amounts and can raise `StorageError`
@@ -261,17 +215,12 @@ the required four (`input`, `raw`, `parsed`, `error`) and the additional fields 
 `tokens`); nothing above is renamed or removed.
 
 - **`session_id`** — a 32-character `uuid4().hex` generated once when `src/call_llm.py`
-  is loaded. Every call in that process shares it, so **per-session aggregation** in D's
-  current implementation means grouping by process run. It does not identify a separate
-  user session when one process handles multiple users. It is distinct from `call_id`,
+  is loaded. Every call in that process shares it. It is distinct from `call_id`,
   which is generated for each call.
 - **`request_id`** — an identifier for **one user request**. One request may trigger
   **multiple** `extract` attempts, so several `llm_calls` records may share one
   `request_id`. `call_id` remains the unique identifier for **one attempt**;
-  `request_id` groups attempts, `call_id` identifies one attempt. In D's current
-  `pipeline.process`, one `request_id` is created per invocation and only one `extract`
-  call is made; multi-attempt grouping requires a caller to pass the same id explicitly
-  to multiple `extract` calls and is not yet a pipeline behavior.
+  `request_id` groups attempts, `call_id` identifies one attempt.
 - **`usage_source`** — an enum with **exactly** these values: `gateway`, `partial`,
   `missing`. It describes the token counts **recorded in this log line**: `gateway` = all
   three counts present, `partial` = some counts present, `missing` = no counts recorded.
@@ -300,7 +249,7 @@ Preserved requirements (unchanged by these fields):
 - `usage_source` must stay consistent with `tokens`: `gateway`/`partial` imply token data
   exists, `missing` implies it does not.
 
-#### 5.2.2 Pre-HTTP local failures (confirmed)
+#### 5.2.2 Pre-HTTP local failures
 
 A missing base URL or API key stops the call before the HTTP attempt but **still writes
 exactly one `llm_calls.jsonl` line**. The record uses the same ten-key schema as a normal
@@ -314,10 +263,6 @@ call; missing values are written as `null` and **never omitted**:
 - **`tokens`** is `null` because no gateway usage object exists before an HTTP request.
 - **`raw`** and **`parsed`** are `null`.
 - **`request_made`** is `false`.
-
-This is the **only** `request_made = false` path in D's current implementation: missing
-configuration stops before the HTTP attempt. Any path that attempts the call records
-`request_made = true`, even if the connection fails before the gateway receives it.
 
 ### Storage failure is not a policy rejection
 
@@ -340,15 +285,6 @@ configuration stops before the HTTP attempt. Any path that attempts the call rec
   `review.jsonl` policy line.
 
 ### Evidence linkage by `call_id`
-
-Main's NFR-006 measures **log coverage**: the percentage of model calls with a
-`llm_calls.jsonl` line and policy rejections with a `review.jsonl` line. Its numeric
-coverage threshold is `null` in main. D writes one call-log line per `extract` attempt
-when the log is writable, including pre-HTTP configuration failures, and one review line
-per policy rejection when the review log is writable. If either evidence write fails, the
-operation fails closed (RP-004 or `StorageError`) rather than proceeding as a successful
-decision. The Phase 2 `call_id` join below is an **additional structural traceability
-check**, not a replacement definition or a numeric coverage threshold.
 
 There are three possible evidence locations — the two log files (`llm_calls` and
 `review`) plus the storage record in `data/records.jsonl` — but a
@@ -383,7 +319,7 @@ threshold.
   so the review line and the routing decision agree. Each rejection line carries both
   `call_id` (join key) and `request_id` (grouping).
 
-#### Validated storage spend — implemented on D's branch, not merged
+#### Validated storage spend
 
 - **Approved boundary:**
   `append_validated(record, expected_spent=None)` with
@@ -393,41 +329,4 @@ threshold.
   `expected_spent` would be a **numeric validation parameter, not a persisted record
   field**. Its purpose is to prevent **under-reporting prior spending**, which would
   otherwise let a record slip past the budget guard (`C-INV-003` / `RP-005`).
-- **D-branch implementation (verified at `df729a9`, not merged):**
-  `src/storage.py::append_validated(record, expected_spent=None)` validates the
-  numeric parameter, rejects an `expected_spent` below persisted cumulative spend,
-  re-runs the policy guards, and checks `total == expected_spent + amount` before
-  appending. `src/pipeline.py::process` passes its effective `spent` value into this
-  parameter. The implementation and its offline tests exist on D's branch only.
-- **Main-branch status:** The current `main` snapshot still has the older
-  `append_validated(record)` boundary, so the budget-bypass gap remains open on `main`
-  until D's branch is merged. The D implementation must not be described as present on
-  `main` before that merge.
-
-#### Repository-root anchoring of evidence paths (verified per module)
-
-Evidence paths are anchored to the repository root via
-`pathlib.Path(__file__).resolve().parents[1]`, so they follow the module rather than the
-process working directory. This is **confirmed** in:
-
-- `src/call_llm.py` — `LOG_PATH` (`logs/llm_calls.jsonl`)
-- `src/pipeline.py` — `REVIEW_PATH` (`logs/review.jsonl`)
-- `src/storage.py` — `DATA_PATH` (`data/records.jsonl`)
-- `scripts/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
-
-It is **not** used everywhere: `src/report_tokens.py` still defaults to a **relative**
-`LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")` (working-directory dependent, overridable
-by an argument), and `scripts/measure_tokens.py` defines no path of its own. The anchoring
-claim applies only to the four modules listed above.
-
-#### D-02 — error logging short-code rule (unresolved implementation debt)
-
-Short, **secret-safe** error information in logs is a **security requirement** (Phase 1,
-`structural-constraints.md §5`): the `error` field is a short code, and a raw exception
-string must not be able to leak a URL, query parameter or credential into the log. D's
-current `src/call_llm.py::extract` constructs `error` using full `str(exc)` for transport
-and protocol failures; `_append_log` then writes that record. This is an **unresolved D
-implementation debt (D-02)**: the security requirement stands and the implementation
-has not yet been brought into line with it.
-
 ---
