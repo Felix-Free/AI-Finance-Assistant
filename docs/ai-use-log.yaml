@@ -1421,3 +1421,40 @@
     gate_effect: 'Gate 6 requires a new session for the prompts/ change in this PR; this entry is that session'
     local_checks: 'markdown reviewed; no src/, test/ or requirements change in this PR'
     pending: 'Gate 4 semantic-eval diagnosis; section prose to be filled by the assigned owners'
+- date: '2026-11-16'
+  role: B
+  student_id: '60357951'
+  phase: 2
+  session: 1
+  topic: 'Role B Phase 2 (Issue #13): ADR, NFR quantification, traceability matrix, risk list and option ledger'
+  tool: opencode
+  files_created:
+  - docs/architecture/adr/001-ai-layered-context-structure.md
+  - docs/architecture/adr/002-token-budget-cap.md
+  - docs/architecture/risk-list.md
+  - docs/architecture/option-ledger.md
+  - docs/architecture/evaluation-table.md
+  - transcripts/60357951-QingZhi LU.md
+  files_modified:
+  - docs/req/requirements.yaml
+  - docs/architecture/trace-matrix.md
+  files_not_modified:
+  - src/**
+  - test/**
+  - .github/workflows/ci.yml
+  summary: 'Authored the Role B Phase 2 deliverables in three human-approved batches after read-only audits: created ADR-001 (AI layered context) and ADR-002 (token budget cap), both marked Design-only with the token value Pending PD-007; created risk-list (RISK-001..008, scores TBD) and option-ledger (OPT-001..007); updated NFR-001/002/006 descriptive fields only and added a four-state status set plus a Runtime Monitor column to the trace matrix. Human repeatedly forced claims back to file/git-verified evidence: a broken docs/ai-use-log.yaml conflict marker and a non-clean working tree were caught; stale Phase-1 facts about CI and E test coverage were corrected; a wrong "5 skipped" count was corrected to 4 module-level-skipped test functions; and an out-of-scope edit to the role-E-owned ci.yml was flagged as out of authority.'
+  human_review:
+  - required read-only audits before any write and approved work batch by batch
+  - required an external backup with SHA-256 restore proof before syncing the branch
+  - constrained edits to role-B files and named fields, forbidding any threshold/owner/status change
+  - forbade inventing NFR thresholds, token budgets or the user_request_count metric
+  - required ADRs to be Design-only and the token cap value Pending PD-007
+  - demanded origin/main and git-history evidence for every merged/unmerged claim and refused guessed values when the network was unavailable (git fetch failed)
+  - insisted skipped tests are not passed, merged implementation is not completed evidence, and a CI workflow file is not a passing CI run
+  - challenged the CI edit and confirmed ci.yml is owned by role E, so the edit is outside role B authority
+  validation:
+    yaml_parse: pass (jsonschema Draft 2020-12, 0 errors on requirements.yaml)
+    git_diff_check: clean
+    backup_restore_sha256: 'all modified files and the batch patch reproduced exactly'
+    pytest_offline_local: '158 passed, 4 skipped (local only, not GitHub Actions)'
+    branch_state: 'origin/main verified at f2442c2 locally; live GitHub state not verified (network unreachable, gh unavailable)'
