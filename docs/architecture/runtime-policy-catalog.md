@@ -285,9 +285,11 @@ After a failure is detected, no later result is accepted or stored.
 ### 5.5 Validation and persisted spend
 
 - Persisted cumulative spend is authoritative.
-- `expected_spent` is a validation parameter, not a persisted record field.
-- `expected_spent` below persisted cumulative spend raises `StorageError`.
-- The accepted record must satisfy `total == expected_spent + amount`.
+- For `pipeline.process()` writes, storage re-reads persisted cumulative spend under the lock and
+  uses it for both budget validation and `total`; a stale caller-supplied `spent` value is ignored.
+- For direct storage API calls, `expected_spent` remains a validation parameter (not a persisted
+  field); `expected_spent` below persisted cumulative spend raises `StorageError`.
+- The accepted pipeline record must satisfy `total == persisted_total + amount`.
 - Equality at the budget limit is allowed; exceeding the limit raises
   `PolicyError(code="policy:budget", review=True)`.
 - Rejection evidence preserves the original `policy:*` error code so that the evidence
@@ -389,9 +391,11 @@ Where they differ (e.g. review-write failure, logging schema), §6 wins for this
 ### 7.4 Persisted spend authority and `expected_spent` (design-confirmed)
 
 - **Persisted storage cumulative spend is authoritative.**
-- **`expected_spent` is a validation parameter, not a persisted field.**
-- `expected_spent` **below** persisted cumulative spend → **`StorageError`**; a **higher**
-  value is allowed and stricter (`total == expected_spent + amount` must hold).
+- **Pipeline path:** storage reads persisted cumulative spend under the lock and uses that value
+  for budget validation and the resulting total; caller-supplied stale `spent` is ignored.
+- **Direct storage API:** `expected_spent` is a validation parameter, not a persisted field;
+  `expected_spent` below persisted cumulative spend → **`StorageError`**.
+- Pipeline accepted records satisfy `total == persisted_total + amount`.
 - **Equality at the budget limit is allowed**; **over-budget** raises
   `PolicyError(code="policy:budget", review=True)`.
 
@@ -417,16 +421,22 @@ Where they differ (e.g. review-write failure, logging schema), §6 wins for this
   append-mode, so no partial state is ever visible. **Concurrency implementation, the
   concurrency regression, ADR-003, and E's regression evidence remain pending.**
 
-### 7.8 Privacy / redaction (pending, not approved)
+### 7.8 Privacy / redaction (design confirmed; implementation pending)
 
-- **Unredacted `input` / `raw` logging is NOT approved as the final design.** The four-field
-  logging schema is not an approval of unredacted content. `input`/`raw` may contain personal
-  financial data.
-- Two candidate paths for a later decision: (a) **minimization/redaction before persistence**,
-  or (b) an **enforceable synthetic-data-only runtime constraint**.
+- **Unredacted `input` / `raw` logging is not approved.** The ten-field call-log schema remains
+  intact, but sensitive values are minimized before persistence:
+  - `input` and available `raw` text use `redacted:len=<n>`, where `<n>` is the Python character
+    count; do not store the original text or a hash.
+  - `parsed` is `null`.
+  - `review.amount`, `review.category`, `review.spent`, and `review.total` are `null`.
+  - Preserve `call_id`, `request_id`, safe error codes, `review`, and non-sensitive metadata.
+  - Validated business records in the normal ledger retain the values required by the application.
+- On a successful model call, `llm_calls.error` is `null`; failure entries retain only the safe,
+  closed-vocabulary error code. Review entries retain the safe policy error code.
 - `StorageError` messages and evidence logs **must not** contain raw exception strings, URLs,
   HTTP bodies, credentials, or sensitive data; a **safe short policy code** may be retained
-  separately if needed.
+  separately if needed. This is the confirmed target contract; implementation and tests remain
+  pending until the follow-up changes are reviewed and merged.
 
 ### 7.9 Whitelist finality (pending B/C)
 

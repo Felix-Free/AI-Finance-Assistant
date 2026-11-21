@@ -96,16 +96,20 @@ storage.append_validated()
    `PolicyError(policy:*)`，不会因为来自 storage 而改成 `StorageError`。这样即使未来出现
    绕过 `policy_core` 的调用者，非法数据也无法经由 storage 进入。
 3. `spent` 的权威来源是 **storage 中持久化的累计金额**（persisted cumulative spend），
-   不是调用者传入值。
-4. 若调用者传入的 `spent` / `expected_spent` 低于持久化累计金额，抛出独立的
-   `StorageError`（不是 `PolicyError`，也不进入 `REVIEW`）。
+   不是调用者传入值。对于 `pipeline.process()`，storage 必须在锁内重新读取该权威值；
+   pipeline 传入的旧 `spent`（无论高于还是低于最新值）不得覆盖它，也不得单独导致
+   `StorageError`。
+4. 对直接调用 storage 的公开接口，若显式传入的 `expected_spent` 低于持久化累计金额，
+   仍抛出独立的 `StorageError`（不是 `PolicyError`，也不进入 `REVIEW`）。pipeline
+   使用受控的内部写入路径，以区分这两种调用语义；不能提供让普通调用者关闭该检查的参数。
 5. 允许。`spent + amount == budget_limit` 被接受（等于预算不越界）。
 6. 是。`spent + amount > budget_limit` 始终拒绝，抛出
    `PolicyError(code="policy:budget", review=True)`。
 
-> `expected_spent` 是**校验参数**，不是持久化字段。它必须等于持久化累计金额或更高；
-> 更低则 `StorageError`，更高则允许但校验更严格（`total == expected_spent + amount`
-> 必须成立）。以上为设计口径；实现合入与本地验证仍 pending。
+> `expected_spent` 是**直接 storage API 的校验参数**，不是持久化字段；低于持久化累计值
+> 仍是算术一致性错误并抛 `StorageError`。pipeline 路径不把调用者快照当作 `expected_spent`：
+> storage 在锁内以最新持久化累计值计算 `total` 并执行预算判断。以上为设计口径；实现合入
+> 与验证仍 pending。
 
 ## 4. 错误分类和 fail-closed 行为
 
@@ -234,8 +238,8 @@ D 待实现项）：
   `PolicyError(policy:*)`。
 - 直接 storage 调用不写 review 证据；pipeline 级 policy 拒绝尝试恰好写一条 review 线，
   若写失败则抛 `StorageError` 且不产生正常数据（写失败时不得声称存在 review 行）。
-- persisted cumulative spend 权威；`expected_spent` 是校验参数（非持久字段），低于持久值
-  抛 `StorageError`，更高允许但更严格。
+- persisted cumulative spend 权威。pipeline 路径在 storage 锁内使用最新持久值覆盖调用者的
+  stale `spent`；direct storage API 的 `expected_spent < persisted` 仍抛 `StorageError`。
 - 预算相等接受；超预算抛 `PolicyError(code="policy:budget", review=True)`。
 - 禁止 hidden retry；禁止 catch-all 合并不同失败类别。
 - `call_id` 系统生成、不可被模型覆盖、进入 `policy_core` 前移除。
