@@ -74,7 +74,7 @@ def test_non_200_request_made_no_usage(log, monkeypatch):
     assert rec["request_made"] is True
     assert rec["tokens"] is None
     assert rec["usage_source"] == "missing"
-    assert rec["error"] == "http 500: err"
+    assert rec["error"] == "http 500 (LlmTransportError)"
 
 
 def test_malformed_envelope_request_made_no_usage(log, monkeypatch):
