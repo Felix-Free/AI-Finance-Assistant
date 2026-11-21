@@ -1393,3 +1393,19 @@
     mypy_python39: "Success: no issues found in 11 source files"
     fault_injection: "release+logger, close+logger, and pre-commit+cleanup failures all preserved the caller's result"
     pending: "final E re-verification and merge"
+- date: "2026-11-21"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 3
+  topic: "privacy-safe logs, authoritative ledger budgeting under concurrency, public I/O errors"
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/ai-use-log.yaml
+    - test/offline/test_pipeline_seam.py
+    - test/offline/test_evidence_join.py
+  summary: >
+    After C's audit was reviewed by E, OpenCode drafted offline test-first scenarios for privacy-safe
+    logs, authoritative ledger budgeting under concurrency, and fixed public I/O errors; D's
+    implementation follows independent test review. No results are claimed.
+  pending: "independent review of the drafted tests"
