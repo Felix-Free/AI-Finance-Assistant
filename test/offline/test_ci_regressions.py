@@ -100,12 +100,12 @@ def git_history(tmp_path):
     }
 
 
-def _run_gate(history, target_sha):
+def _run_gate(history, target_sha, base=None, head=None, submitted_at=None):
     module = runpy.run_path(str(CI_CHECKS))
     gate = module["gate_test_approval"]
     env = {
-        "BASE_SHA": history["base"],
-        "PR_HEAD_SHA": history["impl"],
+        "BASE_SHA": base if base is not None else history["base"],
+        "PR_HEAD_SHA": head if head is not None else history["impl"],
         "PR_AUTHOR": "original-author",
         "GH_TOKEN": "",
     }
@@ -116,7 +116,7 @@ def _run_gate(history, target_sha):
             "author_association": "MEMBER",
             "state": "APPROVED",
             "commit_id": target_sha,
-            "submitted_at": _REVIEW_SUBMITTED,
+            "submitted_at": submitted_at or _REVIEW_SUBMITTED,
         }
     ]
     return gate(env, reviews=reviews, git_cwd=str(history["repo"]))
@@ -290,3 +290,87 @@ def test_gate1_pr20_waiver(tmp_path):
         assert summary.read_text(encoding="utf-8").strip() == (
             waived if flag == "true" else ""
         )
+
+
+# ---------------------------------------------------------------------------
+# Gate 1: upstream-sync and post-approval test-edit histories (real repos)
+# ---------------------------------------------------------------------------
+
+_SYNC_TIME = "2026-11-16T05:00:00+00:00"
+_MERGE_TIME = "2026-11-16T06:00:00+00:00"
+_WEAKEN_TIME = "2026-11-16T07:00:00+00:00"
+_LATE_REVIEW = "2026-11-16T08:00:00+00:00"
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("test/test_upstream.py", 0),  # clean sync adds a different test file
+        ("test/test_feature.py", 1),  # add/add conflict resolved to upstream
+    ],
+    ids=["clean-sync-accepted", "conflict-rejected"],
+)
+def test_gate1_upstream_sync(git_history, path, expected):
+    """Upstream sync of only tests: a clean add passes, a conflict drop fails."""
+    repo = git_history["repo"]
+    _git(repo, ["branch", "feature", git_history["impl"]], _SYNC_TIME)
+    _git(repo, ["checkout", "-q", "-b", "upstream", git_history["base"]], _SYNC_TIME)
+    _write(repo, path, "def test_upstream_only():\n    assert True\n")
+    up = _commit(repo, "upstream tests", _SYNC_TIME)
+    _git(repo, ["checkout", "-q", "feature"], _MERGE_TIME)
+
+    if path == "test/test_feature.py":
+        with pytest.raises(subprocess.CalledProcessError) as exc:
+            _git(repo, ["merge", "--no-ff", "--no-commit", "upstream"], _MERGE_TIME)
+        assert exc.value.returncode == 1
+        unmerged = _git(repo, ["diff", "--name-only", "--diff-filter=U"], _MERGE_TIME)
+        assert path in unmerged
+        _git(repo, ["checkout", "--theirs", path], _MERGE_TIME)
+        merge_head = _commit(repo, "resolve conflict", _MERGE_TIME)
+    else:
+        _git(repo, ["merge", "-q", "--no-ff", "--no-edit", "upstream"], _MERGE_TIME)
+        merge_head = _git(repo, ["rev-parse", "HEAD"], _MERGE_TIME)
+
+    result = _run_gate(
+        git_history, git_history["test_only"], base=up, head=merge_head
+    )
+    assert result == expected
+
+
+def test_gate1_post_approval_test_edit_rejected(git_history, capsys):
+    """Editing the approved assertion after implementation is rejected."""
+    repo = git_history["repo"]
+    _write(repo, "test/test_feature.py",
+           "def test_new_behaviour():\n    pass\n")
+    head = _commit(repo, "weaken approved test", _WEAKEN_TIME)
+
+    assert _run_gate(git_history, git_history["test_only"], head=head) == 1
+    out = capsys.readouterr().out
+    assert "test/test_feature.py" in out
+
+
+def test_gate1_review_after_implementation_rejected(git_history, capsys):
+    """An approval submitted after the implementation commit is too late."""
+    assert _run_gate(
+        git_history,
+        git_history["test_only"],
+        submitted_at=_LATE_REVIEW,
+    ) != 0
+    text = capsys.readouterr().out.lower()
+    assert any(word in text for word in ("late", "before", "after", "timing")), text
+
+
+def test_gate1_no_approval_rejected(git_history, capsys):
+    """No valid reviewer approval is rejected with a no-review message."""
+    module = runpy.run_path(str(CI_CHECKS))
+    env = {
+        "BASE_SHA": git_history["base"],
+        "PR_HEAD_SHA": git_history["impl"],
+        "PR_AUTHOR": "original-author",
+        "GH_TOKEN": "fixture-only",
+    }
+    result = module["gate_test_approval"](
+        env, reviews=[], git_cwd=str(git_history["repo"])
+    )
+    assert result != 0
+    assert "no valid" in capsys.readouterr().out.lower()
