@@ -21,13 +21,20 @@ REVIEW_PATH = _REPO_ROOT / "logs" / "review.jsonl"
 
 
 def _append_rejection(record: dict) -> None:
-    """Append exactly one rejection line. Fail-closed: raise StorageError on failure."""
+    """Append exactly one rejection line. Fail-closed: raise StorageError on failure.
+
+    Business fields (amount/category/spent/total) are forced to ``None`` so a
+    review line never carries user amounts; only ids, the safe ``error`` code and
+    ``review`` survive. The failure message is safe (no path / raw OSError text).
+    """
+    for field in ("amount", "category", "spent", "total"):
+        record[field] = None
     try:
         REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
         with REVIEW_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:  # pragma: no cover - environment failure
-        raise storage.StorageError("evidence write failure: %s" % exc) from exc
+        raise storage.StorageError("review write failed") from exc
 
 
 def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
@@ -38,7 +45,9 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
     the record passed to ``policy_core.validate_record`` never contains it.
 
     When ``spent`` is None the running total is read from ``storage`` so that
-    INV-003 is checked against what has actually been persisted.
+    INV-003 is checked against what has actually been persisted. The caller's
+    ``spent`` is advisory only: the persisted total is always the authoritative
+    validation input, and a stale (low or high) value never decides the budget.
 
     Every policy rejection (INV-001, INV-002, INV-003) appends exactly one line
     to logs/review.jsonl carrying ``error`` = the ORIGINAL rejection code and
@@ -48,8 +57,9 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
     model call, written by call_llm.extract).
     ``LlmTransportError`` propagates unchanged and is never retried.
 
-    INV-003 support: a validated record is appended via ``storage.append_validated``
-    and a ``StorageError`` from persistence propagates (never a fake success).
+    INV-003 support: a validated record is appended via the internal storage
+    path so the persisted total is authoritative under the lock; a
+    ``StorageError`` from persistence propagates (never a fake success).
     Rejections are evidence, not state: they are logged to logs/review.jsonl and
     are never persisted.
     """
@@ -59,28 +69,24 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
     if not isinstance(call_id, str) or not call_id:
         raise storage.StorageError("missing call_id from model client")
 
-    if spent is None:
-        spent = storage.current_total()
+    # ``spent`` is advisory only: the persisted total is the authoritative
+    # validation input. A stale low or high caller value never decides the
+    # budget (and never raises StorageError by itself).
+    persisted = storage.current_total()
 
     # C's rule: rejections are evidence, not state — they are written to
     # logs/review.jsonl only and are NEVER passed to storage.
     try:
-        validated = policy_core.validate_record(raw, spent, budget_limit)
+        validated = policy_core.validate_record(raw, persisted, budget_limit)
     except policy_core.PolicyError as exc:
-        amount = raw.get("amount") if isinstance(raw, dict) else None
-        category = raw.get("category") if isinstance(raw, dict) else None
-        try:
-            total = spent + amount
-        except TypeError:
-            total = None
         _append_rejection({
             "call_id": call_id,
             "request_id": request_id,
             "error": exc.code,
-            "amount": amount,
-            "category": category,
-            "spent": spent,
-            "total": total,
+            "amount": None,
+            "category": None,
+            "spent": None,
+            "total": None,
             "review": exc.review,
         })
         raise
@@ -94,5 +100,21 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
         "budget_limit": budget_limit,
         "decided_at": decided_at,
     }
-    storage.append_validated(record, expected_spent=spent)
-    return record
+    # The pre-check above is only advisory; storage re-reads the persisted total
+    # under the lock and recomputes the authoritative total. A lock-time budget
+    # rejection is a PolicyError and gets exactly one review line; a
+    # StorageError propagates unchanged with no review.
+    try:
+        return storage._append_from_pipeline(record)
+    except policy_core.PolicyError as exc:
+        _append_rejection({
+            "call_id": call_id,
+            "request_id": request_id,
+            "error": exc.code,
+            "amount": None,
+            "category": None,
+            "spent": None,
+            "total": None,
+            "review": exc.review,
+        })
+        raise
