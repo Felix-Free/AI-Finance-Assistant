@@ -9,12 +9,31 @@ Fail-closed: a record that cannot be validated or written raises
 """
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
+import os
 import pathlib
+import shutil
+import tempfile
 from decimal import Decimal
-from typing import Iterator, Set, cast
+from typing import Any, Iterator, Optional, Set, cast
 
 from src import policy_core
+
+logger = logging.getLogger(__name__)
+
+_fcntl: Optional[Any]
+try:  # POSIX advisory file lock (cross-process)
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    _fcntl = None
+
+_msvcrt: Optional[Any]
+try:  # Windows file lock (cross-process)
+    import msvcrt as _msvcrt
+except ImportError:
+    _msvcrt = None
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA_PATH = _REPO_ROOT / "data" / "records.jsonl"
@@ -112,6 +131,81 @@ def _existing_call_ids() -> set:
     return ids
 
 
+def _acquire(fh) -> None:
+    """Take an exclusive lock on an open lock file (blocking)."""
+    if _fcntl is not None:
+        _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
+    elif _msvcrt is not None:  # pragma: no cover - Windows
+        _msvcrt.locking(fh.fileno(), _msvcrt.LK_LOCK, 1)
+    else:  # pragma: no cover - no OS lock available
+        raise StorageError(
+            "no OS file lock available (fcntl/msvcrt); refusing an unsafe append"
+        )
+
+
+def _release(fh) -> None:
+    """Release the exclusive lock taken by ``_acquire``."""
+    if _fcntl is not None:
+        _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
+    elif _msvcrt is not None:  # pragma: no cover - Windows
+        _msvcrt.locking(fh.fileno(), _msvcrt.LK_UNLCK, 1)
+    else:  # pragma: no cover - unreachable: _acquire refuses without an OS lock
+        return
+
+
+def _best_effort_warning(message: str) -> None:
+    """Log a teardown problem without ever letting logging failure escape."""
+    try:
+        logger.warning(message)
+    except Exception:  # pragma: no cover - logging must never mask the result
+        pass
+
+
+@contextlib.contextmanager
+def _locked():
+    """Exclusive lock across read -> duplicate check -> budget check -> write -> replace.
+
+    Uses a same-directory sidecar lock file ``<data>.lock`` so writers in other
+    processes are serialised too (POSIX ``flock`` / Windows ``msvcrt.locking``,
+    both blocking). There is no process-local fallback: if neither OS lock is
+    available the append fails closed with ``StorageError`` before any temp file
+    is created.
+    """
+    lock_path = DATA_PATH.with_name(DATA_PATH.name + ".lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = lock_path.open("a+b")
+    except OSError as exc:
+        raise StorageError("cannot acquire storage lock: %s" % exc) from exc
+    try:
+        _acquire(fh)
+    except StorageError:
+        try:
+            fh.close()
+        except Exception:
+            pass
+        raise
+    except OSError as exc:
+        try:
+            fh.close()
+        except Exception:
+            pass
+        raise StorageError("cannot acquire storage lock: %s" % exc) from exc
+    try:
+        yield
+    finally:
+        try:
+            try:
+                _release(fh)
+            except Exception:
+                _best_effort_warning("storage lock release failed")
+        finally:
+            try:
+                fh.close()
+            except Exception:
+                _best_effort_warning("storage lock close failed")
+
+
 def append_validated(record: dict, expected_spent=None) -> None:
     """Re-check the record against the persisted state, then append one JSON line.
 
@@ -126,50 +220,88 @@ def append_validated(record: dict, expected_spent=None) -> None:
     ``PolicyError`` with the original ``policy:*`` code; under-reported spend,
     arithmetic inconsistency and IO failures raise ``StorageError``. Every
     validation failure rejects before any byte is written, so the file is
-    unchanged; an interruption during the write itself can leave a partial final
-    line, which readers reject as a ``StorageError`` (fail-closed).
+    unchanged. The append itself is atomic: the existing bytes and the new line
+    are written to a same-directory temporary file, flushed and ``fsync``-ed,
+    then committed with ``os.replace``. A failed commit leaves the original
+    file byte-identical; readers therefore never see a partially written line.
     """
     _validate_record(record)
-    if record["call_id"] in _existing_call_ids():
-        raise StorageError("duplicate call_id")
-    if expected_spent is not None and not _is_number(expected_spent):
-        raise StorageError(
-            "expected_spent must be a number, got %r"
-            % type(expected_spent).__name__
-        )
-    persisted = current_total()
-    if expected_spent is None:
-        effective = persisted
-    else:
-        effective = expected_spent
-        if effective < persisted:
+    with _locked():
+        if record["call_id"] in _existing_call_ids():
+            raise StorageError("duplicate call_id")
+        if expected_spent is not None and not _is_number(expected_spent):
             raise StorageError(
-                "expected_spent below persisted cumulative spend: %r < %r"
-                % (effective, persisted)
+                "expected_spent must be a number, got %r"
+                % type(expected_spent).__name__
             )
-    policy_core.enforce_amount(record["amount"])
-    policy_core.enforce_category(record["category"])
-    policy_core.enforce_budget(effective, record["amount"], record["budget_limit"])
-    if (Decimal(str(record["total"]))
-            != Decimal(str(effective)) + Decimal(str(record["amount"]))):
-        raise StorageError(
-            "total inconsistent with expected_spent + amount: %r != %r + %r"
-            % (record["total"], effective, record["amount"])
-        )
-    try:
-        line = json.dumps(record, ensure_ascii=False)
-    except TypeError:
-        field = _non_serialisable_field(record)
-        raise StorageError(
-            "record is not JSON-serialisable: field %r has type %r"
-            % (field, type(record.get(field)).__name__)
-        ) from None
-    try:
-        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DATA_PATH.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-    except OSError as exc:
-        raise StorageError("cannot write %s: %s" % (DATA_PATH, exc)) from exc
+        persisted = current_total()
+        if expected_spent is None:
+            effective = persisted
+        else:
+            effective = expected_spent
+            if effective < persisted:
+                raise StorageError(
+                    "expected_spent below persisted cumulative spend: %r < %r"
+                    % (effective, persisted)
+                )
+        policy_core.enforce_amount(record["amount"])
+        policy_core.enforce_category(record["category"])
+        policy_core.enforce_budget(effective, record["amount"], record["budget_limit"])
+        if (Decimal(str(record["total"]))
+                != Decimal(str(effective)) + Decimal(str(record["amount"]))):
+            raise StorageError(
+                "total inconsistent with expected_spent + amount: %r != %r + %r"
+                % (record["total"], effective, record["amount"])
+            )
+        try:
+            line = json.dumps(record, ensure_ascii=False)
+        except TypeError:
+            field = _non_serialisable_field(record)
+            raise StorageError(
+                "record is not JSON-serialisable: field %r has type %r"
+                % (field, type(record.get(field)).__name__)
+            ) from None
+        try:
+            DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(
+                dir=str(DATA_PATH.parent),
+                prefix=DATA_PATH.name + ".",
+                suffix=".tmp",
+            )
+        except OSError as exc:
+            raise StorageError(
+                "cannot create temporary file: %s" % exc
+            ) from exc
+        tmp = pathlib.Path(tmp_name)
+        try:
+            fh = os.fdopen(fd, "wb")
+        except Exception as exc:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise StorageError(
+                "cannot open temporary file: %s" % exc
+            ) from exc
+        try:
+            with fh:
+                if DATA_PATH.exists():
+                    with DATA_PATH.open("rb") as src:
+                        shutil.copyfileobj(src, fh)
+                fh.write((line + "\n").encode("utf-8"))
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, DATA_PATH)
+        except OSError as exc:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise StorageError("cannot write %s: %s" % (DATA_PATH, exc)) from exc
 
 
 def current_total() -> float:

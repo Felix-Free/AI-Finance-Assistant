@@ -22,6 +22,8 @@ import uuid
 import requests
 from dotenv import load_dotenv
 
+from src.failure_kind import failure_kind
+
 load_dotenv()
 
 BASE_URL = (os.environ.get("LLM_BASE_URL") or "").rstrip("/")
@@ -233,12 +235,7 @@ def extract(text: str, request_id=None) -> dict:
     try:
         raw, usage = _post(payload)
     except LlmTransportError as exc:
-        status_code = getattr(exc, "status_code", None)
-        if status_code is not None:
-            body = (getattr(exc, "body", "") or "")[:120]
-            error = "http %s: %s" % (status_code, body)
-        else:
-            error = str(exc)
+        error = failure_kind(exc)
         _append_log(_line(
             request_made=True, usage_source="missing", error=error,
         ))
