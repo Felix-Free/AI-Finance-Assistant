@@ -9,7 +9,7 @@
 >
 > **Scoring policy.** Likelihood and Impact are left **`TBD`** unless the project material
 > supports a value. This register does **not** invent scores. It also does **not** approve any
-> pending decision (PD-002, PD-007, PD-008).
+> pending decision (PD-007, PD-008).
 
 ---
 
@@ -33,7 +33,7 @@
 - **No scores are assigned.** Likelihood/Impact remain `TBD` pending team input; the RAG/scoring of
   these risks is not decided here.
 - **Status `Open`** means "present and unresolved", not "accepted". No risk is marked closed.
-- **Nothing here approves** PD-002, PD-007, or PD-008, and nothing asserts unmerged code is on
+- **Nothing here approves** PD-007 or PD-008, and nothing asserts unmerged code is on
   `main`, that skipped tests passed, or that measurements are verified.
 - Related design context: ADR-001 (context structure) and ADR-002 (token budget); requirement
   rows: `requirements.yaml` NFR-001/002/006/007; status labels: `trace-matrix.md` §1.3.
