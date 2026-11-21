@@ -808,7 +808,6 @@
   files_modified:
   - docs/architecture/runtime-policy-catalog.md
   - docs/architecture/evaluation-logbook.md
-  - docs/architecture/phase2-c-handoff.md
   - docs/ai-use-log.yaml
   files_not_modified:
   - src/**
