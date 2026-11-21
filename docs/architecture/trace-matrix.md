@@ -118,14 +118,14 @@ assigned **only when the evidence supports them**:
 | NFR-006 | Log traceability | Model client / pipeline; Runtime Monitor: — | **`main`: `src/call_llm.py::_append_log`; `src/pipeline.py::_append_rejection`.** `_append_rejection` is the renamed rejection writer on `main` (was `_append_review`); it carries `call_id` and joins to `src/storage.py` | `main`: `test_pipeline_seam.py::test_seam_returns_parsed_object_and_logs_once`; `test_seam_non_json_is_logged_then_reraised`; `test_policy_rejection_writes_one_review_line`. `test/offline/test_evidence_join.py` on `main` (present; all test functions currently skipped pending E) | PARTIALLY_IMPLEMENTED — join code on `main`, join test skipped | main-implemented; test-pending | "Exactly one line" behaviour tested on `main`. The call_id accepted/rejected join (`_append_rejection`, `storage.py`) is now on `main` (merged via PR #18). No numeric coverage threshold. PD-008 (owner C). |
 | NFR-007 | Testability | test suite / CI; Runtime Monitor: — | `main`: `test/offline/test_policy_core_smoke.py`; `test/offline/test_invariants.py` (2 INV-001 tests) | `main`: smoke INV-001/002/003 guard-removal tests in `test_policy_core_smoke.py`; `main` `test_invariants.py` = 2 INV-001 tests. E branch (unmerged `cab1901`) `test_invariants.py` = 12 INV tests | IN_MAIN; IMPLEMENTED_AND_TESTED — original AC met on `main` | main-implemented; test-pending | Original AC (`verification`: "map each INV to ≥1 test that fails without the guard; run pytest test/offline") is **met on `main`**: INV-001/002/003 each have a `pytest.raises(PolicyError)` smoke test that fails if the guard is removed. `main`'s `test_invariants.py` has **only 2 INV-001 tests**. E's **unmerged** `feat/e-phase2-verification` (`cab1901`) adds **12 INV tests covering INV-001/002/003** (guard-removal) — those are E's **local** results, **not** `main`/CI results. `test file exists` ≠ `test passed` ≠ `CI verified`. |
 
-### 2.3 Business invariants (INV-001 … INV-003; INV-PENDING-01 is a placeholder, not a formal requirement)
+### 2.3 Business invariants (INV-001 … INV-003; plus INV-PENDING-01, now confirmed and excluded from the 36 formal count)
 
 | Requirement ID | Description | Architecture Component | Source File/Function | Test File/Test Case | Verification Evidence | Status | Gap/Remarks |
 |---|---|---|---|---|---|---|---|
 | INV-001 | Amount finite, >0, ≤2 dp | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_amount` | `test_policy_core_smoke.py::test_inv001_rejects_invalid_amount` (9 params); `test_inv001_accepts_boundary_and_returns_unchanged`; `test_inv001_never_returns_decimal` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-002/003/004) | main-implemented | Negative test fails if the guard is removed. E's INV-001 tests are `PENDING_MERGE`. |
 | INV-002 | Category in closed whitelist (case-sensitive) | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_category`; `src/policy_core.py::CATEGORY_WHITELIST` | `test_policy_core_smoke.py::test_inv002_rejects_out_of_vocabulary`; `test_inv002_accepts_every_whitelisted_category` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-005/006) | main-implemented | E branch adds **no** INV-002 test. Whitelist membership finality: `INV-PENDING-01`. |
 | INV-003 | Cumulative spend ≤ budget (equality allowed) | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_budget` | `test_policy_core_smoke.py::test_inv003_equality_is_allowed`; `test_inv003_over_budget_rejected_with_review` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-007/008) | main-implemented | E branch adds **no** INV-003 test. No separate `budget±0.01` parametrised cases (equality + over-budget covered). |
-| INV-PENDING-01 | **[Placeholder — not a formal requirement; excluded from the total of 36]** Exact category whitelist membership final | Policy core constant; Runtime Monitor: — | `src/policy_core.py::CATEGORY_WHITELIST` | `test_inv002_accepts_every_whitelisted_category` (reads current 8 values) | IN_MAIN; NOT_VERIFIED — finality unconfirmed | pending_confirmation | Membership is exercised, but whether the 8 values are **final** is unconfirmed (owner C, PD-002). Counted separately from the 36 formal requirements. |
+| INV-PENDING-01 | **[Not a formal requirement — excluded from the total of 36; finality confirmed]** Exact category whitelist membership final | Policy core constant; Runtime Monitor: — | `src/policy_core.py::CATEGORY_WHITELIST` | `test_inv002_accepts_every_whitelisted_category` (reads current 8 values) | IN_MAIN; IMPLEMENTED_AND_TESTED — finality confirmed | confirmed | Finality confirmed: C confirmed the final 8-category whitelist on 2026-11-19 (now approved; see `requirements.yaml` INV-PENDING-01). Values: food, transport, shopping, entertainment, housing, utilities, health, other. Counted separately from the 36 formal requirements. |
 
 ### 2.4 AI requirements (AI-REQ-001 … AI-REQ-008)
 
@@ -197,8 +197,8 @@ must not be reported as passing on `main`/CI until merged and run in the hosted 
 ERR (5) + SEC (5) = **36 formal requirements**.
 
 **Counting rules (explicit):**
-- `INV-PENDING-01` is a **placeholder for an unconfirmed decision**, kept in §2.3 for traceability but
-  **not counted** in the total of 36.
+- `INV-PENDING-01` is a **placeholder** (finality now confirmed by C on 2026-11-19; see §2.3), kept in
+  §2.3 for traceability but **not counted** in the total of 36.
 - `PD-001 … PD-008` are **pending decisions**, not requirement rows; they are **not** counted.
 - Nothing was deleted to reach 36 — the placeholder row remains, only excluded from the count.
 
@@ -238,10 +238,10 @@ ERR (5) + SEC (5) = **36 formal requirements**.
 | IMPLEMENTED_NOT_TESTED | 5 | AI-REQ-005, AI-REQ-008, SEC-002, ERR-004, SEC-005. |
 | PARTIALLY_IMPLEMENTED | 6 | NFR-003, NFR-004, NFR-005, NFR-006, SEC-001, SEC-004. |
 | NOT_IMPLEMENTED | 0 | — |
-| NOT_VERIFIED | 3 | NFR-001, NFR-002, `INV-PENDING-01 (placeholder, excluded from the formal requirement count)`. |
+| NOT_VERIFIED | 2 | NFR-001, NFR-002 (`INV-PENDING-01` is now confirmed by C on 2026-11-19 and excluded from the 36). |
 
-> Counts use the 36 formal requirements. `INV-PENDING-01` is NOT_VERIFIED but is excluded from these
-> per-group totals (placeholder). A requirement is `IMPLEMENTED_AND_TESTED` only when its cited test is
+> Counts use the 36 formal requirements. `INV-PENDING-01` is now confirmed (C, 2026-11-19) and remains
+> excluded from these per-group totals (placeholder). A requirement is `IMPLEMENTED_AND_TESTED` only when its cited test is
 > on `main`; unmerged tests never raise a row's status.
 
 ---
