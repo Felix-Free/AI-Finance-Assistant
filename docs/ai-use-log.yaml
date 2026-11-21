@@ -1313,3 +1313,15 @@
     - test/offline/test_ci_regressions.py
     - docs/ai-use-log.yaml
   summary: "E selected the upstream-only sync case versus the post-approval test-edit and conflict-modification cases for the test-first PR: an upstream branch from base adds only upstream tests and is merged, while a separate case edits or a conflict resolution drops the approved definition; a late-approval case covers the timing diagnostic. Implementation awaits independent review."
+
+- date: "2026-11-21"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 2
+  topic: Gate 1 upstream-sync handling of existing test paths
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/ci_checks.py
+    - docs/ai-use-log.yaml
+  summary: "After D approved the exact test commit 245e18b, E requested preserving upstream-only test changes while rejecting post-approval PR edits and lost tests at merge. Human review required handling upstream modifications to existing files, not just additions. No test results claimed."
