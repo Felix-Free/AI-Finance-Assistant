@@ -1409,3 +1409,19 @@
     logs, authoritative ledger budgeting under concurrency, and fixed public I/O errors; D's
     implementation follows independent test review. No results are claimed.
   pending: "independent review of the drafted tests"
+
+- date: "2026-11-22"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 4
+  topic: "narrow test-only scope for tempfile fault injection and four model-failure cases"
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/ai-use-log.yaml
+    - test/offline/test_evidence_join.py
+  summary: >
+    C requested narrowing the tempfile fault injection and checking four model-failure cases with
+    synthetic markers and real JSONL. E directed a test-only scope; D's implementation follows human
+    review. No results are claimed.
+  pending: "human review of D's implementation and independent test review"
