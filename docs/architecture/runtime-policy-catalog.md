@@ -70,20 +70,6 @@ logging and is **not** a business-state mutation, so it is out of scope for this
 - **Implementation seam** — `code-confirmed`: `src/call_llm.py::extract` (`json.loads` block).
 - **Test-evidence status** — `code-confirmed`: covered by `test/offline/test_pipeline_seam.py::test_seam_non_json_is_logged_then_reraised` (asserts one line and `error=="not_json"`).
 
-> **Valid JSON that is not an object (doc-only / unmerged + branch note).** A JSON array,
-> string or number parses successfully, so it does **not** trigger RP-001 or `not_json`.
-> On **this branch** (`origin/main`-identical code) `call_llm.extract` logs the parsed
-> value with no `error` key and returns it; it adds **no** `__call_id__` because `call_id`
-> does not exist on this branch (`doc-only (unmerged)`). In the normal `pipeline.process`
-> path on this branch, the returned non-object flows straight to
-> `policy_core.validate_record`, which raises `PolicyError(code="policy:amount")` for a
-> non-dict (`src/policy_core.py:97-99`) — so a valid-but-non-object JSON is classified as a
-> **policy rejection**, not a `StorageError`. The Phase 2 text's claim that a
-> `StorageError("missing call_id from model client")` is raised before `policy_core` is
-> **`doc-only (unmerged)`** (it describes D's unmerged branch, which adds `call_id`) and is
-> **not** what this branch does. The difference in failure classification remains an
-> **unresolved D implementation gap**; `pending D`.
-
 ### RP-002 — Model-client configuration / transport / response-protocol failure
 
 - **Trigger** — `code-confirmed`: missing base URL or API key before HTTP (`src/call_llm.py:123`); network error, timeout, auth failure, non-200 status (`src/call_llm.py:75-83`), or an HTTP 200 response whose envelope is not valid JSON, lacks `choices[0].message.content`, or has a non-string `content` (`src/call_llm.py:85-102`).
@@ -162,40 +148,21 @@ logging and is **not** a business-state mutation, so it is out of scope for this
 - **Trigger** — `doc-only (unmerged)` / `pending D`: storage rejects a new record's shape or duplicate `call_id`, cannot read existing records (including malformed JSON or a nonnumeric stored amount when computing the current total), or cannot write a validated record (I/O error or unwritable path). The uncaught type/serialization cases recorded from D's branch are required to follow RP-007 but (on that branch) do not currently raise `StorageError`.
 - **Action** — `pending D`: raise an **independent `StorageError`**. It is an infrastructure failure, not a rule decision.
 - **Execution order** — `pending D`: (read current total → validate → append) is the intended order; it is defined only on D's unmerged branch and is **not** present on this branch.
-- **State-change guarantee** — `pending D`: **No partial state** is allowed — the previous stored state remains authoritative (the write either completes or the prior state stands). *Reserved prefix:* `policy:*` is reserved **only** for deterministic policy/rule rejection (RP-003/005/006); a storage failure **must not** be rewritten as `policy:*`. *Not a policy rejection:* a storage failure must not create a policy review line (`logs/review.jsonl`). No part of this is demonstrated on this branch.
+- **State-change guarantee** — **No partial state** is allowed: the previous stored state remains authoritative (the write either completes or the prior state stands). D must implement this boundary, and E must verify it with a failure-injection test. *Reserved prefix:* `policy:*` is reserved **only** for deterministic policy/rule rejection (RP-003/005/006); a storage failure **must not** be rewritten as `policy:*`.
+- **Not a policy rejection** — a storage failure must not create a policy review line (`logs/review.jsonl`).
 - **Evidence and logging** — `pending D`: the required failure signal is `StorageError` to the caller; a read or validation failure stops before a new record is appended; a write failure has the separate no-partial-state requirement. The exact storage-failure evidence detail is **not defined** (see below) and must not be invented.
 - **Implementation seam** — `doc-only (unmerged)`: `src/storage.py` (absent here). `src/pipeline.py::process` on this branch has **no** storage call.
 - **Test-evidence status** — `pending D`: no test on this branch; the storage tests and the skipped `test_evidence_join.py` live only on D's unmerged branch. **No test run on this branch proves RP-007.**
 
-**Unresolved D exception paths (code review of D's branch, not test-verified, not on this branch).** In
-`src/storage.py::_existing_call_ids`, a persisted JSON object with an unhashable
-`call_id` (for example a list) reaches `ids.add(...)` and raises `TypeError`; the read
-path does not convert it to `StorageError`. Missing stored `call_id` values are skipped,
-and empty strings are added without validation; neither is reported as an invalid
-stored ID. In `append_validated(record)`, structural
-checks do not validate `decided_at` for JSON serializability. A direct caller can pass a
-nonserializable value (for example a date/time object); `json.dumps(record)` then raises
-`TypeError`, while the write handler catches only `OSError`. Both failures must stop the
-operation and surface as `StorageError` under RP-007; this conversion is **not implemented**.
+> **Storage failure classification.** Storage read, validation, serialization, and write
+> failures must surface as an independent `StorageError`. They are infrastructure
+> failures, not policy decisions; they must not be rewritten as `policy:*` or create a
+> valid policy-review line.
 
-> **Pending clarification.** The exact storage-failure evidence detail (whether it is
-> logged at all and, if so, in what record and format) is **not** defined by D's current
-> implementation. RP-007 requires only `StorageError`, no `policy:*` conversion, and the
-> absence of a `policy` review line; it does not invent a new log format. The precise
-> evidence record remains pending until the implementation/spec fixes it.
-
-**Rejection-evidence write-failure (current *branch* behavior differs from D's branch).**
-The Phase 2 text records that on D's unmerged branch, if `pipeline._append_rejection`
-cannot append to `logs/review.jsonl`, D raises `storage.StorageError("evidence write
-failure: ...")` instead of returning the original `PolicyError` — that is *not* this
-branch's code and is `doc-only (unmerged)`. **On this branch** (`origin/main`-identical),
-`src/pipeline.py::_append_review` does **not** map the review-write `OSError` to a
-`StorageError`; it raises `PolicyError("cannot write review log: ...", code="policy:budget",
-review=True)` (`src/pipeline.py:27-31`). That means a **review evidence-write failure is
-currently misclassified as a budget policy rejection** — a genuine error-classification
-defect. No rejected record is persisted (there is no storage on this branch), but the
-misclassification is wrong: an infrastructure failure must not masquerade as `policy:budget`.
-This is recorded for D to fix (`pending D`); it is not fixed by this documentation task.
+> **Rejection-evidence write failure.** If writing rejection evidence fails, the operation
+> must fail closed, raise `StorageError`, leave normal business data unchanged, and never
+> treat a partial review record as valid evidence. RP-007 does not prescribe a separate
+> storage-failure log format.
 
 ---
 
@@ -478,19 +445,19 @@ process working directory. This is **confirmed** in:
 - `src/call_llm.py` — `LOG_PATH` (`logs/llm_calls.jsonl`)
 - `src/pipeline.py` — `REVIEW_PATH` (`logs/review.jsonl`)
 - `src/storage.py` — `DATA_PATH` (`data/records.jsonl`)
-- `src/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
+- `scripts/measure_latency.py` — `LATENCY_PATH` (`logs/latency.jsonl`)
 
 It is **not** used everywhere: `src/report_tokens.py` still defaults to a **relative**
 `LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")` (working-directory dependent, overridable
-by an argument), and `src/measure_tokens.py` defines no path of its own. The anchoring
+by an argument), and `scripts/measure_tokens.py` defines no path of its own. The anchoring
 claim applies only to the four modules listed above.
 
 > **Branch caveat (Phase 3).** Only `src/call_llm.py` and `src/pipeline.py` exist on this
 > branch, and **neither** anchors its path: `LOG_PATH = pathlib.Path("logs/llm_calls.jsonl")`
 > (`src/call_llm.py:22`) and `REVIEW_PATH = pathlib.Path("logs/review.jsonl")`
 > (`src/pipeline.py:18`) are **relative** and therefore working-directory dependent. The
-> `parents[1]` anchoring and the `src/storage.py` / `src/measure_latency.py` / D-branch
-> modules named above are `doc-only (unmerged)`.
+> `parents[1]` anchoring and the `src/storage.py` / `scripts/measure_latency.py` /
+> `scripts/measure_tokens.py` / D-branch modules named above are `doc-only (unmerged)`.
 
 #### D-02 — error logging short-code rule (unresolved implementation debt)
 
