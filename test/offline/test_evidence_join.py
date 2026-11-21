@@ -24,8 +24,10 @@ import json
 import pathlib
 import tempfile
 import threading
+import uuid
 
 import pytest
+import requests
 
 from src import call_llm, pipeline, policy_core, storage
 
@@ -274,17 +276,26 @@ def test_accept_append_open_failure_raises_and_keeps_old_bytes(isolated, monkeyp
     assert seed["call_id"]
     before = storage.DATA_PATH.read_bytes()
 
+    # Snapshot the ledger directory so residue from the failed append is provable.
+    ledger_parent = storage.DATA_PATH.parent
+    before_files = {p.name for p in ledger_parent.iterdir()}
+
     monkeypatch.setattr(
         call_llm, "_post", _fake_post('{"amount": 5, "category": "food"}'),
     )
-    _block_append(monkeypatch, storage.DATA_PATH)
 
     orig_mkstemp = tempfile.mkstemp
-    target_dir = storage.DATA_PATH.parent
+    target_dir = str(ledger_parent)
     target_prefix = storage.DATA_PATH.name + "."
+    hits = []
 
     def blocking_mkstemp(*args, **kwargs):
-        if kwargs.get("dir") == str(target_dir) and kwargs.get("prefix") == target_prefix:
+        if (
+            kwargs.get("dir") == target_dir
+            and kwargs.get("prefix") == target_prefix
+            and kwargs.get("suffix") == ".tmp"
+        ):
+            hits.append("mkstemp")
             raise OSError("simulated append-open failure")
         return orig_mkstemp(*args, **kwargs)
 
@@ -292,9 +303,18 @@ def test_accept_append_open_failure_raises_and_keeps_old_bytes(isolated, monkeyp
     with pytest.raises(storage.StorageError) as exc:
         pipeline.process("y", spent=100.0, budget_limit=1000.0)
 
+    # Exactly one fault injection for the records-file temp create.
+    assert len(hits) == 1, hits
     assert isinstance(exc.value.__cause__, OSError)
     assert str(exc.value.__cause__) == "simulated append-open failure"
     assert storage.DATA_PATH.read_bytes() == before
+    # No temp-file residue left behind in the ledger directory.
+    after_files = {p.name for p in ledger_parent.iterdir()}
+    assert after_files == before_files
+    assert not any(
+        name.startswith(target_prefix) and name.endswith(".tmp")
+        for name in after_files
+    )
     # No policy review line: a storage write failure is not a policy rejection.
     assert not pipeline.REVIEW_PATH.exists()
 
@@ -614,3 +634,91 @@ def test_public_storage_error_redacts_io_details(isolated, monkeypatch, site):
     log_text = call_llm.LOG_PATH.read_text(encoding="utf-8")
     for marker in markers[:4]:
         assert marker not in log_text
+
+
+_FAKE_MARKER = "合成异常响应体-42-" + _CRED_MARKER
+
+
+class _FakeResponse:
+    def __init__(self, status, content):
+        self.status_code = status
+        self.encoding = "utf-8"
+        self._content = content
+
+    @property
+    def text(self):
+        return self._content.decode("utf-8")
+
+    def json(self):
+        return json.loads(self.text)
+
+
+def _failure_post(kind):
+    if kind == "timeout":
+        def _p(payload):
+            raise requests.exceptions.ReadTimeout("read timeout " + _FAKE_MARKER)
+        return _p
+    if kind == "http":
+        return lambda payload: _FakeResponse(503, _FAKE_MARKER.encode("utf-8"))
+    if kind == "protocol":
+        body = '{"body": "%s", "choices": []}' % _FAKE_MARKER
+        return lambda payload: _FakeResponse(200, body.encode("utf-8"))
+    raise AssertionError("unknown kind")
+
+
+@pytest.mark.parametrize(
+    "kind,error,request_made,makes_request",
+    [
+        ("config", "config: missing base url or key", False, False),
+        ("timeout", "transport: read timeout (LlmTransportError)", True, True),
+        ("http", "http 503 (LlmTransportError)", True, True),
+        ("protocol", "transport: other (LlmTransportError)", True, True),
+    ],
+    ids=["config-missing-key", "transport-read-timeout", "http-503", "protocol-missing-choices"],
+)
+def test_transport_failure_redacts_and_logs_one_line(
+    isolated, monkeypatch, kind, error, request_made, makes_request,
+):
+    text = "8421.37 food " + _sensitive_text()
+    request_id = uuid.uuid4().hex
+    seen = []
+
+    def spy_post(*args, **kwargs):
+        seen.append(args)
+        return _failure_post(kind)(None)
+
+    monkeypatch.setattr(call_llm.requests, "post", spy_post)
+    if kind == "config":
+        monkeypatch.setattr(call_llm, "API_KEY", "")
+
+    with pytest.raises(call_llm.LlmTransportError):
+        call_llm.extract(text, request_id=request_id)
+
+    assert len(seen) == (1 if makes_request else 0)
+
+    blob = call_llm.LOG_PATH.read_text(encoding="utf-8")
+    lines = blob.splitlines()
+    assert len(lines) == 1
+    line = json.loads(lines[0])
+
+    assert set(line) == TEN_KEYS
+    assert line["error"] == error
+    assert line["request_made"] is request_made
+    assert line["parsed"] is None
+    assert line["input"] == _redacted(text)
+    assert line["request_id"] == request_id
+    _assert_call_id(line["call_id"])
+
+    # raw: None when no response text existed; EXACT length descriptor when a
+    # response text was supplied to the log contract (http / protocol).
+    if kind in ("config", "timeout"):
+        assert line["raw"] is None
+    else:
+        body = _failure_post(kind)(None).text
+        assert line["raw"] == _redacted(body)
+
+    for marker in (_FAKE_MARKER, _URL_MARKER, _PATH_MARKER, _CRED_MARKER, "8421.37", "food"):
+        assert marker not in blob
+    decoded = json.dumps(line, ensure_ascii=False)
+    for marker in (_FAKE_MARKER, _URL_MARKER, _PATH_MARKER, _CRED_MARKER, "8421.37", "food"):
+        assert marker not in decoded
