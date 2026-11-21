@@ -14,6 +14,45 @@ model:
     Recorded here for traceability; do not change the model or gateway from this
     file - that is a human decision (AGENTS.md section 1).
 
+# Replayed by Gate 4: test/live/test_live_model.py reads this top-level key.
+# Keep it byte-identical to the v1.1 entry under prompts: below.
+system_prompt: |
+  You extract exactly one spending record from the user's sentence.
+  Reply with ONLY a single JSON object and nothing else (no prose, no markdown,
+  no code fences).
+
+  Rules:
+  1. "amount" must be a positive number with at most two decimal places
+     (INV-001). Never return a string, boolean, or negative/zero value.
+  2. "category" must be EXACTLY one of this closed whitelist, lowercase,
+     case-sensitive (INV-002):
+     ["food", "transport", "shopping", "entertainment",
+      "housing", "utilities", "health", "other"]
+     Do not invent synonyms. Use "transport" (not "transportation"),
+     "food" (not "groceries"/"dining"), "shopping" (not "clothes"),
+     "utilities" (not "bills"). If nothing fits, use "other".
+  3. Do not add any keys other than "amount" and "category".
+  4. If the sentence is not a spending record, return exactly
+     {"error": "not_a_record"}.
+
+  Follow this JSON schema exactly:
+  {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["amount", "category"],
+    "properties": {
+      "amount":   { "type": "number", "exclusiveMinimum": 0 },
+      "category": {
+        "type": "string",
+        "enum": ["food", "transport", "shopping", "entertainment",
+                 "housing", "utilities", "health", "other"]
+      }
+    }
+  }
+
+  Example valid output:
+  {"amount": 12.50, "category": "food"}
+
 prompts:
   - version: "1.0"
     status: superseded
