@@ -63,7 +63,7 @@ assessed as **design-level** only.
 | Token Cost | Neutral/unknown. | Neutral at present (only system prompt + sentence sent). | `architecture-blueprint.md` §7–§8. |
 | Maintainability | Weak: logic fused into prompt. | Strong: one model seam + isolated guards. | `structural-constraints.md`; `main` module boundaries. |
 | Testability | Weak: hard to isolate model "decisions". | Strong: guards are pure functions with offline tests. | NFR-007; `test/offline/test_policy_core_smoke.py` on `main`. |
-| Traceability | Weak: mixed responsibility. | Strong: one line per call; rejection evidence separate. | NFR-006; `src/pipeline.py::_append_review` on `main`. |
+| Traceability | Weak: mixed responsibility. | Strong: one line per call; rejection evidence separate. | NFR-006; `src/pipeline.py::_append_rejection` on `main`. |
 
 **Outcome:** B dominates A on Reliability, Security, Maintainability, Testability, Traceability, and is
 not worse on Token Cost → **B selected**. This is a design judgement backed by the `main`
@@ -102,12 +102,17 @@ Rationale summary (each tied to a criterion):
 ## 6. Evidence and Limitations
 
 - **Implemented & tested on `main`:** FR-001..008 core paths, INV-001/002/003 guards, offline smoke
-  tests, `_append_review` rejection logging (see `trace-matrix.md` §2 and §4; 36 formal requirements).
+  tests, `_append_rejection` rejection logging (see `trace-matrix.md` §2 and §4; 36 formal requirements).
 - **Design-only (not implemented):** ADR-001 context assembly/injection; ADR-002 compression/budget.
-- **Unmerged branch work (NOT `main` evidence):** D's `feat/D-phase2-measurement` (`df729a9`) adds
-  storage + token capture (`_append_rejection`, `storage.py`, `report_tokens.py`, `measure_latency.py`);
-  its `test_evidence_join.py` is **5 skipped**. E's `feat/e-phase2-verification` (`cab1901`) adds 12 INV
-  tests (un-skipped join); **unmerged**. Branch state verified 2026-11-16.
+- **Merged into `main` via PR #18 (D):** `src/storage.py`, `src/report_tokens.py`,
+  `scripts/measure_latency.py`, token capture, `call_id` threading, and `_append_rejection`. The
+  `test/offline/test_evidence_join.py` file is on `main` but its **4 test functions are all skipped**
+  (module-level `pytestmark = pytest.mark.skip(...)` plus per-test `pytest.skip`); the join
+  **implementation is merged**, while the **join test is still skipped — no passing-test evidence yet**.
+- **Still unmerged (not `main` evidence):** E's `feat/e-phase2-verification` (`cab1901`) adds a fuller
+  `test_invariants.py` (12 INV tests, guard-removal) and un-skips the join test; it is **not** an
+  ancestor of `main`, so its results are not `main`/CI evidence. Branch state verified against
+  `origin/main` (`f2442c2`); the online PR status was not re-verified this pass (no `gh`).
 - **`Pending Validation`:** token-cost and latency numbers (no committed runtime evidence; PD-007);
   `user_request_count` metric (not implemented); NFR-006 numeric coverage threshold (PD-008).
 - **Non-claims:** no numeric score, pass rate, benchmark, or CI-run result is asserted here; a skipped
