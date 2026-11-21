@@ -1393,6 +1393,34 @@
     mypy_python39: "Success: no issues found in 11 source files"
     fault_injection: "release+logger, close+logger, and pre-commit+cleanup failures all preserved the caller's result"
     pending: "final E re-verification and merge"
+- date: '2026-11-21'
+  role: A
+  student_id: '60528523'
+  phase: 2
+  session: 6
+  topic: 'D6 report framework: section ownership, word budget and evidence contract'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - Report.md
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/**
+  - test/**
+  - docs/req/**
+  - docs/architecture/**
+  summary: 'Replaced the placeholder Report.md with a D6 framework: 12 sections with a per-section owner, target word count, required evidence and inline citation, two diagram skeletons, the relative-contribution table with its mean/weight rule, and five self-reflection slots. The agent drafted the structure and the per-section evidence pointers from the repository; the human (leader) reviewed the structure, fixed the section-to-owner split, the 9,650-word budget and the honesty rules (no unmeasured NFR-001/002 claim, no "branch protection enabled" claim), and assigned the sections to the members. No application code, test or requirement file was touched.'
+  human_review:
+  - rejected a placeholder that only named sections; required owner, word budget and evidence per section
+  - required the report to state NFR-001/002 as pending and DEBT-08 as unverified instead of implying a pass
+  - required every claim to cite a repository artefact or a PR/CI link
+  - fixed the owner split so B keeps requirements/architecture traceability and E keeps gate evidence
+  - removed the framework guidance block from the submission text before merge
+  validation:
+    report_sections: '12 sections + 2 appendices; total word budget 9,650 (cap 10,000)'
+    owner_assignment: 'A: 1,2,5.1,5.3,7,10,12; B: 3,4.4,8; C: 4.1-4.3,9; D: 5.2,6.3; E: 6.1,6.2,6.4; reflections by each member'
+    gate_effect: 'Gate 6 requires a new session for the prompts/ change in this PR; this entry is that session'
+    local_checks: 'markdown reviewed; no src/, test/ or requirements change in this PR'
+    pending: 'Gate 4 semantic-eval diagnosis; section prose to be filled by the assigned owners'
 - date: '2026-11-16'
   role: B
   student_id: '60357951'
