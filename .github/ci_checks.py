@@ -50,6 +50,7 @@ EXIT_USAGE = 2
 
 MODEL_ENTRY = "src/call_llm.py"
 
+
 TRANSPORT_MODULES = ("requests", "httpx", "aiohttp", "urllib.request", "http.client", "socket")
 
 CRITICAL_FILES = frozenset({
@@ -270,6 +271,45 @@ def _test_changes_at(commit, cwd=None):
     return changes
 
 
+def _changed_paths(parent, commit, cwd):
+    out = git(
+        ["diff", "--name-only", "-z", "--no-renames", parent, commit],
+        cwd,
+    )
+    return [p for p in out.split("\x00") if p]
+
+
+def _test_tree_entry(rev, path, cwd):
+    return git(
+        ["--literal-pathspecs", "ls-tree", "-z", rev, "--", path],
+        cwd,
+    )
+
+
+def _post_approval_test_problem(sha, head, base, cwd=None):
+    chain = git(["rev-list", "--first-parent", head], cwd).split()
+    if sha not in chain:
+        return ("<approval outside first-parent history>", head)
+    for commit in chain:
+        if commit == sha:
+            break
+        parents = _parents(commit, cwd)
+        tests = [p for p in _changed_paths(parents[0], commit, cwd) if _is_test_path(p)]
+        if not tests:
+            continue
+        if len(parents) != 2 or not _is_ancestor(parents[1], base, cwd):
+            return (tests[0], commit)
+        bases = git(["merge-base", "--all", parents[0], parents[1]], cwd).split()
+        if len(bases) != 1:
+            return (tests[0], commit)
+        for path in tests:
+            if _test_tree_entry(parents[0], path, cwd) != _test_tree_entry(bases[0], path, cwd):
+                return (path, commit)
+            if _test_tree_entry(commit, path, cwd) != _test_tree_entry(parents[1], path, cwd):
+                return (path, commit)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # reviews / approvals
 # ---------------------------------------------------------------------------
@@ -394,6 +434,7 @@ def gate_test_approval(env, *, reviews=None, git_cwd=None):
 
     first_impl_time = min(_commit_time(c, git_cwd) for c in impl_commits)
     commit_set = set(commits)
+    timing_reason = ""
 
     for review in approvals:
         sha = (review.get("commit_id") or "").strip()
@@ -409,12 +450,31 @@ def gate_test_approval(env, *, reviews=None, git_cwd=None):
         if not all(_is_ancestor(sha, c, git_cwd) for c in impl_commits):
             continue
         if not _commit_time(sha, git_cwd) <= submitted < first_impl_time:
+            reason = (
+                "late review on %s submitted %s but must be before first "
+                "implementation %s"
+                % (sha[:12], submitted.isoformat(), first_impl_time.isoformat())
+            )
+            timing_reason = timing_reason or reason
             continue
-        if any(_is_test_path(p) for p in _diff_files(sha, head, git_cwd)):
+        problem = _post_approval_test_problem(sha, head, base, git_cwd)
+        if problem is not None:
+            path, commit = problem
+            reason = (
+                "test path changed after approved commit %s: %s in %s"
+                % (sha[:12], path, commit[:12])
+            )
+            timing_reason = timing_reason or reason
             continue
         return _ok("test-first approval verified at %s" % sha[:12])
 
-    return _fail("no approval on a qualified test-first commit")
+    if timing_reason:
+        return _fail(timing_reason)
+    return _fail(
+        "no approval on a qualified test-first commit (approved %s, "
+        "a test path changed or approval timing/ancestry failed)"
+        % (sorted(a.get("commit_id", "")[:12] for a in approvals) or "none")
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1213,6 +1213,118 @@
     local_ci_regressions: 4 passed
     pending: hosted rerun
 
+- date: "2026-11-17"
+  role: E
+  student_id: "61049313"
+  phase: 3
+  session: 1
+  topic: Phase 3 #25 QA evidence refresh
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - docs/bug-diary.md
+    - docs/debt-register.md
+    - docs/ai-use-log.yaml
+  summary: "Refreshed the Role E QA docs against PR #20 (b82ac6d). Verified Gate 4 passed 5/5 on the real PR path in the protected semantic-eval environment, recorded the one-time Gate 1 first-rollout waiver for #20 only, and kept the append partial-write and uncleaned-error-body fixes open. Offline baseline 204 passed with network blocked. Expected final main checks and rules remain pending."
+  human_review:
+    - Role E authorized the local documentation evidence refresh and selected the scope.
+  validation:
+    gate4_pr_evidence: 5 passed in 9.35s (job 133284009010)
+    gate1_waiver: "First rollout of #20 only (job 133283820698); a waiver is not test-first evidence"
+    open_debts: "BUG-03 / DEBT-01 and BUG-04 / DEBT-02 stay open; D issue #27 awaiting #18"
+    offline_isolation: 204 offline passed with network blocked
+    pending: "Expected final main checks and rules; merge-time live execution"
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 2
+  topic: 'Phase 3 verification evidence for #25'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/bug-diary.md
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'After E reviewed the test-first and implementation records, OpenCode drafted updates
+    to the two QA docs, keeping #30 verification separate from the final main evidence.'
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 4
+  topic: 'Record team-lead operating decision on Gate 1'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'On the team lead''s direction, updated DEBT-04 and the outstanding bullet to record
+    that Gate 1 reports test-first evidence (evidenced at 22cdf96) but is not a hard merge block,
+    and that a team-permitted admin override for mixed test/implementation histories with a green
+    local suite is not a passing result. Making Gate 1 a required hard check is tracked as follow-up.
+    No workflow changes; the six required checks are not claimed enforced.'
+  human_review:
+    - Team lead directed the Gate 1 operating decision and the override scope.
+  validation:
+    scope: 'docs/debt-register.md and docs/ai-use-log.yaml only; no tests run and none claimed'
+
+- date: '2026-11-20'
+  role: E
+  student_id: '61049313'
+  phase: 3
+  session: 5
+  topic: 'Apply maintainer review to PR #34 (DEBT-08)'
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+  - docs/debt-register.md
+  - docs/ai-use-log.yaml
+  summary: 'Following maintainer GitHub feedback, added DEBT-08 (owner A configuration / E verification,
+    open) for unverified required-check enforcement of the six PR gates, narrowed DEBT-04 to human
+    test-first evidence at 22cdf96 on #30, and removed the non-required / blanket-override wording.
+    This supersedes the session 4 wording. No workflow changes; no tests run or claimed.'
+  human_review:
+    - Maintainer review on PR #34 directed the DEBT-08 split and wording.
+  validation:
+    scope: 'docs/debt-register.md and docs/ai-use-log.yaml only; no tests run and none claimed'
+
+- date: "2026-11-20"
+  role: E
+  student_id: "61049313"
+  phase: 3
+  session: 3
+  topic: Phase 3 fail-closed ledger write test on PR30
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_evidence_join.py
+    - docs/ai-use-log.yaml
+  summary: "The human reproduced DID NOT RAISE on PR30 integrated with main: the append-open fault no longer triggers because the ledger write uses a temp file plus os.replace. OpenCode added a targeted temporary-ledger-creation fault in addition to the direct append fault, and the test now checks the injected OSError as __cause__ with its message."
+  validation:
+    main_35f580d: 211 passed (external verification)
+    local_merge_571564d: 219 passed
+
+- date: "2026-11-21"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 1
+  topic: Gate 1 upstream-sync versus post-approval test-edit histories
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_ci_regressions.py
+    - docs/ai-use-log.yaml
+  summary: "E selected the upstream-only sync case versus the post-approval test-edit and conflict-modification cases for the test-first PR: an upstream branch from base adds only upstream tests and is merged, while a separate case edits or a conflict resolution drops the approved definition; a late-approval case covers the timing diagnostic. Implementation awaits independent review."
+
+- date: "2026-11-21"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 2
+  topic: Gate 1 upstream-sync handling of existing test paths
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - .github/ci_checks.py
+    - docs/ai-use-log.yaml
+  summary: "After D approved the exact test commit 245e18b, E requested preserving upstream-only test changes while rejecting post-approval PR edits and lost tests at merge. Human review required handling upstream modifications to existing files, not just additions. No test results claimed."
 - date: '2026-11-19'
   role: D
   student_id: '60915652'
@@ -1281,19 +1393,3 @@
     mypy_python39: "Success: no issues found in 11 source files"
     fault_injection: "release+logger, close+logger, and pre-commit+cleanup failures all preserved the caller's result"
     pending: "final E re-verification and merge"
-
-
-- date: "2026-11-20"
-  role: E
-  student_id: "61049313"
-  phase: 3
-  session: 3
-  topic: Phase 3 fail-closed ledger write test on PR30
-  tool: opencode (DeepSeek V4 Flash)
-  files_modified:
-    - test/offline/test_evidence_join.py
-    - docs/ai-use-log.yaml
-  summary: "The human reproduced DID NOT RAISE on PR30 integrated with main: the append-open fault no longer triggers because the ledger write uses a temp file plus os.replace. OpenCode added a targeted temporary-ledger-creation fault in addition to the direct append fault, and the test now checks the injected OSError as __cause__ with its message."
-  validation:
-    main_35f580d: 211 passed (external verification)
-    local_merge_571564d: 219 passed
