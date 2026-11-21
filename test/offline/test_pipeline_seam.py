@@ -42,16 +42,27 @@ def test_seam_non_json_is_logged_then_reraised(captured_log, monkeypatch):
     assert captured_log[0]["error"] == "not_json"
 
 
-def test_seam_transport_error_logs_once(captured_log, monkeypatch):
+def test_seam_transport_error_logs_once(monkeypatch, tmp_path):
+    log_path = tmp_path / "logs" / "llm_calls.jsonl"
+    monkeypatch.setattr(call_llm, "LOG_PATH", log_path)
+    monkeypatch.setattr(call_llm, "BASE_URL", "http://example.invalid")
+    monkeypatch.setattr(call_llm, "API_KEY", "test-key")
+
     def boom(payload):
         raise call_llm.LlmTransportError("transport: boom")
 
     monkeypatch.setattr(call_llm, "_post", boom)
     with pytest.raises(call_llm.LlmTransportError):
         call_llm.extract("x")
-    assert len(captured_log) == 1
-    assert captured_log[0]["input"] == "x"
-    assert "call_id" in captured_log[0]
+
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["input"] == "redacted:len=1"
+    assert record["error"]
+    assert "boom" not in record["error"]
+    assert record["error"].startswith("transport:")
+    assert "call_id" in record
 
 
 def test_config_error_logs_once(captured_log, monkeypatch):
@@ -93,6 +104,15 @@ def test_policy_rejection_writes_one_review_line(
 ):
     review_path = tmp_path / "review.jsonl"
     monkeypatch.setattr(pipeline, "REVIEW_PATH", review_path)
+    if expected_error == "policy:budget":
+        # Seed the real ledger so the persisted total actually exceeds the budget;
+        # do not rely on a stale caller-supplied number.
+        monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
+        storage.append_validated({
+            "call_id": "seed00000001", "amount": spent, "category": "food",
+            "total": float(spent), "budget_limit": budget,
+            "decided_at": "2026-11-12T00:00:00Z",
+        })
     def fake_extract(text, request_id=None):
         return dict(raw, __call_id__="abc123def456")
     monkeypatch.setattr(call_llm, "extract", fake_extract)
@@ -196,8 +216,8 @@ def test_process_reads_running_total_from_storage(captured_log, monkeypatch, tmp
     record = json.loads(lines[0])
     assert record["error"] == "policy:budget"
     assert record["review"] is True
-    assert record["spent"] == 990.0
-    assert record["total"] == 1010.0
+    assert record["spent"] is None
+    assert record["total"] is None
 
 
 def test_process_without_spent_passes_persisted_as_expected_spent(
@@ -208,21 +228,15 @@ def test_process_without_spent_passes_persisted_as_expected_spent(
         "call_id": "seed00000001", "amount": 500, "category": "food",
         "total": 500.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
     })
-    seen = {}
-    real = storage.append_validated
-
-    def spy(record, expected_spent=None):
-        seen["expected_spent"] = expected_spent
-        return real(record, expected_spent=expected_spent)
-
-    monkeypatch.setattr(storage, "append_validated", spy)
     monkeypatch.setattr(
         call_llm, "extract",
         lambda text, request_id=None: {"amount": 100, "category": "food", "__call_id__": "abc123def456"},
     )
-    pipeline.process("x", budget_limit=1000.0)
-    assert seen["expected_spent"] == 500.0
+    record = pipeline.process("x", budget_limit=1000.0)
+    assert record["total"] == 600.0
     assert storage.current_total() == 600.0
+    stored = list(storage.iter_records())
+    assert [r["call_id"] for r in stored] == ["seed00000001", record["call_id"]]
 
 
 def test_process_explicit_spent_over_budget_is_policy_not_storage_error(
@@ -230,6 +244,11 @@ def test_process_explicit_spent_over_budget_is_policy_not_storage_error(
 ):
     monkeypatch.setattr(storage, "DATA_PATH", tmp_path / "records.jsonl")
     monkeypatch.setattr(pipeline, "REVIEW_PATH", tmp_path / "review.jsonl")
+    # Seed the real ledger at 990 so the persisted total exceeds 1000 on +20.
+    storage.append_validated({
+        "call_id": "seed00000001", "amount": 990, "category": "food",
+        "total": 990.0, "budget_limit": 1000.0, "decided_at": "2026-11-12T00:00:00Z",
+    })
     monkeypatch.setattr(
         call_llm, "extract",
         lambda text, request_id=None: {"amount": 20, "category": "food", "__call_id__": "abc123def456"},
