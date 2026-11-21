@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import tempfile
 
 import pytest
 
@@ -272,9 +273,22 @@ def test_accept_append_open_failure_raises_and_keeps_old_bytes(isolated, monkeyp
         call_llm, "_post", _fake_post('{"amount": 5, "category": "food"}'),
     )
     _block_append(monkeypatch, storage.DATA_PATH)
-    with pytest.raises(storage.StorageError):
+
+    orig_mkstemp = tempfile.mkstemp
+    target_dir = storage.DATA_PATH.parent
+    target_prefix = storage.DATA_PATH.name + "."
+
+    def blocking_mkstemp(*args, **kwargs):
+        if kwargs.get("dir") == str(target_dir) and kwargs.get("prefix") == target_prefix:
+            raise OSError("simulated append-open failure")
+        return orig_mkstemp(*args, **kwargs)
+
+    monkeypatch.setattr(tempfile, "mkstemp", blocking_mkstemp)
+    with pytest.raises(storage.StorageError) as exc:
         pipeline.process("y", spent=100.0, budget_limit=1000.0)
 
+    assert isinstance(exc.value.__cause__, OSError)
+    assert str(exc.value.__cause__) == "simulated append-open failure"
     assert storage.DATA_PATH.read_bytes() == before
     # No policy review line: a storage write failure is not a policy rejection.
     assert not pipeline.REVIEW_PATH.exists()
