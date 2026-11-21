@@ -91,3 +91,32 @@ Revisit this ADR if any of the following holds:
 - The protected environment's variable/secret names change.
 - The helper stops being the single home of the gate logic.
 - Python 3.9 support (the verified version) is dropped.
+
+---
+
+## Addendum — 2026-11-21: Gate 1 upstream-sync handling (PR #36)
+
+This addendum records a change to Gate 1 (`.github/ci_checks.py`), which is a
+security-critical path, scoped to how a previously approved test is preserved across a
+target-branch sync. Earlier decisions above remain in force and are not superseded.
+
+- **Preservation on first-parent history.** Gate 1 walks the first-parent chain from the PR
+  head back to the approved commit and inspects only commits after it. A two-parent merge
+  may change a test path against its first parent **iff** the PR side of that path still
+  matches its merge base (unchanged on the feature branch) **and** the merge result equals
+  the incoming (target-branch) tree entry exactly — mode, type and content. Upstream edits
+  and deletions of an existing file are therefore allowed only when the PR side did not
+  touch it and the merge result is exactly the incoming version.
+- **Ambiguity fails closed.** Overlapping edits (PR side differs from the merge base),
+  altered merge results, multiple merge bases, or a conflict resolution that does not
+  reproduce the incoming file are rejected and require review. Dropping a previously
+  approved test by matching the incoming file is never silently accepted.
+- **Unchanged requirements.** A real, independent, non-author, test-only approval and its
+  timing (submitted at or after the approved commit and before the first implementation)
+  remain required; earlier candidates that fail are recorded and the gate continues to
+  check all effective approvals before failing.
+- **Evidence.** Test-first approval for #36 at test SHA `245e18b`; #30 local replay of the
+  same first-parent sync rule at `22cdf96` for `89f2f8f`. The local replay is offline
+  evidence only.
+- **Scope of the claim.** Hosting a green job does not prove branch protection is active;
+  that the six checks actually block a bad merge remains an outstanding verification item.
