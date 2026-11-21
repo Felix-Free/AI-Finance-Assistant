@@ -38,8 +38,8 @@
 | NFR | Model API response time for an `extract` round trip. |
 | Metric | Wall-clock latency per round trip; D's report also shows `attempted`, `ok`, `failed`, `failure_rate`, and successful-call p50/p95/max in ms. |
 | Threshold | `null` in main; no approved latency budget. |
-| Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `src/measure_latency.py` with a fixed probe sentence. |
-| Measurement command / procedure | `python -m src.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
+| Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `scripts/measure_latency.py` with a fixed probe sentence. |
+| Measurement command / procedure | `python -m scripts.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
 | Expected evidence files | `logs/latency.jsonl` and a run report under `docs/measurements/`. |
 | Owner | B (requirement), D (script), E (measurement). |
 | Status | pending |
