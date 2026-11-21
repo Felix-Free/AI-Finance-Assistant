@@ -101,11 +101,14 @@ def process(text: str, spent=None, budget_limit: float = 1000.0) -> dict:
         "decided_at": decided_at,
     }
     # The pre-check above is only advisory; storage re-reads the persisted total
-    # under the lock and recomputes the authoritative total. A lock-time budget
-    # rejection is a PolicyError and gets exactly one review line; a
-    # StorageError propagates unchanged with no review.
+    # under the lock and recomputes the authoritative total (selected via the
+    # controlled ``_PIPELINE_ORIGIN`` marker). A lock-time budget rejection is a
+    # PolicyError and gets exactly one review line; a StorageError propagates
+    # unchanged with no review.
     try:
-        return storage._append_from_pipeline(record)
+        return storage.append_validated(
+            record, expected_spent=persisted, origin=storage._PIPELINE_ORIGIN
+        )
     except policy_core.PolicyError as exc:
         _append_rejection({
             "call_id": call_id,

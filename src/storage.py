@@ -49,6 +49,10 @@ REQUIRED_FIELDS = (
 
 _NUMERIC_FIELDS = ("amount", "total", "budget_limit")
 
+# Controlled internal marker: only the pipeline can select the authoritative
+# persisted-total path. It is not a hard security boundary (module-private).
+_PIPELINE_ORIGIN = object()
+
 
 class StorageError(RuntimeError):
     """Raised when a validated record cannot be persisted. Never a policy rejection."""
@@ -256,7 +260,7 @@ def _write_record_locked(record: dict) -> None:
         raise StorageError("storage write failed") from exc
 
 
-def append_validated(record: dict, expected_spent=None) -> None:
+def append_validated(record: dict, expected_spent=None, *, origin=None):
     """Re-check the record against the persisted state, then append one JSON line.
 
     INV-001/002/003 are re-run here by calling ``policy_core`` guards; storage
@@ -265,6 +269,12 @@ def append_validated(record: dict, expected_spent=None) -> None:
     persisted cumulative spend, because under-reporting prior spend would let a
     record slip past the cumulative budget guard. ``expected_spent=None`` uses
     the persisted cumulative spend as the effective spend.
+
+    ``origin`` is a controlled internal marker: when it is the private
+    ``_PIPELINE_ORIGIN`` sentinel (only the pipeline passes it), the record goes
+    through the authoritative persisted-total path
+    (``_append_from_pipeline``). Any other value keeps the direct semantics
+    below unchanged, so external callers cannot opt into the pipeline path.
 
     Rejections keep role C's error semantics: a rule violation raises
     ``PolicyError`` with the original ``policy:*`` code; under-reported spend,
@@ -275,6 +285,8 @@ def append_validated(record: dict, expected_spent=None) -> None:
     then committed with ``os.replace``. A failed commit leaves the original
     file byte-identical; readers therefore never see a partially written line.
     """
+    if origin is _PIPELINE_ORIGIN:
+        return _append_from_pipeline(record)
     _validate_record(record)
     with _locked():
         if record["call_id"] in _existing_call_ids():
