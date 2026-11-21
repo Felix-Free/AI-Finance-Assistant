@@ -1212,3 +1212,18 @@
     actionlint: passes both workflows
     local_ci_regressions: 4 passed
     pending: hosted rerun
+
+- date: "2026-11-20"
+  role: E
+  student_id: "61049313"
+  phase: 3
+  session: 3
+  topic: Phase 3 fail-closed ledger write test on PR30
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_evidence_join.py
+    - docs/ai-use-log.yaml
+  summary: "The human reproduced DID NOT RAISE on PR30 integrated with main: the append-open fault no longer triggers because the ledger write uses a temp file plus os.replace. OpenCode added a targeted temporary-ledger-creation fault in addition to the direct append fault, and the test now checks the injected OSError as __cause__ with its message."
+  validation:
+    main_35f580d: 211 passed (external verification)
+    local_merge_571564d: 219 passed
