@@ -993,6 +993,29 @@ def _model_block(text):
     return None
 
 
+def _is_replayable_prompt(rev, path, cwd=None):
+    """True unless the prompt file says ``status: superseded``.
+
+    A superseded prompt records what used to run; replaying it against the live
+    model would evaluate text that production no longer sends. Only an explicit
+    marker opts a file out: a missing or non-string ``status``, an unparseable
+    file or a missing blob stays replayable so the live test can still fail on it.
+    """
+    text = _blob(rev, path, cwd)
+    if text is None or yaml is None:
+        return True
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return True
+    if not isinstance(document, dict):
+        return True
+    status = document.get("status")
+    if not isinstance(status, str):
+        return True
+    return status.strip().lower() != "superseded"
+
+
 def classify_semantic_paths(base, head, changed, cwd=None):
     runtime_prompts = []
     required = False
@@ -1015,6 +1038,7 @@ def classify_semantic_paths(base, head, changed, cwd=None):
         runtime_prompts = [
             p for p in git(["ls-tree", "-r", "--name-only", head, "--", PROMPT_PREFIX], cwd).splitlines()
             if p.strip() and _is_prompt_yaml(p) and _blob(head, p, cwd) is not None
+            and _is_replayable_prompt(head, p, cwd)
         ]
     if _model_registry_changed(base, head, cwd):
         required = True
