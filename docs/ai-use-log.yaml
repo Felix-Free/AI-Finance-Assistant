@@ -1301,3 +1301,15 @@
   validation:
     main_35f580d: 211 passed (external verification)
     local_merge_571564d: 219 passed
+
+- date: "2026-11-21"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 1
+  topic: Gate 1 upstream-sync versus post-approval test-edit histories
+  tool: opencode (DeepSeek V4 Flash)
+  files_modified:
+    - test/offline/test_ci_regressions.py
+    - docs/ai-use-log.yaml
+  summary: "E selected the upstream-only sync case versus the post-approval test-edit and conflict-modification cases for the test-first PR: an upstream branch from base adds only upstream tests and is merged, while a separate case edits or a conflict resolution drops the approved definition; a late-approval case covers the timing diagnostic. Implementation awaits independent review."
