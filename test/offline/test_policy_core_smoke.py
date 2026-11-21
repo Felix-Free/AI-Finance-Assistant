@@ -32,6 +32,12 @@ def test_inv001_accepts_boundary_and_returns_unchanged():
     assert isinstance(enforce_amount(350), int)
 
 
+def test_inv001_rejects_minus_zero_point_zero_one():
+    with pytest.raises(PolicyError) as exc:
+        enforce_amount(-0.01)
+    assert exc.value.code == "policy:amount"
+
+
 def test_inv001_never_returns_decimal():
     result = enforce_amount(350)
     assert not hasattr(result, "as_tuple")
