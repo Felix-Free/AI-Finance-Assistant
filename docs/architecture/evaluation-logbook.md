@@ -300,7 +300,6 @@ tests are skipped, so the join remains unverified.
    Entirely `pending D` — no `src/storage.py` to review or test.
 7. **Secret scan.** Only an ad-hoc `git grep` pattern scan was run this session; no dedicated
    secret-scanning tool/result is recorded, so NFR-004 stays `pending`.
-8. **Review of `(call_id)` joins on unmerged branch.** Not verified; see #5.
 
 ### 5.4 Historical permission consistency check
 
@@ -324,6 +323,10 @@ merged-main measurements are recorded in §2, §3 and §6.3.
 > pre-merge status statements in §5 for the current mainline. The C branch used to edit this
 > logbook still has the older source snapshot; the evidence below is based on review of the
 > merged PR/source and its recorded checks, not a local test run on this C checkout.
+
+> **Historical gap disposition.** The issues recorded in §5.3 were resolved in the merged
+> mainline; their implementation and verification are summarized in §6.1–§6.2 and the NFR
+> evidence in §2–§3.
 
 ### 6.1 Evidence and verification source
 

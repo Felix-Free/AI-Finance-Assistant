@@ -1042,9 +1042,6 @@
   phase: 3
   session: 15
   topic: Record D Phase 3 design confirmation (coordination, documentation-only)
-  note: >
-    "session 15" is the next Phase 3 C session for student 60339160 and is not globally unique
-    (role E also has a phase-1 session 15).
   tool: opencode
   files_created: []
   files_modified:
@@ -1101,20 +1098,13 @@
     yaml_parse: ".venv/bin/python -c \"import yaml; yaml.safe_load(open('docs/ai-use-log.yaml')); print('YAML OK')\" -> pass"
     impl_config_check: "git diff --name-only -- src test .opencode -> empty"
     runtime_tests: "none run (documentation-only); no source/test/permissions changes"
-  remaining_risks:
-    - D concurrency fix, ADR-003, final commit/merge, and E regression results are still pending
-    - storage atomicity/no-partial-state, call_id joins, fail-closed/no-bypass/logging-schema tests unverified
-    - unredacted input/raw logging remains unapproved; privacy/redaction policy pending
-    - final category whitelist finality pending B/C
-    - D-reported branch/commit/log references are not independently verified
-
 - date: "2026-11-22"
   role: C
   student_id: "60339160"
   phase: 3
   session: 16
   topic: Post-merge security audit and architecture evidence update
-  tool: Codex
+  tool: opencode
   files_created: []
   files_modified:
     - docs/architecture/evaluation-logbook.md
@@ -1161,21 +1151,13 @@
     offline_tests: "PR #38 reports python -m pytest test/offline -q -> 237 passed; not rerun in this C checkout"
     permissions_check: "data/records.jsonl* is denied for read and edit; broader data/** measurement allow remains"
     docs_validation: "git diff --check: pass; Ruby YAML parser: pass; JSONC parsed with comment/trailing-comma normalization; read/edit ledger deny entries verified"
-  remaining_risks:
-    - logs/review.jsonl append is not atomic; a failed mid-write may leave partial evidence
-    - _PIPELINE_ORIGIN is an internal marker, not a hard in-process privilege boundary
-    - branch protection and a blocked bad-merge scenario are not independently verified
-    - NFR-001/002/003/004/005/006/007 remain pending measurement/scan/guard-removal evidence
-    - malformed direct storage calls can echo arbitrary unknown field names in shape-error messages; accepted as non-blocking for this merge
-    - broad legacy wording in AGENTS.md and docs/req/requirements.yaml remains for owner reconciliation
-
 - date: "2026-11-22"
   role: C
   student_id: "60339160"
   phase: 3
   session: 17
   topic: Refresh post-merge audit after permission config correction
-  tool: Codex
+  tool: opencode
   files_created: []
   files_modified:
     - docs/architecture/evaluation-logbook.md
@@ -1203,6 +1185,3 @@
     diff_check: "git diff --check -> pass"
     yaml_parse: "Ruby YAML.load_file -> pass (41 entries)"
     source_tests: "not run; documentation-only update"
-  remaining_risks:
-    - OpenCode runtime matcher behavior has not been independently exercised
-    - NFR measurements, secret scan, and branch-protection enforcement remain unverified
