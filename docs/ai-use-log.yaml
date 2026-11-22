@@ -1824,7 +1824,7 @@
   - .github/ci_checks.py
   - test/offline/test_ci_regressions.py
   - docs/ai-use-log.yaml
-  summary: 'Gate 4 replayed every YAML under prompts/, so the archived v1.0 prompt could not sit in the D9 location: its missing not_a_record rule fails the live non-expense case for a prompt production no longer sends. Added a replayability rule to classify_semantic_paths: a prompt is replayed unless it declares status: superseded, and missing or malformed status stays replayable so a broken prompt still fails loudly. The regression test was written and approved before the implementation, and ADR-005 records the decision and the rejected alternatives.'
+  summary: 'Gate 4 replayed every YAML under prompts/, so the archived v1.0 prompt could not sit in the D9 location: its missing not_a_record rule fails the live non-expense case for a prompt production no longer sends. Added a replayability rule to classify_semantic_paths: a prompt is replayed unless it declares status: superseded, and a missing status stays replayable and a malformed file aborts the scope job with a named error. The regression test was written and approved before the implementation, and ADR-005 records the decision and the rejected alternatives.'
   human_review:
   - required the decision to live in the gate, not in the live test, so scope and behaviour cannot drift apart
   - required the default to stay "replay", with an explicit opt-out only, so a candidate prompt is never silently skipped

@@ -998,8 +998,9 @@ def _is_replayable_prompt(rev, path, cwd=None):
 
     A superseded prompt records what used to run; replaying it against the live
     model would evaluate text that production no longer sends. Only an explicit
-    marker opts a file out: a missing or non-string ``status``, an unparseable
-    file or a missing blob stays replayable so the live test can still fail on it.
+    marker opts a file out. A missing or non-string ``status`` stays replayable,
+    and a file that cannot be parsed raises: silently replaying it hides a broken
+    artefact behind five confusing live-test failures.
     """
     text = _blob(rev, path, cwd)
     if text is None or yaml is None:
@@ -1007,7 +1008,7 @@ def _is_replayable_prompt(rev, path, cwd=None):
     try:
         document = yaml.safe_load(text)
     except yaml.YAMLError:
-        return True
+        raise RuntimeError("prompt file is not valid YAML: %s" % _norm(path))
     if not isinstance(document, dict):
         return True
     status = document.get("status")

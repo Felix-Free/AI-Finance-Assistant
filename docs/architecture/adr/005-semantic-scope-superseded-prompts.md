@@ -36,8 +36,11 @@ A prompt file is replayed **unless it declares `status: superseded`**.
 - The check lives in `.github/ci_checks.py::_is_replayable_prompt` and is applied where the
   runtime-prompt list is built, so the semantic-scope job and Gate 4 agree on the same list.
 - Only an explicit, lowercase-insensitive `superseded` opts a file out. A file with no `status`
-  key, a non-string `status`, an unparseable file or a missing blob stays **replayable**, so a
-  malformed prompt still fails loudly instead of silently disappearing from the evaluation.
+  key, a non-string `status` or a missing blob stays **replayable**, so a candidate prompt never
+  disappears from the evaluation by accident. A file that **cannot be parsed** aborts the
+  semantic-scope job with `prompt file is not valid YAML: <path>`: replaying it instead produced
+  five confusing live-test failures on the first attempt at this change, which is exactly the
+  failure a gate should report in one line.
 - `status: superseded` is documentation, not enforcement: the prompt files remain readable and
   the archive is still part of the repository.
 
@@ -54,6 +57,8 @@ With the rule in place, `prompts/prompt_v1.0.yaml` can live at the D9 location, 
   version must change in the same pull request; a superseded prompt still has to exist in history.
 - The live test still fails closed on a prompt file with no top-level `system_prompt` — the shape
   bug found in PR #28 stays caught.
+- A malformed prompt file now fails the semantic-scope step, not the live evaluation, so the
+  failure names the file that has to be fixed.
 
 ## 4. Alternatives considered
 
