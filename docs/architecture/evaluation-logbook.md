@@ -206,13 +206,13 @@ tests are skipped, so the join remains unverified.
 
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
-| NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | measured | PR #42: 20 live gateway calls; p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms |
-| NFR-002 | per-request/per-session token totals and logging statistics | `null`; descriptive statistics only | B / D / E | measured | PR #42: 20/20 complete; 125/12/137 tokens per request; session total 2500/240/2740 |
-| NFR-003 | transport/HTTP failure handling and retry behaviour | `null` numeric target; no automatic retry | C / D / E | measured | PR #42: 5 failure paths passed; PR #38 hosted offline suite: 237 passed |
-| NFR-004 | committed secret occurrences | **0**, approved | B / E | measured | PR #42: zero credential-pattern matches in eligible tracked readable files, locally and in CI |
-| NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | measured | PR #42: 0/16 accepted synthetic records failed independent re-validation |
-| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` numeric target; one line per writable evidence path, fail closed on write failure | C / D / E | measured | PR #42: 48/48 call rows; 16/16 accepted joins; 32/32 rejected joins |
-| NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | measured | PR #42: 3/3 guard-removal negatives (1.0); requirement confirmation remains separate |
+| NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | measured | 20 live gateway calls; p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms |
+| NFR-002 | per-request/per-session token totals and logging statistics | `null`; descriptive statistics only | B / D / E | measured | 20/20 complete; 125/12/137 tokens per request; session total 2500/240/2740 |
+| NFR-003 | transport/HTTP failure handling and retry behaviour | `null` numeric target; no automatic retry | C / D / E | measured | 5 failure paths passed; hosted offline suite: 237 passed |
+| NFR-004 | committed secret occurrences | **0**, approved | B / E | measured | Zero credential-pattern matches in eligible tracked readable files, locally and in CI |
+| NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | measured | 0/16 accepted synthetic records failed independent re-validation |
+| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` numeric target; one line per writable evidence path, fail closed on write failure | C / D / E | measured | 48/48 call rows; 16/16 accepted joins; 32/32 rejected joins |
+| NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | measured | 3/3 guard-removal negatives (1.0); requirement confirmation remains separate |
 
 ---
 
