@@ -709,7 +709,12 @@ failure. The model is reached through one provider; a gateway change is a human 
 have bypassed a red gate (#32). A human can still merge with administrator rights, which means the gates are a
 strong convention plus a demonstration rather than a hard guarantee. The AI-use log proves that a session was
 recorded and that earlier rows were not altered; it cannot prove that the entry is a good description of what
-happened. Role B's Phase 1 work has no AI-use entry, so that part of the trace is thin.
+happened. Role B's Phase 1 work has no AI-use entry, so that part of the trace is thin. Two
+documentation-only pull requests (#37, #40) were also merged without a session row: neither
+`docs/` nor `transcripts/` is a Gate 6 trigger path, so nothing forced an entry at the time.
+They are disclosed here rather than backfilled, because the log's value is that it is written
+when the work happens; a row reconstructed days later would be weaker evidence than a stated
+gap.
 
 **Measurement limits.** `NFR-001` and `NFR-002` have no committed evidence. The scripts exist and the
 procedure is written, but no sample was captured, and the logbook refuses to substitute another metric for the

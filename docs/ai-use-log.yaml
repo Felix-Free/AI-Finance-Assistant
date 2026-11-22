@@ -2060,7 +2060,7 @@
   student_id: '60528523'
   phase: 3
   session: 1
-  topic: 'D5 transcript consolidation and D6 report finalization (backfill for PR #40)'
+  topic: 'D5 transcript consolidation and D6 report finalization'
   tool: opencode
   files_modified:
   - Report.md
@@ -2079,9 +2079,9 @@
     (progress audit and report framework, the PR #28 gate diagnosis, and the append-only log repair).
     The D6 report was then written against `main`: twelve sections with per-section evidence
     citations, two diagrams and eleven tables, every status line (D5 4/5, D7 unverified required
-    checks, D9 prompt locations) checked against the repository rather than asserted. This row also
-    backfills the record that PR #40 should have carried: `transcripts/` is not a Gate 6 trigger
-    path, so the transcript merge landed without a session entry.
+    checks, D9 prompt locations) checked against the repository rather than asserted. PR #40 itself
+    carried no session row because `transcripts/` is not a Gate 6 trigger path; that gap is
+    disclosed in the report rather than reconstructed after the fact.
   human_review:
   - rejected an earlier draft that described branch protection as enabled and NFR-001/002 as measured, because the repository's own debt register contradicts both
   - required every report claim to cite a file, a commit, a pull request or a CI run instead of an intention
@@ -2093,4 +2093,5 @@
     report_length: 'approximately 7,300 words excluding diagrams and tables'
     report_status_lines: 'D5 4/5, D7 required checks unverified (DEBT-08), D9 both prompt versions present'
     gate_effect: 'transcripts/ and docs/ are not Gate 6 trigger paths; this row is a traceability backfill, not a gate requirement'
+    commit_identity: '38b90f4, daa32ad and 2a44cba were applied from patch files under a local tooling identity during the PR #41 integration; the work and the review are Role A''s'
     pending: 'individual reflections (§11) and the relative-contribution table (§12) to be filled by the members'
