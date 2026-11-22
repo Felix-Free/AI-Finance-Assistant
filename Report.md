@@ -4,8 +4,8 @@
 **Repository:** https://github.com/Felix-Free/AI-Finance-Assistant
 **Course:** CS5351 Agentic Software Engineering · City University of Hong Kong
 **Submission date:** 22 November 2026
-**Baseline:** `main` at `06ec2f5` · 192 commits · 42 merge commits · development window 6–22 November 2026
-**Length:** approximately 7,300 words excluding diagrams and tables; §11 is written by each member on top of this draft.
+**Baseline:** `main` at `20417a7` · 239 commits · 59 merge commits · development window 6–22 November 2026
+**Length:** approximately 9,100 words excluding diagrams and tables.
 
 ---
 
@@ -127,7 +127,7 @@ evaluation table, the trace matrix rework).
 (ADR-003), log redaction and budget re-checking under the storage lock (ADR-004), the test-approval gate's
 behaviour across upstream syncs, the requirement-approval evidence, and the reporting infrastructure itself.
 
-The numbers are ordinary but they are the honest record: 192 commits and 42 merge commits over seventeen
+The numbers are ordinary but they are the honest record: 239 commits and 59 merge commits over seventeen
 days, of which the majority are small, reviewable changes rather than large drops.
 
 | Phase | Window | What it added | Evidence |
@@ -161,20 +161,11 @@ Three changes earned their place.
 **The AI-use log became a gate instead of an honour system.** A log that is updated "when convenient" is a
 log that documents the easy sessions. Gate 6 now fails any pull request that touches `src/`, `test/`,
 `prompts/`, `.github/`, `scripts/`, `requirements.txt`, `Prompt.md` or `pytest.ini` without appending a new
-session key, and it fails any pull request that edits or removes an earlier row. The log went from 0 to 65
-sessions and, more importantly, from unverifiable to checkable.
+session key, and it fails any pull request that edits or removes an earlier row. The log went from 0 to more than seventy sessions and, more importantly, from unverifiable to checkable.
 
-**Test-first moved from discipline to a merge condition.** Gate 1 initially existed only as a rule; the team
-demonstrated it could be satisfied by an approval on a *documentation* commit (BUG-01). The gate was then
-tightened to require a commit that changes tests and nothing else. That tightening immediately blocked the
-leader's own merge of PR #20 — the clearest possible evidence that the gate is not decorative.
+**Test-first moved from discipline to a merge condition.** Gate 1 initially existed only as a rule; the team demonstrated it could be satisfied by an approval on a *documentation* commit (BUG-01). The gate was then tightened to require a commit that changes tests and nothing else. That tightening immediately blocked the leader's own merge of PR #20 — the clearest possible evidence that the gate is not decorative.
 
-**Review was parallelised by role, with integration serialised.** Five members reviewing their own areas in
-parallel, and one leader merging, matched how the work actually partitioned. The cost is a bottleneck at the
-leader; the benefit is that every merge had one person who had read the whole diff. In practice
-that meant thirty reviews on thirty-three pull requests — nineteen approvals, seven change
-requests and four comments — and thirty-three of the fifty-eight merge commits on `main`, at
-the time of writing.
+**Review was parallelised by role, with integration serialised.** Five members reviewed their own areas in parallel while integration stayed with one person, so every merge had at least one reviewer who had read the whole diff. Across the project that produced thirty reviews on thirty-three pull requests — nineteen approvals, seven change requests and four comments — and thirty-three of the fifty-nine merge commits on `main`.
 
 **Figure 2 — the pull-request gate pipeline.**
 
@@ -440,17 +431,14 @@ review observation ("two writers can lose a record") and ended as a merged chang
    already committed would have looked failed to its caller. The fix was a module logger, and the reason is
    now part of the code review checklist.
 
-Scale is worth stating plainly, with the caveat that counts are not quality: 192 commits and 42 merges over
-sixteen days; 65 logged AI sessions; 36 formal requirements; nine deliverables; 164 offline test functions;
-six CI gates and two branch jobs.
+Scale is worth stating plainly, with the caveat that counts are not quality: 239 commits and 59 merges over sixteen days; 65 logged AI sessions; 36 formal requirements; nine deliverables; 164 offline test functions; six CI gates and two branch jobs.
 
 ### 5.2 Prompt evolution: v1.0 → v1.1
 
 The prompt history is kept at `prompts/prompt_v1.1.yaml`, and it is the project's cleanest case of an AI
 failure that a human diagnosed and turned into a specification change.
 
-**v1.0** asked, in two sentences, for a JSON object with `amount` and `category`. It named no vocabulary and
-imposed no output discipline.
+**v1.0** asked, in two sentences, for a JSON object with `amount` and `category`. It named no vocabulary and imposed no output discipline.
 
 **What went wrong on the live gateway.** The model returned `transportation` instead of `transport`, and
 `groceries` instead of `food`. The safety layer behaved correctly — `INV-002` rejects any label outside the
@@ -769,11 +757,11 @@ The thesis the work finally supports is the one it started from, with one clause
 
 I came into this project expecting to write code, but I spent most of it deciding what counted as done.
 
-**Process Quality & Requirement Volatility.** Our registry held 36 formal requirements, and the ones that moved were not the features, but the names and criteria. Renaming `C-INV-###` to `INV-###` touched the registry, its schema and the trace matrix in one afternoon, and the C-owned documents kept an explicit `C-INV-###` to `INV-###` mapping so that historical references stayed readable. The other volatility was deliberate: eight open decisions were recorded rather than guessed, seven are still open, and one of them, the category whitelist (PD-002), was confirmed only on the last day. That discipline cost us speed but bought us a report we could defend line by line: 22 of 36 requirements implemented and tested, five implemented without a test that would notice their removal, six partial, three unverified, and we stated it honestly.
+**Process Quality & Requirement Volatility.** Our registry held 36 formal requirements, and the ones that moved were not the features, but the names and criteria. Renaming `C-INV-###` to `INV-###` touched the registry, its schema and the trace matrix in one afternoon, and the C-owned documents kept an explicit `C-INV-###` to `INV-###` mapping so that historical references stayed readable. The other volatility was deliberate: eight open decisions were recorded rather than guessed, seven are still open, and one of them, the category whitelist (PD-002), was confirmed only on the last day. That discipline cost us speed but bought us a report we could defend line by line: 22 of 36 requirements implemented and tested, five implemented without a test that would notice their removal, six partial, three unverified — and the report states it in those terms.
 
 **Artifact Co-evolution.** When the measurement scripts moved from `src/` to `scripts/`, the documentation kept pointing to the old paths. PR #31 fixed two files, and I routed the same drift in `mcp-tool-manifest.md` to its owner, who fixed it in the Phase 3 audit. The prompt history is another example: v1.0 hallucinated category labels, so v1.1 closed the vocabulary. However, the version file itself then broke the semantic gate, not because the prompt was wrong, but because the YAML lacked a top-level `system_prompt` key for the evaluator to read. Gate 4 failed in zero seconds, and I first misread it as a model-quality problem. Reading the fixture took ten minutes; reading my own assumption took longer.
 
-**Human Oversight vs. Agent.** What I caught was mostly cross-artifact inconsistency. The agent was locally fluent but globally unaware: it would write a correct function and a confident sentence about it. The reviews that mattered were never line-level; they compared the plan to the diff, the claim to the `git status`, and the requirement to its test. The lowest point was PR #32, which was merged while a gate was red because the team reported being blocked; I recorded it as a debt item instead of reverting the CI helper, and that entry is now the most honest part of our report.
+**Human Oversight vs. Agent.** What I caught was mostly cross-artifact inconsistency. The agent was locally fluent but globally unaware: it would write a correct function and a confident sentence about it. The reviews that mattered were never line-level; they compared the plan to the diff, the claim to the `git status`, and the requirement to its test. The lowest point was PR #32, which was merged while a gate was red because the team reported being blocked; I recorded it as a debt item instead of reverting the CI helper, and that entry is where the report records the bypass.
 
 What I believe now: supervision is mostly the work of keeping two descriptions of the same system from drifting apart. The agent is very good at producing one of them.
 
