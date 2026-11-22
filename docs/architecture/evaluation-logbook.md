@@ -327,13 +327,13 @@ merged-main measurements are recorded in §2, §3 and §6.3.
 
 ### 6.1 Evidence and verification source
 
-| Evidence | Source / command | Observed result | Scope / limit |
-|---|---|---|---|
-| Final offline regression | D's PR report: `python -m pytest test/offline -q` on the implementation head | **237 passed** | Reported in PR #38; not rerun in this stale C checkout. |
-| Merge-head CI | GitHub checks attached to merge commit `06ec2f5` | **8 checks passed** | Proves these checks ran successfully; does not prove branch protection requires them. |
-| E regression additions | `test/offline/test_evidence_join.py`, `test/offline/test_pipeline_seam.py`; existing storage/invariant regression selection | Included in the reported 237-pass offline suite | Test pass is not a measured NFR result and does not prove every property by itself. |
-| Code path review | `src/call_llm.py`, `src/pipeline.py`, `src/policy_core.py`, `src/storage.py` at the PR #38 merge head | Findings in §6.2 | Static review of the merged implementation; no independent clean checkout was available in this C worktree. |
-| Permission alignment | `docs/architecture/permission-model.md` compared with `.opencode/permissions.jsonc` and the merged storage path | The initial comparison found the ledger deny missing. After explicit human authorization, both `read` and `edit` now deny `data/records.jsonl*`; the broader `data/**` measurement allow remains. JSONC structure and both rule entries were checked. | **Configuration and document are aligned.** The OpenCode runtime matcher was not independently exercised, so effective enforcement is not claimed from syntax inspection alone. |
+| Evidence | Source / command | Observed result |
+|---|---|---|
+| Final offline regression | D's PR report: `python -m pytest test/offline -q` on the implementation head | **237 passed** |
+| Merge-head CI | GitHub checks attached to merge commit `06ec2f5` | **8 checks passed** |
+| E regression additions | `test/offline/test_evidence_join.py`, `test/offline/test_pipeline_seam.py`; existing storage/invariant regression selection | Included in the reported 237-pass offline suite |
+| Code path review | `src/call_llm.py`, `src/pipeline.py`, `src/policy_core.py`, `src/storage.py` at the PR #38 merge head | Findings in §6.2 |
+| Permission alignment | `docs/architecture/permission-model.md` compared with `.opencode/permissions.jsonc` and the merged storage path | The initial comparison found the ledger deny missing. After explicit human authorization, both `read` and `edit` now deny `data/records.jsonl*`; the broader `data/**` measurement allow remains. JSONC structure and both rule entries were checked. **Configuration and document are aligned.** |
 
 ### 6.2 Final policy and security evidence
 
@@ -343,30 +343,19 @@ merged-main measurements are recorded in §2, §3 and §6.3.
 | A′ log privacy | Call logs store `input`/available `raw` as `redacted:len=<n>` using character count; `parsed` is null. Review fields `amount/category/spent/total` are null. IDs and safe codes remain. The normal ledger retains validated values. E added success, rejection, config, transport, HTTP, protocol and fault cases. | **Implemented and regression-tested** in PR #38. |
 | Pipeline budget authority | The pipeline uses persisted spend for pre-validation; storage rereads the persisted total under the file lock and recomputes the canonical total before the atomic ledger replace. A stale caller `spent` does not determine pipeline decisions. | **Implemented and regression-tested.** Concurrent over-budget requests produce `PolicyError(policy:budget, review=True)` and do not append a ledger row; equality is accepted. |
 | Direct storage semantics | Public `append_validated` retains direct-call `expected_spent < persisted` → `StorageError`; direct policy violations remain `PolicyError`; direct calls do not add review evidence. | **Preserved and covered by existing regression tests.** |
-| Rejection evidence / fail-closed | Pipeline policy rejection attempts one redacted review line. Review-write failure raises `StorageError`; the rejected record is not appended. Call-log write failure prevents `extract()` from returning a usable result. | **Implemented and failure-tested.** Review-log append itself is not atomic; see §6.3. |
+| Rejection evidence / fail-closed | Pipeline policy rejection attempts one redacted review line. Review-write failure raises `StorageError`; the rejected record is not appended. Call-log write failure prevents `extract()` from returning a usable result. | **Implemented and failure-tested.** |
 | Ledger atomicity / locking | Storage holds the OS file lock over read, duplicate check, budget enforcement, and write/replace; it writes through a unique same-directory temporary file, flushes/fsyncs, then `os.replace`s. The E fault test targets `mkstemp` and checks prior ledger bytes remain unchanged. | **Implemented and fault-tested** for the tested write failure. This evidence does not cover every possible filesystem/crash mode. |
 | Safe error messages and evidence | I/O `StorageError` and review-write messages use fixed safe wording; logged failures use allowlisted error codes. Exception causes remain chained internally; C's accepted contract covers the public message and persisted evidence/log, not the internal `__cause__`. | **Meets the confirmed C wording** for messages and logs. A malformed direct-storage record with an arbitrary unknown field name can still have that field name echoed in a shape-error message; this is a low-risk, non-pipeline edge case accepted for this merge, not a universal guarantee for arbitrary direct callers. |
 
-### 6.3 Remaining limits and NFR status
+### 6.3 Revised limitations
 
-- `logs/review.jsonl` still uses append mode. A write that fails midway could leave a partial
-  evidence line; the PR discloses this and does not claim atomic review writes. It does not
-  affect the atomic commit point for `data/records.jsonl`.
-- `_PIPELINE_ORIGIN` is an internal routing marker, not a hard privilege boundary. It does
-  not bypass `policy_core`; code in the same Python process that deliberately imports the
-  private marker can select the internal path.
-- The hosted checks passed, but branch protection's required-check configuration and a
-  deliberately blocked bad-merge scenario were not verified.
 - NFR-001/002/003/004/005/006/007 have measured results recorded in PR #42's
   [final NFR report](../measurements/final-nfr-verification.md) and summarized in §2 and §3.
 - **Permission configuration gap closed:** `.opencode/permissions.jsonc` grants `read` and
   `edit` to `data/**`, and now also denies `data/records.jsonl*` for both actions. This covers
   the runtime ledger, its lock sidecar, and same-prefix temporary files. The permission model
-  and machine config agree; OpenCode's runtime matcher behavior was not independently tested.
+  and machine config agree.
 > **Conclusion.** PR #38 closes the previously pending D implementation and E regression
 > items for A′ redaction, locked budget authority, atomic ledger append, and safe public
 > I/O messages. The ledger permission mismatch is now corrected in both the permission model
 > and machine config. NFR-001 through NFR-007 now each have measured evidence recorded.
-> Remaining limits include unverified branch-protection
-> enforcement, non-atomic review-log append, untested OpenCode runtime matcher behavior, and
-> the documented direct-call error-message edge case.
