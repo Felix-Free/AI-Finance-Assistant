@@ -304,15 +304,13 @@ tests are skipped, so the join remains unverified.
    secret-scanning tool/result is recorded, so NFR-004 stays `pending`.
 8. **Review of `(call_id)` joins on unmerged branch.** Not verified; see #5.
 
-### 5.4 Permission consistency check (this pass — no edit)
+### 5.4 Historical permission consistency check
 
-`permission-model.md` §2 (rows and §3.1) and `.opencode/permissions.jsonc` were compared
-directly. Every §2 ✅/❌/⚠️ row maps to an `allow`/`deny`/`ask` entry (default `"*":"deny"`;
-`docs/req/**`, `.opencode/**`, `.agent/**`, `.github/**`, `transcripts/**`, `logs/**`
-denied for edit; `.env` denied read+write; `data/**`, `scripts/**`, `docs/measurements/**`
-and the three bash patterns present per §3.1; `git push/commit/reset --hard/clean` and
-`rm -rf` denied). **No mismatch was found.** No correction is proposed. (`.opencode` is
-inspect-only for C; it was not modified.)
+In this earlier C snapshot, `permission-model.md` and `.opencode/permissions.jsonc` were
+compared and found consistent under the rules then documented. That check predates the
+runtime-ledger deny for `data/records.jsonl*`; it does not describe the current configuration.
+The post-merge permission review and correction are recorded in §6.1 and §6.3. No config
+edit was made during the historical check.
 
 ### 5.5 Status of NFRs after this audit (unchanged)
 
@@ -320,62 +318,6 @@ NFR-001/002/003/005/006 remain `pending` (no independent measurement on this bra
 NFR-004 remains `pending` (no tooled scan); NFR-007 remains `pending` (guard-removal
 mapping is E's, not run here). This section records **audit evidence and gaps**, not
 measurements, and does not promote any NFR.
-
-### 5.6 D design confirmation — coordination evidence (not runtime evidence)
-
-> **This subsection records D's latest design confirmation. It is coordination evidence, not
-> runtime or test evidence.** Nothing here was run or observed on the current C branch.
-
-**(A) Distinguish the three evidence sources.**
-- **Historical evidence from earlier D snapshots** — the "C-side storage security review"
-  table earlier in this logbook. It describes an **earlier / unmerged** snapshot and is
-  **retained for history**. Where it appears to conflict with the design below, the older
-  table is simply an older snapshot, not a current property; see (B).
-- **D's latest design confirmation** — reference `1332483` (D-reported intermediate
-  implementation commit), design only. Labelled *D-reported / interim / not independently
-  verified*. Branch `feat/D-phase3-hardening`; log commit `4281ea3`.
-- **Runtime/test evidence on the current C branch** — the §5.2 smoke run (41 passed) only. It
-  proves **none** of the storage/`call_id`/fail-closed/no-bypass claims below.
-
-**(B) Reconciliation with the historical storage review.** The earlier
-"C-side storage security review" table describes an **earlier/unmerged snapshot** and is
-retained for history. This subsection records the **latest target design only**; it does not
-retro-edit the older table and does not turn the older snapshot into current evidence.
-
-**(C) Confirmed design points (design-only; not code-confirmed on this branch).**
-- `pipeline.process()` sole business entry; `call_llm.py` sole model-network entry;
-  `extract()` returns unvalidated output + system metadata.
-- Normal business/storage writes only after `policy_core` validation; storage adds
-  defense-in-depth validation.
-- Direct storage invariant failures remain `PolicyError(policy:*)`; storage I/O / shape /
-  duplicate-`call_id` / arithmetic-consistency / persistence → independent `StorageError`.
-- Direct storage calls write no review evidence; pipeline policy rejection attempts exactly one
-  review line, and a review-write failure raises `StorageError` (no normal data).
-- Persisted cumulative spend authoritative; `expected_spent` is a validation parameter (not
-  persisted), below persisted → `StorageError`, higher allowed but stricter.
-- Budget equality accepted; over-budget → `PolicyError(code="policy:budget", review=True)`.
-- No hidden retry; no catch-all collapse of failure classes.
-- `call_id` system-generated, not model-overridable, removed before `policy_core`;
-  `request_id`/`session_id`/`call_id` semantics and joins design-confirmed but
-  **unverified here**.
-- Atomicity target: unique temp file + file lock (read/check/write/replace).
-- Eight categories unchanged; final whitelist **pending B/C**; D must not change independently.
-- **Unredacted `input`/`raw` logging NOT approved**; privacy/redaction pending.
-
-**(D) Privacy requirement (pending).** `input`/`raw` may contain personal financial data;
-unredacted logging remains **pending and unapproved**, and the four-field schema is **not**
-approval of unredacted content. Candidate paths for later decision: minimization/redaction
-before persistence, or an enforceable synthetic-data-only runtime constraint. `StorageError`
-messages/evidence must not contain raw exception strings, URLs, HTTP bodies, credentials, or
-sensitive data; a safe short policy code may be kept separately.
-
-**(E) Still pending (do not read as satisfied).** atomicity/no-partial-state proof;
-concurrency regression; ADR-003; `call_id` joins; fail-closed tests; no-bypass tests; complete
-logging-schema tests; privacy/redaction policy; final whitelist confirmation; final D commit;
-E's reproducible regression results.
-
-**No NFR is promoted from `pending` to `measured` by this subsection, and no D-branch test is
-presented as current-branch evidence.**
 
 ## 6. Post-merge C security audit — `main@06ec2f5`
 
