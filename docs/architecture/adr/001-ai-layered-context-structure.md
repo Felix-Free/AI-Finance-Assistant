@@ -106,7 +106,7 @@ logic, or class-2/3 injection exists in the codebase.
   can be added later without touching safety code *(structural-constraints; trace-matrix FR-001).*
 - **Design constraints:** model output is untrusted (SEC-003); every call is logged once
   (FR-008); rules live in code (AI-REQ-005); the category whitelist and budget are code-defined
-  (INV-002/003, INV-PENDING-01 **Pending PD-002**).
+  (INV-002/003, INV-PENDING-01 — finality confirmed by C on 2026-11-22; previously pending PD-002).
 
 ### 4.2 Round 1 — First candidate: flat prompt
 Tried the simplest model (Alternative A). It satisfies QA4 trivially but **fails QA1** (trust
@@ -148,7 +148,8 @@ selection/injection logic is **unimplemented**. Remaining gaps recorded in §6.
 ### Neutral / out of scope
 - Concrete selection algorithms, history caps, and at-limit behaviour are **not** decided in
   this ADR (design-only; see ADR-002).
-- Category vocabulary finality remains **INV-PENDING-01 / PD-002 (owner C)** — not decided here.
+- Category vocabulary finality was **INV-PENDING-01 / PD-002 (owner C)** at the time this ADR was
+  written (not decided here); it was later **confirmed by C on 2026-11-22** (final 8-category whitelist).
 
 ---
 
@@ -159,7 +160,7 @@ selection/injection logic is **unimplemented**. Remaining gaps recorded in §6.
 | Whether/when classes 2/3 are ever injected | pending (design intent only) | B |
 | Selection algorithm for class 4 vs history | pending | B |
 | Token-budget interactions of larger context | pending — **PD-007** | B/C (see ADR-002) |
-| Category whitelist finality referenced by class 3 | pending — **PD-002** | C |
+| Category whitelist finality referenced by class 3 | confirmed by C on 2026-11-22 (final 8-category whitelist; was PD-002) | C |
 | Any prompt-injection escaping beyond structural separation (blueprint §9 "Partial") | pending / not implemented | C/B |
 
 > This ADR does **not** approve PD-007/PD-008 and does **not** assert the design is deployed or
