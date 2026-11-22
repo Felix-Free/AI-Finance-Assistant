@@ -1797,6 +1797,20 @@
 
     '
   pending: human review of D's implementation and independent test review
+
+- date: "2026-11-22"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 5
+  tool: "opencode (DeepSeek V4 Flash)"
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_created:
+    - docs/measurements/final-nfr-verification.md
+  summary: "Final NFR verification at commit 06ec2f59: synthetic 20-attempt latency session (p50 2422.222 ms, p95 2850.720 ms), token accounting 125/12/137 per request, 5 real extract error paths passing, hosted 237 offline tests passing, secret-scan clean locally and in CI, OFFLINE NFR-005/006 ledger run (16 accepted, 48/48 logged, joins verified), and NFR-007 mutation coverage 3/3 = 1.0; scoped to measured cases only."
+  human_review: "E ran and audited all measurements and the mutation/fault-injection checks; OpenCode only composed the report from E-supplied evidence and did not execute the measurements."
 - date: '2026-11-22'
   role: A
   student_id: '60528523'
