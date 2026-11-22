@@ -2055,3 +2055,40 @@
     diff_check: "git diff --check -> pass"
     yaml_parse: "Ruby YAML.load_file -> pass (41 entries)"
     source_tests: "not run; documentation-only update"
+
+- date: '2026-11-22'
+  role: D
+  student_id: '60915652'
+  phase: 3
+  session: 11
+  topic: Phase 3 cleanup and secrets audit; measurement relocation verification
+  tool: opencode
+  files_created:
+  - docs/measurements/phase3-cleanup-audit.md
+  files_modified:
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/storage.py
+  - src/call_llm.py
+  - scripts/measure_latency.py
+  - scripts/measure_tokens.py
+  - test/offline/test_phase3_hardening.py
+  - test/offline/test_phase3_concurrency.py
+  summary: 'Audited the Phase 3 cleanup scope on main 8533465 after the security follow-up #38: measurement
+    scripts are already under scripts/ and both measurement evidence files exist; no debug/dead code is safe to
+    remove; the secrets scan is clean. Added the Phase 3 audit document only; storage fail-closed is delivered by #30
+    and A′ log redaction / locked budget / safe errors by #38, and are not re-implemented here. The NFR evidence was
+    measured at main 06ec2f5 with 237 passed, while this audit runs on 8533465 with 238; the two are kept distinct.
+    DEBT-01/02 still read "pending main" in docs/debt-register.md although #30 is merged, and are recorded as a stale
+    status for the register owner rather than marked resolved. No product or test code was changed; known limitations
+    are recorded.
+    '
+  human_review:
+  - 'D audited the tree read-only; B confirmed no cleanup code change and no requirement reference update'
+  - 'C confirmed the eight-category whitelist as final in the group; file-level confirmation was still pending at drafting time'
+  validation:
+    pytest_offline: '238 passed'
+    cleanup_scan: 'no TODO/FIXME/breakpoint/pdb; prints are CLI output'
+    secrets_scan: '.env never committed; .env.example is a placeholder'
+    security_followup: '#38 merged (A′ redaction, locked budget, safe errors); ADR-004; known limitations recorded'
+    pending: 'PD-002 / INV-PENDING-01 file confirmation and final PR review'
