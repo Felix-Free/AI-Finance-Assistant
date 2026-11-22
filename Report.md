@@ -765,14 +765,17 @@ The thesis the work finally supports is the one it started from, with one clause
 
 ## 11. Individual self-reflections
 
-*Each member's reflection is written in the first person, between 300 and 500 words, and answers four
-questions: what you personally built; one decision you made against the agent's suggestion and why; one thing
-you got wrong; and what you now believe about supervising an AI coding agent that you did not believe in week
-one. The reflections are inserted below the headings and are deliberately left blank in this draft.*
-
 ### 11.1 Tan Jingling — 60528523 (Role A, Leader)
 
-*(to be completed by the member)*
+I came into this project expecting to write code, but I spent most of it deciding what counted as done.
+
+**Process Quality & Requirement Volatility.** Our registry held 36 formal requirements, and the ones that moved were not the features, but the names and criteria. Renaming `C-INV-###` to `INV-###` touched the registry, its schema and the trace matrix in one afternoon, and the C-owned documents kept an explicit `C-INV-###` to `INV-###` mapping so that historical references stayed readable. The other volatility was deliberate: eight open decisions were recorded rather than guessed, seven are still open, and one of them, the category whitelist (PD-002), was confirmed only on the last day. That discipline cost us speed but bought us a report we could defend line by line: 22 of 36 requirements implemented and tested, five implemented without a test that would notice their removal, six partial, three unverified, and we stated it honestly.
+
+**Artifact Co-evolution.** When the measurement scripts moved from `src/` to `scripts/`, the documentation kept pointing to the old paths. PR #31 fixed two files, and I routed the same drift in `mcp-tool-manifest.md` to its owner, who fixed it in the Phase 3 audit. The prompt history is another example: v1.0 hallucinated category labels, so v1.1 closed the vocabulary. However, the version file itself then broke the semantic gate, not because the prompt was wrong, but because the YAML lacked a top-level `system_prompt` key for the evaluator to read. Gate 4 failed in zero seconds, and I first misread it as a model-quality problem. Reading the fixture took ten minutes; reading my own assumption took longer.
+
+**Human Oversight vs. Agent.** What I caught was mostly cross-artifact inconsistency. The agent was locally fluent but globally unaware: it would write a correct function and a confident sentence about it. The reviews that mattered were never line-level; they compared the plan to the diff, the claim to the `git status`, and the requirement to its test. The lowest point was PR #32, which was merged while a gate was red because the team reported being blocked; I recorded it as a debt item instead of reverting the CI helper, and that entry is now the most honest part of our report.
+
+What I believe now: supervision is mostly the work of keeping two descriptions of the same system from drifting apart. The agent is very good at producing one of them.
 
 ### 11.2 Qingzhi Lu — 60357951 (Role B, Requirements & Architecture)
 
@@ -780,15 +783,35 @@ one. The reflections are inserted below the headings and are deliberately left b
 
 ### 11.3 Qiang Wanyun — 60339160 (Role C, Security & Policy)
 
-*(to be completed by the member)*
+During the AI-Finance-Assistant project, I was responsible for the C component, focusing on security, governance, and evaluation. 
+
+The main difficulty was that requirements, implementation, and testing evidence across roles were not always synchronized. In Phase 2, the logging and storage requirements changed several times, so the meanings and behavior of call_id, request_id, and session_id had to be reconfirmed. I had to distinguish approved requirements from design suggestions and from features implemented on D’s branch but not yet merged or verified. To address this, I used AI to map requirements to implementation and validation evidence, compare versions, and trace how logging fields were used across call_llm, pipeline, and storage. This made cross-file checking much faster and helped turn discussions into explicit contracts and handoff notes. Another challenge was defining reliable evidence: whether a pre-request failure should still be logged, whether missing token usage should be recorded as null rather than 0, and whether not_called should be a stored enum. 
+
+AI helped organize these cases and propose candidate solutions, but its output still required careful human review. For example, an early draft replaced the budget invariant with logging integrity, reused INV-002 already assigned to another role, and overstated generic JSONC parsing as OpenCode permission-format validation. I found and corrected these issues by checking the requirements, AGENTS.md, D’s code, and E’s test results. I also kept unverified measurements and unmerged changes marked as pending instead of presenting them as completed. This distinction was especially important when documentation looked complete but the corresponding code or test was still pending. 
+
+This experience taught me that AI is useful for organizing complex information, tracing relationships across files, and drafting changes, but humans must still review security boundaries, conflicts between requirements, and the strength of evidence. A complete-looking document or a passing partial test is not, by itself, proof that the system is secure.
 
 ### 11.4 Liu Wanyang — 60915652 (Role D, Implementation)
 
-*(to be completed by the member)*
+My main responsibility was to turn the agreed design into working code and to integrate it without breaking the existing ledger. The work centred on three changes: making the record append atomic, replacing the raw HTTP error text in the log with a short, secret-safe code, and making concurrent appends safe.
+
+The first difficulty was a correctness bug rather than a missing feature. The original writer appended directly to the JSONL file, so an interruption could leave a partial line. I used OpenCode to implement a same-directory temporary file, `fsync`, and `os.replace`, and to add regression tests that inject a failure at the replace step. The second difficulty was a requirement change. The old test expected the error field to contain the response body (`http 500: err`), but the security contract required a short code such as `http 503 (LlmTransportError)`. This was a real contract collision, not a test failure to silence. I stopped the implementation, separated the test change into its own test-only commit, and asked the reviewer to approve that commit before the implementation continued.
+
+The most valuable difficulty was concurrency. My first implementation used a fixed temporary file name and no lock. The reviewer reproduced a lost record: two writers shared the temporary file, one reported success, but its record disappeared. The AI had not considered that two writers could read the same old state. I used OpenCode again to add a unique `mkstemp` temporary file and a sidecar file lock covering read, duplicate check, budget check, write, and replace. I also asked it to compare several lock designs rather than accept the first one.
+
+Human supervision caught several things the AI missed. The reviewer found the concurrency failure that the AI's tests did not cover. The reviewer also rejected `warnings.warn` for a post-commit unlock failure, because `-W error` could turn the warning into an exception and make a committed append look failed; we switched to a module logger. I caught a documentation error: the AI wrote that the temporary path was bound before the `try`, while the code still assigned it inside. I also had to reject a test that passed without reaching the atomic path, and a stale test mock that still intercepted `Path.open("a")` after the writer had moved to `os.replace`.
+
+My main lesson is that AI is effective at producing a plausible implementation and a large number of tests, but it does not reliably question its own assumptions about failure modes, ordering, or contracts. The human role is to define the contract, design adversarial checks, and verify that the evidence matches the claim. In this project, the most important human contribution was not writing more code, but stopping the AI at the right moment and asking for a different design.
 
 ### 11.5 Chen Guanyu — 61049313 (Role E, Verification & QA)
 
-*(to be completed by the member)*
+The hardest decision I made as the QA lead for our AI Finance Assistant was whether a failing test justified asking a teammate to change working code. During integration, one of my tests expected a storage error when the application tried to add a transaction. I had arranged for opening the ledger in append mode to fail. By then, our implementation teammate had changed the writer to create a temporary file and replace the ledger only after the write succeeded. The transaction went through because it never reached the operation I was intercepting. I reproduced the failure and used OpenCode with DeepSeek to revise the test. The requirement was that a failed write had to leave the previous ledger byte-for-byte intact. What needed to change was where the test introduced the failure. Later, our security reviewer noticed a weakness in my first correction. I had kept both failure points, so even the obsolete writer could pass the test. I narrowed the injection to temporary file creation, counted its calls, and ran the test against both writers. It passed with the atomic writer and failed with the old one. Seeing my own correction need a second review changed how I supervise an agent. I now ask what incorrect implementation could still satisfy an assertion before I accept the test.
+
+I faced a similar question when our automated review gate rejected a pull request whose tests I had personally approved before implementation. Synchronising the branch with `main` had brought in other people's test changes. The gate treated those changes as though the author had edited tests after my approval. I asked OpenCode to construct two Git histories that looked similar in the final diff. In one, the branch simply inherited upstream tests. In the other, resolving a conflict discarded an approved test. A teammate reviewed those examples before implementation. We updated the gate and its accompanying architecture decision record together, then replayed the actual pull request history and recovered the original approval. We also documented an administrator override separately, since a red job alone could not establish that merging was impossible.
+
+The final audit also changed what I counted as convincing evidence. When the logging contract required sensitive values to be removed, a green test that joined two records by ID could still overlook a leaked amount. I kept the ID checks and added assertions against the entire saved log line. For the report, I counted what the tests actually observed. All 48 calls in a controlled sample had a log entry, all 16 accepted records linked to the ledger, and all 32 rejections linked to their review entries. Those denominators gave me a claim I could explain and defend.
+
+In a future project, I would record one example that should pass and one that should fail alongside each important requirement from the outset. That would give the developer, the reviewer, and the coding agent a shared way to recognise when a change has silently altered what a test proves.
 
 ---
 
