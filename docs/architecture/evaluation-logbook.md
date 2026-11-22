@@ -40,22 +40,20 @@
 | Metric | Wall-clock latency per round trip; D's report also shows `attempted`, `ok`, `failed`, `failure_rate`, and successful-call p50/p95/max in ms. |
 | Threshold | `null` in main; no approved latency budget. |
 | Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `scripts/measure_latency.py` with a fixed probe sentence. |
-| Measurement command / procedure | `python -m scripts.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
+| Measurement command / procedure | PR #42 ran `python -m scripts.measure_latency --n 20`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
 | Expected evidence files | `logs/latency.jsonl` and a run report under `docs/measurements/`. |
 | Owner | B (requirement), D (script), E (measurement). |
-| Status | pending |
-| Observed result | The offline measurement-script tests are included in PR #38's reported 237-pass suite; no live gateway latency sample or latency report is recorded. |
+| Status | measured |
+| Observed result | [PR #42 final NFR report](../measurements/final-nfr-verification.md) records 20 successful real-gateway calls with a fixed synthetic input: p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms; 0 failures. |
 
-> **Path migration note.** The measurement path and command above follow D's post-#19
-> migration (`a420987`) from `src/` to `scripts/`. The migrated script is not present in
-> this C checkout yet, so this remains a documentation/path update, not current-branch
-> measurement evidence.
+> **Historical C-checkout note.** This C branch snapshot predates the merged measurement
+> script. The measurement evidence is from the merged main baseline documented in PR #42,
+> not from a local run on this C checkout.
 
-> **Reported by D; not verified by committed run evidence.** D's debt ledger reports
+> **Superseded historical report.** D's debt ledger reported
 > `n=20: p50 2356.7 ms / p95 4759.5 ms / max 5771.2 ms`. This does not count as a
-> measured result here. The migrated `scripts/measure_latency.py` labels itself NFR-001;
-> the earlier mismatch is resolved in the merged mainline. The measurement itself remains
-> pending until E records reproducible run evidence.
+> measured result; it is retained as historical context. The newer reproducible E result is
+> recorded above and in PR #42's final NFR report.
 
 ### NFR-002 — Token Usage statistics
 
@@ -69,17 +67,15 @@
 | Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` value. Three recorded integers → `gateway`; at least one recorded integer and one `null` → `partial`; `tokens: null` or three `null` counts → `missing`. Non-integer counts in a processed usage object normalize to `null`. Check `usage_source` agrees with recorded `tokens` and missing counts are never replaced with `0` or estimates. `tokens` is always present: it is `null` when usage was not recorded (including model-content JSON parse failure), or an object with `input`, `output` and `total` when usage was processed (missing counts `null`). These are descriptive statistics, with no pass/fail judgment. |
 | Meaning of `api_call_count` | `request_made: true` counts attempted HTTP calls, including DNS, connection and timeout failures. It does not count only requests known to have reached the gateway. |
 | Meaning of `usage_source: missing` | No usable token counts were recorded in that log line. On a JSON parsing failure, D records `tokens: null` and `usage_source: missing` even if the gateway response included usage. Therefore the missing-usage count cannot establish how often the gateway omitted usage. |
-| Report implementation on `main@06ec2f5` | `src/report_tokens.py` produces per-call rows (including `call_id`, `request_id`, `session_id`, token counts and `usage_source`), per-session aggregation, per-request aggregation, and global counters (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). Code presence is verified at the merged baseline; no report run/evidence is recorded, so NFR-002 remains pending. |
+| Report implementation on `main@06ec2f5` | `src/report_tokens.py` produces per-call rows (including `call_id`, `request_id`, `session_id`, token counts and `usage_source`), per-session aggregation, per-request aggregation, and global counters (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). PR #42 records a real-gateway sample and token aggregation from 20 calls. |
 | Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
 | Owner | B (definition), E (measurement), D (logging fields and report). |
-| Status | pending |
-| Observed result | Token parsing and aggregation fixture tests are included in PR #38's reported 237-pass suite; no real token-usage run or NFR-002 report is recorded. |
+| Status | measured |
+| Observed result | [PR #42 final NFR report](../measurements/final-nfr-verification.md): 20/20 calls had complete gateway usage; each reported 125 input, 12 output, 137 total tokens. One process session totaled 2500 input, 240 output, 2740 total tokens. |
 
-> **Reported by D; not verified by committed run evidence.** D's debt ledger reports token
-> totals `1339* (incomplete, 1 missing) / 2154 (complete) / 2060 (complete)` for three
-> sessions. No committed `docs/measurements/` output or log evidence exists in the
-> repository (`logs/` and `data/` are gitignored), so these are **not** recorded as a
-> measured result and the status stays `pending`.
+> **Superseded historical report.** D's debt ledger reported token totals
+> `1339* (incomplete, 1 missing) / 2154 (complete) / 2060 (complete)` for three sessions.
+> PR #42 supplies the committed E measurement report used for the current result above.
 
 ### NFR-003 — API call failure handling
 
@@ -93,7 +89,7 @@
 | Expected evidence files | Offline test output and failure log excerpts under `docs/measurements/`. |
 | Owner | C (policy), D (implementation), E (verification). |
 | Status | measured |
-| Observed result | [PR #38's reported offline run](https://github.com/Felix-Free/AI-Finance-Assistant/pull/38) (237 passed) includes configuration, transport, HTTP, protocol, one-request/log-line and call-log-write-failure cases; see `test/offline/test_pipeline_seam.py` and `test/offline/test_evidence_join.py`. This is offline behavior evidence, not a live gateway measurement. |
+| Observed result | PR #42's [final NFR report](../measurements/final-nfr-verification.md) records five passing extract failure paths (missing config, timeout, HTTP 503, malformed envelope, invalid model JSON), plus the PR #38 hosted offline suite (237 passed). These are offline failure-path checks, not live gateway failure-rate measurements. |
 
 ### NFR-004 — Data security (secrets)
 
@@ -107,8 +103,8 @@
 | Measurement command / procedure | Run a secret scan over tracked files and review findings. |
 | Expected evidence files | Scan command, scope, findings and review result under `docs/measurements/`. |
 | Owner | B (requirement), E (verification). |
-| Status | pending |
-| Observed result | No scan result recorded here. |
+| Status | measured |
+| Observed result | PR #42's [final NFR report](../measurements/final-nfr-verification.md) records zero credential-pattern matches from `python .github/ci_checks.py secret-scan` over eligible tracked readable files, locally and in hosted CI. `.env` is ignored; `.env.example` is tracked. The scan does not cover committed history or every possible secret format. |
 
 ### NFR-005 — Input/output reliability
 
@@ -121,8 +117,8 @@
 | Measurement command / procedure | Test valid and invalid inputs; recheck accepted records against the policy invariants and verify validation precedes state change. Include the direct-storage and caller-supplied-`spent` gaps documented below. |
 | Expected evidence files | Offline test output and reviewed records under `docs/measurements/`. |
 | Owner | B (requirement), C (policy), E (verification). |
-| Status | pending |
-| Observed result | PR #38's reported offline suite includes invariant, pipeline, storage and concurrency regressions. No separate accepted-record reliability-rate report or denominator is recorded; the former storage-boundary gap statement was pre-merge and is superseded by §6. |
+| Status | measured |
+| Observed result | PR #42's [final NFR report](../measurements/final-nfr-verification.md) records 0/16 accepted synthetic records failing independent deterministic re-validation (0% in this sample); all 16 were checked for amount, category, running total, cap and stored totals. |
 
 ### NFR-006 — Log traceability
 
@@ -137,13 +133,13 @@
 | Measurement command / procedure | Use an offline harness to count `extract` invocations (including pre-HTTP failures) against `llm_calls.jsonl` lines and policy rejections against `review.jsonl` lines; missing log lines cannot be detected by counting logs alone. Inject evidence-write failures separately and check fail-closed behavior. For accepted decisions join `llm_calls` to storage on `call_id`; for rejected decisions join `llm_calls` to review. Mismatched ids or both a normal record and review line for one decision violate the Phase 2 contract. |
 | Expected evidence files | `docs/measurements/` report for NFR-006; the joined `logs/llm_calls.jsonl`, `logs/review.jsonl` and `data/records.jsonl` excerpts used for the check. |
 | Owner | E (measurement), D (pipeline: `call_id` generation and carriage), C (contract). |
-| Status | pending |
-| Observed result | Join and fail-closed regression cases are included in PR #38's reported 237-pass suite; E's earlier local Phase 2 report also records accepted/rejected joins. No overall log-coverage percentage or final-main runtime-log sample report is recorded. |
+| Status | measured |
+| Observed result | PR #42's [final NFR report](../measurements/final-nfr-verification.md) records 48/48 attempts with exactly one call row, 16/16 accepted ledger joins, and 32/32 rejected review joins by `call_id` and `request_id`; rejected IDs were absent from the ledger. |
 
-> **Why NFR-006 is pending.** The evidence-join tests are present and included in PR #38's
-> reported passing suite; they are not skipped on the merged baseline. The pending status is
-> for the unreported overall call/rejection log-coverage measurement, not for absence of
-> regression tests. No numeric coverage target is approved.
+> **Measurement scope.** These coverage figures are from the synthetic offline sample in
+> PR #42. The behavioral criteria are one call line per attempt, applicable `call_id` joins,
+> and fail-closed evidence writes; this sample does not claim to characterize every possible
+> production run.
 
 ### NFR-007 — Testability
 
@@ -152,13 +148,13 @@
 | NFR | Approved invariants have offline negative tests that fail when the guard is removed. |
 | Metric | Fraction of approved invariants with such tests. |
 | Threshold | **1.0** in main, with requirement status still `pending_confirmation`. |
-| Threshold source and rationale | Main `docs/req/requirements.yaml` lists 1.0. For this fraction, 1.0 means every approved invariant has an offline negative test that fails when its guard is removed; any missing test lowers coverage. The requirement and threshold still await confirmation, and this is not a measured result. |
+| Threshold source and rationale | Main `docs/req/requirements.yaml` lists 1.0. For this fraction, 1.0 means every approved invariant has an offline negative test that fails when its guard is removed; any missing test lowers coverage. The requirement and threshold still await confirmation; the observed measurement is recorded separately below. |
 | Input / data source | Approved invariant list and offline negative tests. |
 | Measurement command / procedure | Map each approved invariant to a negative test and verify the test fails when its guard is removed. |
 | Expected evidence files | Invariant-to-test mapping and run output under `docs/measurements/`. |
 | Owner | E. |
 | Status | measured |
-| Observed result | [E's local Phase 2 QA report](https://github.com/Felix-Free/AI-Finance-Assistant/blob/06ec2f59acfdcbb68d3ea437d42b16279eeeb976/docs/measurements/phase2-qa-evidence.md) records 3/3 guard-removal negatives and 201 passing offline tests on baseline `main@94b0ec4` + D #18 `df729a9` + C #19 `6808d7e`; PR #38's final reported suite also passed 237 tests. The NFR-007 threshold's `pending_confirmation` status in B's requirements registry is not a pass/fail decision. |
+| Observed result | PR #42's [final NFR report](../measurements/final-nfr-verification.md) records 3/3 guard-removal negatives (1.0): each control test passed and its corresponding guard-disabled mutant failed. The threshold's `pending_confirmation` status in B's requirements registry remains a separate approval question. |
 
 ### Additional proposal — Input parsing reliability (not a main NFR)
 
@@ -210,13 +206,13 @@ tests are skipped, so the join remains unverified.
 
 | NFR | Metric | Threshold | Owner | Status | Observed result |
 |---|---|---|---|---|---|
-| NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | pending | offline script tests pass; no live latency sample |
-| NFR-002 | per-request/per-session token totals and logging statistics (per-request aggregate absent from D's report) | `null`; descriptive statistics only | B / D / E | pending | fixture tests pass; no real token-usage report |
-| NFR-003 | transport/HTTP failure handling and retry behaviour | `null` numeric target; no automatic retry | C / D / E | measured | offline failure-path regressions in PR #38; 237 reported passed |
-| NFR-004 | committed secret occurrences | **0**, approved | B / E | pending | no scan recorded |
-| NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | pending | regression cases pass; empirical rate not measured |
-| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` numeric target; one line per writable evidence path, fail closed on write failure | C / D / E | pending | join/fail-closed tests pass; overall coverage not measured |
-| NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | measured | 1.0 (3/3) in E's local Phase 2 guard-removal run; threshold confirmation pending |
+| NFR-001 | model API round-trip latency, p50/p95/max ms | `null`; no approved budget | B / D / E | measured | PR #42: 20 live gateway calls; p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms |
+| NFR-002 | per-request/per-session token totals and logging statistics | `null`; descriptive statistics only | B / D / E | measured | PR #42: 20/20 complete; 125/12/137 tokens per request; session total 2500/240/2740 |
+| NFR-003 | transport/HTTP failure handling and retry behaviour | `null` numeric target; no automatic retry | C / D / E | measured | PR #42: 5 failure paths passed; PR #38 hosted offline suite: 237 passed |
+| NFR-004 | committed secret occurrences | **0**, approved | B / E | measured | PR #42: zero credential-pattern matches in eligible tracked readable files, locally and in CI |
+| NFR-005 | accepted records failing later deterministic checks | `null`; numeric rate pending | B / C / E | measured | PR #42: 0/16 accepted synthetic records failed independent re-validation |
+| NFR-006 | log-line coverage for model calls/rejections; Phase 2 `call_id` joins | `null` numeric target; one line per writable evidence path, fail closed on write failure | C / D / E | measured | PR #42: 48/48 call rows; 16/16 accepted joins; 32/32 rejected joins |
+| NFR-007 | fraction of approved invariants with guard-sensitive offline negative tests | **1.0**, requirement pending confirmation | E | measured | PR #42: 3/3 guard-removal negatives (1.0); requirement confirmation remains separate |
 
 ---
 
@@ -249,7 +245,8 @@ tests are skipped, so the join remains unverified.
 > empty and the `git ls-tree` blob hashes match. There is **no `src/storage.py`**, no
 > `call_id` / `request_id` / `session_id`, no `tokens` / `usage_source` / `request_made` on
 > this branch. The evidence below is what a reader can re-check on this branch; it is
-> **not** a measurement of NFR-001/002/005/006, which stay `pending`.
+> **not** a measurement of NFR-001/002/005/006 on this historical C snapshot. Their later
+> merged-main measurements are recorded in §2, §3 and §6.3.
 
 ### 5.1 How this evidence was produced
 
@@ -313,12 +310,12 @@ runtime-ledger deny for `data/records.jsonl*`; it does not describe the current 
 The post-merge permission review and correction are recorded in §6.1 and §6.3. No config
 edit was made during the historical check.
 
-### 5.5 Status of NFRs after this audit (unchanged)
+### 5.5 Historical NFR status at this audit
 
-NFR-001/002/003/005/006 remain `pending` (no independent measurement on this branch);
-NFR-004 remains `pending` (no tooled scan); NFR-007 remains `pending` (guard-removal
-mapping is E's, not run here). This section records **audit evidence and gaps**, not
-measurements, and does not promote any NFR.
+At the time of this branch-only audit, NFR-001/002/003/005/006 were `pending` for lack of
+independent measurement on this branch; NFR-004 had no tooled scan; and the NFR-007
+guard-removal mapping had not been run here. This is a historical status snapshot. Current
+merged-main measurements are recorded in §2, §3 and §6.3.
 
 ## 6. Post-merge C security audit — `main@06ec2f5`
 
@@ -360,16 +357,11 @@ measurements, and does not promote any NFR.
   private marker can select the internal path.
 - The hosted checks passed, but branch protection's required-check configuration and a
   deliberately blocked bad-merge scenario were not verified.
-- NFR-001/002 remain `pending` because no live latency or token-usage measurement is recorded;
-  offline tests for their scripts and parsing logic do not substitute for live samples.
-- NFR-003 is measured by the offline failure-path regressions reported in PR #38 (237 passed).
-  NFR-005 remains `pending` because the suite has reliability regressions but no empirical
-  accepted-record failure-rate report. NFR-006 remains `pending` because join and fail-closed
-  tests pass, but overall log-coverage figures have not been measured.
-- NFR-007 has a local measured result of 1.0 (3/3 guards) in E's Phase 2 guard-removal report;
-  PR #38's final suite also passes. B's requirements registry still marks the 1.0 threshold
-  `pending_confirmation`, so this is not recorded as a requirement pass. NFR-004 remains
-  `pending` because no dedicated secret-scan result is recorded.
+- NFR-001/002/003/004/005/006/007 have measured results recorded in PR #42's
+  [final NFR report](../measurements/final-nfr-verification.md) and summarized in §2 and §3.
+  NFR-001/002/005/006 have no approved numeric threshold; NFR-007's 1.0 threshold remains
+  `pending_confirmation` in B's registry. These are measurement states, not blanket
+  requirement approvals or claims beyond the reported samples.
 - C confirmed the final eight-category whitelist in `invariants.md` on 2026-11-22; E's
   per-member category regression is included in the reported passing suite. The B-owned
   requirements registry still shows PD-002 as `pending_confirmation` and needs its owner to
@@ -385,6 +377,8 @@ measurements, and does not promote any NFR.
 > **Conclusion.** PR #38 closes the previously pending D implementation and E regression
 > items for A′ redaction, locked budget authority, atomic ledger append, and safe public
 > I/O messages. The ledger permission mismatch is now corrected in both the permission model
-> and machine config. Remaining limits include unmeasured NFRs, unverified branch-protection
+> and machine config. NFR-001 through NFR-007 now each have measured evidence recorded; these
+> measurements are limited to the samples and scan scope stated in §2 and the linked report.
+> Remaining limits include unverified branch-protection
 > enforcement, non-atomic review-log append, untested OpenCode runtime matcher behavior, and
 > the documented direct-call error-message edge case.
