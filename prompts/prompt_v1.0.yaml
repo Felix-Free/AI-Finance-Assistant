@@ -1,18 +1,15 @@
-# Superseded prompt — HISTORICAL RECORD ONLY. Current prompt: prompts/prompt_v1.1.yaml.
+# Superseded prompt — historical record. Current prompt: prompts/prompt_v1.1.yaml.
 #
-# Why this file is under docs/ and not under prompts/:
-#   Gate 4 (semantic-eval) replays EVERY *.yaml under prompts/ through
-#   test/live/test_live_model.py. v1.0 has no {"error": "not_a_record"} rule, so replaying it
-#   fails the non-expense case and turns the gate red for a prompt that is no longer used.
-#   The runtime prompt directory therefore holds only replayable prompts; superseded versions
-#   are archived here. If Gate 4 later learns to replay only `status: current` entries, this
-#   file can move to prompts/prompt_v1.0.yaml without content changes.
+# Gate 4 replays every *.yaml under prompts/ through test/live/test_live_model.py. This file
+# declares `status: superseded`, so .github/ci_checks.py::_is_replayable_prompt keeps it out of
+# that replay set: v1.0 has no {"error": "not_a_record"} rule, and re-running a prompt that
+# production no longer sends would fail the non-expense case for no benefit.
 #
-# The v1.0 text below is reproduced verbatim from the version history in
-# prompts/prompt_v1.1.yaml. It is a record, not a rewrite.
+# The text below is reproduced verbatim from the version history in prompt_v1.1.yaml.
+# It is a record, not a rewrite.
 
 schema_version: "1.0"
-file: docs/architecture/prompt-history/prompt_v1.0.yaml
+file: prompts/prompt_v1.0.yaml
 version: "1.0"
 status: superseded
 superseded_by: prompts/prompt_v1.1.yaml
@@ -61,10 +58,9 @@ known_issues:
     consequence: >
       No deterministic path for "this sentence is not a purchase"; the
       {"error": "not_a_record"} convention only appears in v1.1. This is also the
-      case that prevents v1.0 from being replayed by Gate 4.
+      case that keeps v1.0 out of the Gate 4 replay set.
 
-# What v1.1 changed, in one place, so this archive does not have to be read
-# alongside the current file to be understood.
+# What v1.1 changed, so this archive can be read on its own.
 superseding_changes:
   - closed category whitelist quoted verbatim, plus explicit synonym mapping
   - inline JSON schema and a single-object output rule
