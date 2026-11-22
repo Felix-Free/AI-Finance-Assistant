@@ -15,24 +15,28 @@
 > (Trigger / Action / Execution order / State-change guarantee / Evidence and logging /
 > Implementation seam / Test-evidence status), and tags each field with its provenance.
 
+> **Current baseline:** PR #38 is merged to `main` at `06ec2f5`. Sections 1–7 below preserve
+> the pre-merge C-branch snapshot for historical evidence; statements that call behavior
+> `unmerged` or `pending D` describe that earlier snapshot only. **Section 8 is the current
+> normative policy/evidence status for the merged implementation.**
+
 ### Provenance tags (Phase 3)
 
-Every sub-field below carries one of these tags so a reader can tell *how far* a claim is
-backed on the current branch:
+Every sub-field below carries one of these tags to preserve the provenance of the
+pre-merge C-branch snapshot, not to describe current `main`:
 
 | Tag | Meaning |
 |---|---|
-| `code-confirmed` | Verified by reading the code that is **identical to `origin/main`** on this branch (`src/` and `test/` are byte-identical to `origin/main` `6997cef`; `git diff origin/main -- src test` is empty). |
-| `doc-only (unmerged)` | Defined here as the contract, but the implementing code lives only on an **unmerged** D branch; it is **not present** on this branch or on `origin/main`. |
-| `pending D` | Behaviour the implementation must provide but that C has **not** yet confirmed with D; not asserted as implemented. |
+| `code-confirmed` | Verified by reading the code in the **historical C snapshot** (`origin/main` at `6997cef`). |
+| `doc-only (unmerged)` | In that snapshot, the contract was documented but implementation was only on an unmerged D branch. |
+| `pending D` | In that snapshot, C had not yet confirmed the design with D. |
 
-> **Branch reality (read this before RP-007).** This branch and `origin/main` contain only
+> **Historical branch reality at `6997cef` (read before §§1–7).** The old C snapshot contained only
 > `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py` (plus `src/__init__.py`).
-> There is **no `src/storage.py`** on this branch. Any sentence in this catalog that names
+> It had **no `src/storage.py`**. Any sentence in §§1–7 that names
 > `src/storage.py`, a stored `data/records.jsonl`, `call_id` / `request_id` / `session_id`,
-> `tokens` / `usage_source` / `request_made`, or `expected_spent` describes an **unmerged
-> design**, not code you can run here. Those sentences are retained for history and are
-> tagged `doc-only (unmerged)` or `pending D`; they must not be read as implemented.
+> `tokens` / `usage_source` / `request_made`, or `expected_spent` described an unmerged
+> design **at that time**. This statement is historical and is superseded by §8.
 
 ---
 ## 1. Action vocabulary
@@ -341,25 +345,20 @@ results fail closed.
 
 ---
 
-## 7. Phase 3 D design confirmation — design-confirmed, implementation-unmerged
+## 7. Phase 3 D design confirmation — historical pre-merge snapshot
 
-> **Banner — read first.**
-> This section records **D's confirmed target design** from D's reply. It is
-> **design-confirmed but implementation-unmerged**. **`src/storage.py` is absent on the current
-> C branch** (`feat/c-phase3-policy-60339160`; `src/`/`test/` byte-identical to `origin/main`
-> `6997cef`). **None of the behaviour below is `code-confirmed` on this branch.** It must not
-> be promoted to code-confirmed here, and the current branch still contains the known
-> review-write misclassification (see §6 finding 2 and RP-007) that **this documentation
-> update does not fix**.
+> **This is a coordination snapshot captured before PR #38 merged.** At that time,
+> implementation was design-confirmed but unmerged, and `src/storage.py` was absent from the C
+> snapshot. This section must not be used as current-main status; section 8 records the
+> post-merge evidence.
 >
 > **D-reported references (not independently verified):** branch `feat/D-phase3-hardening`;
 > interim implementation commit `1332483`; log commit `4281ea3`. Labelled
 > *D-reported / interim / not independently verified*. The final commit after the concurrency
 > fix and ADR-003 is still pending; E's regression results are still pending.
 
-The existing **§6 branch-reality table is preserved unchanged and still governs what the
-current branch actually does.** This §7 is the confirmed *target*; §6 is *current reality*.
-Where they differ (e.g. review-write failure, logging schema), §6 wins for this branch.
+The existing **§6 branch-reality table is preserved as a historical snapshot**. At the time,
+§7 was the confirmed *target* and §6 the *current reality*. Current `main` status is in §8.
 
 ### 7.1 Process path and model boundary (design-confirmed)
 
@@ -415,13 +414,13 @@ Where they differ (e.g. review-write failure, logging schema), §6 wins for this
 - These are **design-confirmed but remain unverified on the current C branch** (no `call_id`
   here).
 
-### 7.7 Atomicity target (design-confirmed; not implemented/verified)
+### 7.7 Atomicity target (design-confirmed in this historical snapshot)
 
 - Target: **unique temporary file + a file lock** around read/check/write/replace, replacing
-  append-mode, so no partial state is ever visible. **Concurrency implementation, the
-  concurrency regression, ADR-003, and E's regression evidence remain pending.**
+  append-mode, so no partial state is ever visible. Implementation/evidence status is updated
+  in §8.
 
-### 7.8 Privacy / redaction (design confirmed; implementation pending)
+### 7.8 Privacy / redaction (design confirmed in this historical snapshot)
 
 - **Unredacted `input` / `raw` logging is not approved.** The ten-field call-log schema remains
   intact, but sensitive values are minimized before persistence:
@@ -435,19 +434,51 @@ Where they differ (e.g. review-write failure, logging schema), §6 wins for this
   closed-vocabulary error code. Review entries retain the safe policy error code.
 - `StorageError` messages and evidence logs **must not** contain raw exception strings, URLs,
   HTTP bodies, credentials, or sensitive data; a **safe short policy code** may be retained
-  separately if needed. This is the confirmed target contract; implementation and tests remain
-  pending until the follow-up changes are reviewed and merged.
+  separately if needed. Implementation/evidence status is updated in §8.
 
 ### 7.9 Whitelist finality (pending B/C)
 
 - The **eight current categories are unchanged**. Final whitelist ownership/finality remains
   **pending B/C confirmation**; **D must not change the whitelist independently.**
 
-### 7.10 What stays pending
+### 7.10 What stayed pending before PR #38
 
 Concurrency implementation + regression, ADR-003, final commit, final merge, E's reproducible
 regression results, storage atomicity/no-partial-state proof, `call_id` joins, fail-closed
 tests, no-bypass tests, complete logging-schema tests, privacy/redaction policy, and final
-whitelist confirmation. **No item here is code-confirmed on the current branch.**
+whitelist confirmation were pending at that snapshot. Current status is in §8.
+
+## 8. Current mainline policy status — `main@06ec2f5`
+
+> **Source basis:** review of PR #38's merged implementation and E tests, merge commit `06ec2f5`,
+> and the associated report of `python -m pytest test/offline -q` → **237 passed**; GitHub
+> records **8 checks passed** on the merge. The C checkout used to edit this document is older,
+> so these are post-merge source/CI findings, not a local run on this branch.
+
+| Policy | Current trigger and action | Fail-closed/state guarantee | Evidence status |
+|---|---|---|---|
+| RP-001 Invalid model JSON | `call_llm.extract()` logs one redacted call record (`raw=redacted:len=<n>`, `parsed=null`, `error=not_json`) then re-raises `JSONDecodeError`; no retry. | No accepted result reaches pipeline/storage. | E offline regression passed in PR #38. |
+| RP-002 Config/transport/HTTP/protocol failure | At most one request; surface `LlmTransportError`; log only closed-vocabulary error code and redacted input/available response text. | No record is returned or persisted; call-log write failure itself prevents result use. | Config, timeout, HTTP, malformed-envelope and redaction cases included in E suite. |
+| RP-003 Invariant violation | `pipeline.process()` strips system `call_id`, calls `policy_core.validate_record()`; policy rejection attempts one review entry with safe code and null business fields. | No rejected record is written to normal ledger; review-write failure surfaces `StorageError`. | Policy rejection and evidence-join regression included in E suite. |
+| RP-004 Logging integrity | Fixed ten-field call-log schema; A′ redacts input/raw, sets parsed null, keeps IDs and safe metadata. Review schema remains fixed at eight keys with sensitive business fields null. | Call-log failure is fail-closed; policy rejection cannot be represented as accepted success when its review write fails. | Schema/redaction and call/review join regression included in E suite. |
+| RP-005 Budget exceeded | `policy_core` remains the decision authority; pipeline storage path rereads persisted total under lock; strict `>` rejects and equality is accepted. | True concurrent over-budget request raises `PolicyError(policy:budget, review=True)`, writes no ledger row, and attempts one review record. | Concurrent-budget and equality cases included in E suite. |
+| RP-006 Category outside whitelist | C confirmed the final eight-category vocabulary in `invariants.md` on 2026-11-22; `policy_core` enforces exact, case-sensitive membership. Invalid categories are rejected, never normalized or model-corrected. | Rejected category cannot reach ledger. | Per-member category regression is included in the reported passing suite. B-owned PD-002 status synchronization remains pending. |
+| RP-007 Storage failure | Storage validates with `policy_core`, locks read/check/write/replace, and atomically appends via unique same-directory temp file + fsync + `os.replace`. Direct API keeps `expected_spent < persisted` → `StorageError`; infrastructure and persistence failures are separate from policy errors. | Ledger write failure leaves prior bytes unchanged in the tested fault path. No retry; storage errors are not converted to `policy:*`. | Atomic tempfile-fault, direct API, concurrency and fail-closed regressions included in the reported passing suite. |
+
+### 8.1 Audit limits (not claims of completion)
+
+- `logs/review.jsonl` still uses append mode; a mid-write failure could leave a partial
+  evidence line. The merged PR explicitly records this as a deferred limitation. The ledger's
+  atomic replace is separate and remains covered by the fault-injection test.
+- `_PIPELINE_ORIGIN` is a controlled internal marker, not a hard privilege boundary. Both
+  pipeline and direct storage paths still invoke `policy_core` guards.
+- The broad “StorageError messages are safe” guarantee applies to the reviewed I/O/review
+  failure messages and evidence logs. A malformed **direct** storage call can echo an
+  arbitrary unknown field name in its shape-error message; this low-risk edge case is accepted
+  for this merge and is not claimed to be safe for arbitrary caller-supplied field names.
+- Exception causes remain chained internally. Per the confirmed C contract, the audited
+  boundary is the public error message and persisted evidence/log, not internal `__cause__`.
+- Passing CI does not establish that branch protection makes those checks mandatory. No
+  secret-scan output or independent blocked-merge proof is recorded here.
 
 ---

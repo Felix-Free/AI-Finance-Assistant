@@ -17,6 +17,7 @@
     ".github/workflows/**": "allow",
     "transcripts/**": "allow",
     "data/**": "allow",
+    "data/records.jsonl*": "deny",
     "scripts/**": "allow",
     ".env": "deny"
   },
@@ -28,6 +29,7 @@
 
     // Phase 2 measurement inputs, scripts and reports (C1).
     "data/**": "allow",
+    "data/records.jsonl*": "deny",
     "scripts/**": "allow",
     "docs/measurements/**": "allow",
 

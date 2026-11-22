@@ -6,10 +6,11 @@
 > NFR moves from "pending" to a measured result; a threshold without an observed result is
 > marked **pending**, never assumed to pass.
 >
-> Status: **Phase 2 documentation (transcript 60339160).** Main supplies the NFR
+> Status: **Phase 2 NFR registry with Phase 3 C audit evidence.** Main supplies the NFR
 > registry and threshold fields; C records the policy and evidence contract, E runs the
 > measurement, and D implements the pipeline. No measurement result is recorded here
-> until it has actually been run.
+> until it has actually been run. The post-merge security audit is recorded in §6 against
+> `main@06ec2f5`; §5 is retained as the historical audit of the earlier C checkout.
 
 ---
 
@@ -38,17 +39,23 @@
 | NFR | Model API response time for an `extract` round trip. |
 | Metric | Wall-clock latency per round trip; D's report also shows `attempted`, `ok`, `failed`, `failure_rate`, and successful-call p50/p95/max in ms. |
 | Threshold | `null` in main; no approved latency budget. |
-| Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `src/measure_latency.py` with a fixed probe sentence. |
-| Measurement command / procedure | `python -m src.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
+| Input / data source | Live gateway samples in `logs/latency.jsonl`, produced by `scripts/measure_latency.py` with a fixed probe sentence. |
+| Measurement command / procedure | `python -m scripts.measure_latency`; report p50/p95 for successful samples with `(n=ok)` and max separately. Transport and model-content JSON errors are counted as failures. Other errors, including failure to append a successful sample, may stop the run. |
 | Expected evidence files | `logs/latency.jsonl` and a run report under `docs/measurements/`. |
 | Owner | B (requirement), D (script), E (measurement). |
 | Status | pending |
 | Observed result | Not measured. |
 
+> **Path migration note.** The measurement path and command above follow D's post-#19
+> migration (`a420987`) from `src/` to `scripts/`. The migrated script is not present in
+> this C checkout yet, so this remains a documentation/path update, not current-branch
+> measurement evidence.
+
 > **Reported by D; not verified by committed run evidence.** D's debt ledger reports
 > `n=20: p50 2356.7 ms / p95 4759.5 ms / max 5771.2 ms`. This does not count as a
-> measured result here. D's latency script header calls this "NFR-002"; that script label
-> conflicts with the main registry and needs correction by its owner.
+> measured result here. The migrated `scripts/measure_latency.py` labels itself NFR-001;
+> the earlier mismatch is resolved in the merged mainline. The measurement itself remains
+> pending until E records reproducible run evidence.
 
 ### NFR-002 — Token Usage statistics
 
@@ -62,7 +69,7 @@
 | Measurement command / procedure (required by C) | Over the produced `llm_calls` records, compute: (a) **per-session aggregation** grouped by `session_id`; (b) **per-request aggregation** grouped by `request_id` (one request may span multiple calls); (c) **`api_call_count`** = number of rows with `request_made: true`; (d) the **usage-source distribution** over `request_made: true` rows across the three stored `usage_source` values `gateway`, `partial`, `missing`; (e) **missing-usage count** = `request_made: true` rows with `usage_source: missing`. Rows with `request_made: false` are counted separately as **`not_called_calls`** and **excluded** from the usage-source distribution and missing-usage count; `not_called` is derived from `request_made=false`, not a fourth `usage_source` value. Three recorded integers → `gateway`; at least one recorded integer and one `null` → `partial`; `tokens: null` or three `null` counts → `missing`. Non-integer counts in a processed usage object normalize to `null`. Check `usage_source` agrees with recorded `tokens` and missing counts are never replaced with `0` or estimates. `tokens` is always present: it is `null` when usage was not recorded (including model-content JSON parse failure), or an object with `input`, `output` and `total` when usage was processed (missing counts `null`). These are descriptive statistics, with no pass/fail judgment. |
 | Meaning of `api_call_count` | `request_made: true` counts attempted HTTP calls, including DNS, connection and timeout failures. It does not count only requests known to have reached the gateway. |
 | Meaning of `usage_source: missing` | No usable token counts were recorded in that log line. On a JSON parsing failure, D records `tokens: null` and `usage_source: missing` even if the gateway response included usage. Therefore the missing-usage count cannot establish how often the gateway omitted usage. |
-| D's current report implementation (verified at `df729a9`, unmerged) | `src/report_tokens.py` produces **per-call rows** (including `call_id`, `request_id`, `session_id`, `input`, `output`, and `total`), **per-session aggregation** grouped by `session_id`, **per-request aggregation** grouped by `request_id`, and the global counters (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). This implementation exists on D's branch and is **not yet present on `main`**. |
+| Report implementation on `main@06ec2f5` | `src/report_tokens.py` produces per-call rows (including `call_id`, `request_id`, `session_id`, token counts and `usage_source`), per-session aggregation, per-request aggregation, and global counters (`total_api_calls`, `usage_complete_calls`, `usage_missing_calls`, `usage_partial_calls`, `not_called_calls`). Code presence is verified at the merged baseline; no report run/evidence is recorded, so NFR-002 remains pending. |
 | Expected evidence files | `docs/measurements/` report for NFR-002 and the `llm_calls` excerpts used for the aggregation and consistency checks. |
 | Owner | B (definition), E (measurement), D (logging fields and report). |
 | Status | pending |
@@ -369,3 +376,65 @@ E's reproducible regression results.
 
 **No NFR is promoted from `pending` to `measured` by this subsection, and no D-branch test is
 presented as current-branch evidence.**
+
+## 6. Post-merge C security audit — `main@06ec2f5`
+
+> **Audit baseline.** PR [#38](https://github.com/Felix-Free/AI-Finance-Assistant/pull/38)
+> was merged by C into `main` as `06ec2f5` on 2026-11-22. This section supersedes the
+> pre-merge status statements in §5 for the current mainline. The C branch used to edit this
+> logbook still has the older source snapshot; the evidence below is based on review of the
+> merged PR/source and its recorded checks, not a local test run on this C checkout.
+
+### 6.1 Evidence and verification source
+
+| Evidence | Source / command | Observed result | Scope / limit |
+|---|---|---|---|
+| Final offline regression | D's PR report: `python -m pytest test/offline -q` on the implementation head | **237 passed** | Reported in PR #38; not rerun in this stale C checkout. |
+| Merge-head CI | GitHub checks attached to merge commit `06ec2f5` | **8 checks passed** | Proves these checks ran successfully; does not prove branch protection requires them. |
+| E regression additions | `test/offline/test_evidence_join.py`, `test/offline/test_pipeline_seam.py`; existing storage/invariant regression selection | Included in the reported 237-pass offline suite | Test pass is not a measured NFR result and does not prove every property by itself. |
+| Code path review | `src/call_llm.py`, `src/pipeline.py`, `src/policy_core.py`, `src/storage.py` at the PR #38 merge head | Findings in §6.2 | Static review of the merged implementation; no independent clean checkout was available in this C worktree. |
+| Permission alignment | `docs/architecture/permission-model.md` compared with `.opencode/permissions.jsonc` and the merged storage path | The initial comparison found the ledger deny missing. After explicit human authorization, both `read` and `edit` now deny `data/records.jsonl*`; the broader `data/**` measurement allow remains. JSONC structure and both rule entries were checked. | **Configuration and document are aligned.** The OpenCode runtime matcher was not independently exercised, so effective enforcement is not claimed from syntax inspection alone. |
+
+### 6.2 Final policy and security evidence
+
+| Invariant / policy | Final code path and test evidence | Audit result |
+|---|---|---|
+| Model-output authority / no normal-data bypass | `call_llm.extract()` is the model client; `pipeline.process()` removes `__call_id__`, calls `policy_core.validate_record()`, and passes only its normalized business record onward. The pipeline storage path and direct storage path both call `policy_core` guards; storage does not make an independent business-rule decision. | **No bypass found in the reviewed production paths.** Raw model-output audit logging occurs before policy validation by design; it is redacted and is not normal business data. |
+| A′ log privacy | Call logs store `input`/available `raw` as `redacted:len=<n>` using character count; `parsed` is null. Review fields `amount/category/spent/total` are null. IDs and safe codes remain. The normal ledger retains validated values. E added success, rejection, config, transport, HTTP, protocol and fault cases. | **Implemented and regression-tested** in PR #38. |
+| Pipeline budget authority | The pipeline uses persisted spend for pre-validation; storage rereads the persisted total under the file lock and recomputes the canonical total before the atomic ledger replace. A stale caller `spent` does not determine pipeline decisions. | **Implemented and regression-tested.** Concurrent over-budget requests produce `PolicyError(policy:budget, review=True)` and do not append a ledger row; equality is accepted. |
+| Direct storage semantics | Public `append_validated` retains direct-call `expected_spent < persisted` → `StorageError`; direct policy violations remain `PolicyError`; direct calls do not add review evidence. | **Preserved and covered by existing regression tests.** |
+| Rejection evidence / fail-closed | Pipeline policy rejection attempts one redacted review line. Review-write failure raises `StorageError`; the rejected record is not appended. Call-log write failure prevents `extract()` from returning a usable result. | **Implemented and failure-tested.** Review-log append itself is not atomic; see §6.3. |
+| Ledger atomicity / locking | Storage holds the OS file lock over read, duplicate check, budget enforcement, and write/replace; it writes through a unique same-directory temporary file, flushes/fsyncs, then `os.replace`s. The E fault test targets `mkstemp` and checks prior ledger bytes remain unchanged. | **Implemented and fault-tested** for the tested write failure. This evidence does not cover every possible filesystem/crash mode. |
+| Safe error messages and evidence | I/O `StorageError` and review-write messages use fixed safe wording; logged failures use allowlisted error codes. Exception causes remain chained internally; C's accepted contract covers the public message and persisted evidence/log, not the internal `__cause__`. | **Meets the confirmed C wording** for messages and logs. A malformed direct-storage record with an arbitrary unknown field name can still have that field name echoed in a shape-error message; this is a low-risk, non-pipeline edge case accepted for this merge, not a universal guarantee for arbitrary direct callers. |
+
+### 6.3 Remaining limits and NFR status
+
+- `logs/review.jsonl` still uses append mode. A write that fails midway could leave a partial
+  evidence line; the PR discloses this and does not claim atomic review writes. It does not
+  affect the atomic commit point for `data/records.jsonl`.
+- `_PIPELINE_ORIGIN` is an internal routing marker, not a hard privilege boundary. It does
+  not bypass `policy_core`; code in the same Python process that deliberately imports the
+  private marker can select the internal path.
+- The hosted checks passed, but branch protection's required-check configuration and a
+  deliberately blocked bad-merge scenario were not verified.
+- NFR-001/002/003/005/006/007 remain `pending`: the merged test suite is regression evidence,
+  not the required NFR measurement, threshold result, or guard-removal coverage mapping.
+  NFR-004 remains `pending` because no dedicated secret-scan result is recorded.
+- C confirmed the final eight-category whitelist in `invariants.md` on 2026-11-22; E's
+  per-member category regression is included in the reported passing suite. The B-owned
+  requirements registry still shows PD-002 as `pending_confirmation` and needs its owner to
+  synchronize that status.
+- **Permission configuration gap closed:** `.opencode/permissions.jsonc` grants `read` and
+  `edit` to `data/**`, and now also denies `data/records.jsonl*` for both actions. This covers
+  the runtime ledger, its lock sidecar, and same-prefix temporary files. The permission model
+  and machine config agree; OpenCode's runtime matcher behavior was not independently tested.
+- `AGENTS.md`, `docs/req/requirements.yaml`, and other B-owned wording are not changed here;
+  any remaining broad “before any state change/write” language must be reconciled by those
+  owners.
+
+> **Conclusion.** PR #38 closes the previously pending D implementation and E regression
+> items for A′ redaction, locked budget authority, atomic ledger append, and safe public
+> I/O messages. The ledger permission mismatch is now corrected in both the permission model
+> and machine config. Remaining limits include unmeasured NFRs, unverified branch-protection
+> enforcement, non-atomic review-log append, untested OpenCode runtime matcher behavior, and
+> the documented direct-call error-message edge case.

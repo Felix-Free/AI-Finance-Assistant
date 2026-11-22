@@ -1107,3 +1107,102 @@
     - unredacted input/raw logging remains unapproved; privacy/redaction policy pending
     - final category whitelist finality pending B/C
     - D-reported branch/commit/log references are not independently verified
+
+- date: "2026-11-22"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 16
+  topic: Post-merge security audit and architecture evidence update
+  tool: Codex
+  files_created: []
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/phase3-c-confirmation-to-d.md
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/code-governance/structural-constraints.md
+    - .opencode/permissions.jsonc (approved exception)
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - .github/**
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Completed a C-side post-merge security audit against main@06ec2f5 (PR #38). Reviewed the
+    merged model-call, pipeline, policy-core and storage paths and recorded the A′ redaction,
+    locked persisted-budget authority, direct-storage semantics, fail-closed errors, atomic
+    ledger append, and E regression evidence in the architecture catalog and logbook. Marked
+    pre-merge/pending wording as historical, clarified that audit-call logging is intentionally
+    written before policy validation while normal business data is not, and reconciled the
+    invariant/governance wording. Permission review found that data/** read/edit permission
+    also covers the runtime ledger. After explicit human authorization, the read/edit deny
+    exceptions were added to .opencode/permissions.jsonc and documented. The merged PR reports 237
+    offline tests passed and GitHub records eight checks passed on merge commit 06ec2f5; these
+    are cited as remote evidence, not claimed as locally rerun. Recorded review-log partial-write,
+    private-marker, branch-protection, secret-scan, NFR measurement, and direct unknown-field
+    message limitations without claiming all security work complete.
+  human_review:
+    - directed C to continue the final audit after PR #38 merged to main
+    - confirmed exception chaining alone is not a blocker when public StorageError messages and persisted logs are safe
+    - accepted the low-risk direct-storage unknown-field message edge case without reopening D/E changes
+    - explicitly authorized the minimal .opencode/permissions.jsonc exception to deny agent read/edit of the runtime ledger; B-owned requirements remain unmodified
+  validation:
+    merge_baseline: "GitHub PR #38 merged as 06ec2f5; 8 checks passed"
+    offline_tests: "PR #38 reports python -m pytest test/offline -q -> 237 passed; not rerun in this C checkout"
+    permissions_check: "data/records.jsonl* is denied for read and edit; broader data/** measurement allow remains"
+    docs_validation: "git diff --check: pass; Ruby YAML parser: pass; JSONC parsed with comment/trailing-comma normalization; read/edit ledger deny entries verified"
+  remaining_risks:
+    - logs/review.jsonl append is not atomic; a failed mid-write may leave partial evidence
+    - _PIPELINE_ORIGIN is an internal marker, not a hard in-process privilege boundary
+    - branch protection and a blocked bad-merge scenario are not independently verified
+    - NFR-001/002/003/004/005/006/007 remain pending measurement/scan/guard-removal evidence
+    - malformed direct storage calls can echo arbitrary unknown field names in shape-error messages; accepted as non-blocking for this merge
+    - broad legacy wording in AGENTS.md and docs/req/requirements.yaml remains for owner reconciliation
+
+- date: "2026-11-22"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 17
+  topic: Refresh post-merge audit after permission config correction
+  tool: Codex
+  files_created: []
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - .github/**
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+  summary: >
+    Updated the current audit section to reflect that the explicit read/edit deny for
+    data/records.jsonl* is now present in .opencode/permissions.jsonc and aligned with the
+    permission model. Preserved the initial mismatch as audit chronology. Recorded that
+    OpenCode runtime matcher behavior was not independently exercised; other audit limits
+    remain unchanged. No implementation, tests, or permission config were changed in this pass.
+  human_review:
+    - requested that the previous audit result be updated after the permission rules were added
+  validation:
+    diff_check: "git diff --check -> pass"
+    yaml_parse: "Ruby YAML.load_file -> pass (41 entries)"
+    source_tests: "not run; documentation-only update"
+  remaining_risks:
+    - OpenCode runtime matcher behavior has not been independently exercised
+    - NFR measurements, secret scan, and branch-protection enforcement remain unverified
