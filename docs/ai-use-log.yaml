@@ -1797,6 +1797,46 @@
 
     '
   pending: human review of D's implementation and independent test review
+- date: "2026-11-22"
+  role: E
+  student_id: "61049313"
+  phase: 4
+  session: 5
+  tool: "opencode (DeepSeek V4 Flash)"
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_created:
+    - docs/measurements/final-nfr-verification.md
+  summary: "Final NFR verification at commit 06ec2f59: synthetic 20-attempt latency session (p50 2422.222 ms, p95 2850.720 ms), token accounting 125/12/137 per request, 5 real extract error paths passing, hosted 237 offline tests passing, secret-scan clean locally and in CI, OFFLINE NFR-005/006 ledger run (16 accepted, 48/48 logged, joins verified), and NFR-007 mutation coverage 3/3 = 1.0; scoped to measured cases only."
+  human_review: "E ran and audited all measurements and the mutation/fault-injection checks; OpenCode only composed the report from E-supplied evidence and did not execute the measurements."
+- date: '2026-11-22'
+  role: A
+  student_id: '60528523'
+  phase: 2
+  session: 7
+  topic: 'Gate 4: replay only the prompts that can still run (superseded prompt exclusion)'
+  tool: opencode (DeepSeek V4 Flash)
+  files_created:
+  - docs/architecture/adr/005-semantic-scope-superseded-prompts.md
+  files_modified:
+  - .github/ci_checks.py
+  - test/offline/test_ci_regressions.py
+  - docs/ai-use-log.yaml
+  summary: 'Gate 4 replayed every YAML under prompts/, so the archived v1.0 prompt could not sit in the D9 location: its missing not_a_record rule fails the live non-expense case for a prompt production no longer sends. Added a replayability rule to classify_semantic_paths: a prompt is replayed unless it declares status: superseded, and a missing status stays replayable and a malformed file aborts the scope job with a named error. The regression test was written and approved before the implementation, and ADR-005 records the decision and the rejected alternatives.'
+  human_review:
+  - required the decision to live in the gate, not in the live test, so scope and behaviour cannot drift apart
+  - required the default to stay "replay", with an explicit opt-out only, so a candidate prompt is never silently skipped
+  - required a malformed prompt to remain replayable rather than disappearing from the evaluation
+  - required an ADR because .github/ci_checks.py is a security-critical path (Gate 2)
+  - rejected relocating the archive permanently as a substitute for fixing the gate
+  validation:
+    test_first: 'test commit approved before the implementation commit (Gate 1)'
+    offline_regression: 'new test in test/offline/test_ci_regressions.py'
+    compile: 'python -m py_compile .github/ci_checks.py'
+    gate4_effect: 'prompts/ still triggers a live replay, but only for files without status: superseded'
+    pending: 'GitHub CI run and review'
+
 - date: '2026-11-22'
   role: B
   student_id: '60357951'
