@@ -140,7 +140,7 @@ functional_requirements:
     notes: >-
       The exact whitelist membership is fixed in code (8 values:
       food, transport, shopping, entertainment, housing, utilities, health, other).
-      C confirmed on 2026-11-19 that this set is final (recorded as approved in INV-PENDING-01).
+      C confirmed on 2026-11-22 that this set is final (recorded as approved in INV-PENDING-01).
 
   - id: FR-005
     title: Budget rule check
@@ -323,7 +323,7 @@ invariants:
     owner_spec: C
     owner_impl: D
     status: approved
-    notes: "C confirmed on 2026-11-19 that the 8-category whitelist is final: food, transport, shopping, entertainment, housing, utilities, health, other."
+    notes: "C confirmed on 2026-11-22 that the 8-category whitelist is final: food, transport, shopping, entertainment, housing, utilities, health, other."
 
 data_requirements:
   layers:

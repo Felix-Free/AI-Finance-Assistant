@@ -125,7 +125,7 @@ assigned **only when the evidence supports them**:
 | INV-001 | Amount finite, >0, ≤2 dp | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_amount` | `test_policy_core_smoke.py::test_inv001_rejects_invalid_amount` (9 params); `test_inv001_accepts_boundary_and_returns_unchanged`; `test_inv001_never_returns_decimal` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-002/003/004) | main-implemented | Negative test fails if the guard is removed. E's INV-001 tests are `PENDING_MERGE`. |
 | INV-002 | Category in closed whitelist (case-sensitive) | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_category`; `src/policy_core.py::CATEGORY_WHITELIST` | `test_policy_core_smoke.py::test_inv002_rejects_out_of_vocabulary`; `test_inv002_accepts_every_whitelisted_category` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-005/006) | main-implemented | E branch adds **no** INV-002 test. Whitelist membership finality: `INV-PENDING-01`. |
 | INV-003 | Cumulative spend ≤ budget (equality allowed) | Policy core guard; Runtime Monitor: — | `src/policy_core.py::enforce_budget` | `test_policy_core_smoke.py::test_inv003_equality_is_allowed`; `test_inv003_over_budget_rejected_with_review` | IN_MAIN; IMPLEMENTED_AND_TESTED (AC-007/008) | main-implemented | E branch adds **no** INV-003 test. No separate `budget±0.01` parametrised cases (equality + over-budget covered). |
-| INV-PENDING-01 | **[Not a formal requirement — excluded from the total of 36; finality confirmed]** Exact category whitelist membership final | Policy core constant; Runtime Monitor: — | `src/policy_core.py::CATEGORY_WHITELIST` | `test_inv002_accepts_every_whitelisted_category` (reads current 8 values) | IN_MAIN; IMPLEMENTED_AND_TESTED — finality confirmed | confirmed | Finality confirmed: C confirmed the final 8-category whitelist on 2026-11-19 (now approved; see `requirements.yaml` INV-PENDING-01). Values: food, transport, shopping, entertainment, housing, utilities, health, other. Counted separately from the 36 formal requirements. |
+| INV-PENDING-01 | **[Not a formal requirement — excluded from the total of 36; finality confirmed]** Exact category whitelist membership final | Policy core constant; Runtime Monitor: — | `src/policy_core.py::CATEGORY_WHITELIST` | `test_inv002_accepts_every_whitelisted_category` (reads current 8 values) | IN_MAIN; IMPLEMENTED_AND_TESTED — finality confirmed | confirmed | Finality confirmed: C confirmed the final 8-category whitelist on 2026-11-22 (now approved; see `requirements.yaml` INV-PENDING-01). Values: food, transport, shopping, entertainment, housing, utilities, health, other. Counted separately from the 36 formal requirements. |
 
 ### 2.4 AI requirements (AI-REQ-001 … AI-REQ-008)
 
@@ -197,7 +197,7 @@ must not be reported as passing on `main`/CI until merged and run in the hosted 
 ERR (5) + SEC (5) = **36 formal requirements**.
 
 **Counting rules (explicit):**
-- `INV-PENDING-01` is a **placeholder** (finality now confirmed by C on 2026-11-19; see §2.3), kept in
+- `INV-PENDING-01` is a **placeholder** (finality now confirmed by C on 2026-11-22; see §2.3), kept in
   §2.3 for traceability but **not counted** in the total of 36.
 - `PD-001 … PD-008` are **pending decisions**, not requirement rows; they are **not** counted.
 - Nothing was deleted to reach 36 — the placeholder row remains, only excluded from the count.
@@ -238,9 +238,9 @@ ERR (5) + SEC (5) = **36 formal requirements**.
 | IMPLEMENTED_NOT_TESTED | 5 | AI-REQ-005, AI-REQ-008, SEC-002, ERR-004, SEC-005. |
 | PARTIALLY_IMPLEMENTED | 6 | NFR-003, NFR-004, NFR-005, NFR-006, SEC-001, SEC-004. |
 | NOT_IMPLEMENTED | 0 | — |
-| NOT_VERIFIED | 2 | NFR-001, NFR-002 (`INV-PENDING-01` is now confirmed by C on 2026-11-19 and excluded from the 36). |
+| NOT_VERIFIED | 2 | NFR-001, NFR-002 (`INV-PENDING-01` is now confirmed by C on 2026-11-22 and excluded from the 36). |
 
-> Counts use the 36 formal requirements. `INV-PENDING-01` is now confirmed (C, 2026-11-19) and remains
+> Counts use the 36 formal requirements. `INV-PENDING-01` is now confirmed (C, 2026-11-22) and remains
 > excluded from these per-group totals (placeholder). A requirement is `IMPLEMENTED_AND_TESTED` only when its cited test is
 > on `main`; unmerged tests never raise a row's status.
 

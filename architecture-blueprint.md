@@ -414,7 +414,7 @@ Grounded in `requirements.yaml` (role B) and the real code.
 ## Appendix B — Open questions handed to others
 
 **To C (`docs/architecture/*`):**
-- Category whitelist finality: **confirmed** — C confirmed the final 8-category whitelist on 2026-11-19 (was PD-002).
+- Category whitelist finality: **confirmed** — C confirmed the final 8-category whitelist on 2026-11-22 (was PD-002).
 - Confirm budget limit value/period/storage (PD-003).
 - Confirm retry policy for transport failures (PD-008; currently no retry).
 - Confirm `review.jsonl` rejection-evidence contract (already implemented by D as "option B").
