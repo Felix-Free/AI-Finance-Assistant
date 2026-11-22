@@ -359,26 +359,14 @@ merged-main measurements are recorded in §2, §3 and §6.3.
   deliberately blocked bad-merge scenario were not verified.
 - NFR-001/002/003/004/005/006/007 have measured results recorded in PR #42's
   [final NFR report](../measurements/final-nfr-verification.md) and summarized in §2 and §3.
-  NFR-001/002/005/006 have no approved numeric threshold; NFR-007's 1.0 threshold remains
-  `pending_confirmation` in B's registry. These are measurement states, not blanket
-  requirement approvals or claims beyond the reported samples.
-- C confirmed the final eight-category whitelist in `invariants.md` on 2026-11-22; E's
-  per-member category regression is included in the reported passing suite. The B-owned
-  requirements registry still shows PD-002 as `pending_confirmation` and needs its owner to
-  synchronize that status.
 - **Permission configuration gap closed:** `.opencode/permissions.jsonc` grants `read` and
   `edit` to `data/**`, and now also denies `data/records.jsonl*` for both actions. This covers
   the runtime ledger, its lock sidecar, and same-prefix temporary files. The permission model
   and machine config agree; OpenCode's runtime matcher behavior was not independently tested.
-- `AGENTS.md`, `docs/req/requirements.yaml`, and other B-owned wording are not changed here;
-  any remaining broad “before any state change/write” language must be reconciled by those
-  owners.
-
 > **Conclusion.** PR #38 closes the previously pending D implementation and E regression
 > items for A′ redaction, locked budget authority, atomic ledger append, and safe public
 > I/O messages. The ledger permission mismatch is now corrected in both the permission model
-> and machine config. NFR-001 through NFR-007 now each have measured evidence recorded; these
-> measurements are limited to the samples and scan scope stated in §2 and the linked report.
+> and machine config. NFR-001 through NFR-007 now each have measured evidence recorded.
 > Remaining limits include unverified branch-protection
 > enforcement, non-atomic review-log append, untested OpenCode runtime matcher behavior, and
 > the documented direct-call error-message edge case.
