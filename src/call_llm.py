@@ -22,6 +22,8 @@ import uuid
 import requests
 from dotenv import load_dotenv
 
+from src.failure_kind import failure_kind
+
 load_dotenv()
 
 BASE_URL = (os.environ.get("LLM_BASE_URL") or "").rstrip("/")
@@ -103,6 +105,13 @@ def _usage_source(tokens) -> str:
     return "missing"
 
 
+def _redact(value):
+    """Replace user/model text with a length descriptor; never keep the text."""
+    if value is None:
+        return None
+    return "redacted:len=%d" % len(value)
+
+
 def _append_log(record: dict) -> None:
     """Fail-closed: if we cannot log the call, the call must not be used."""
     try:
@@ -110,7 +119,13 @@ def _append_log(record: dict) -> None:
         with LOG_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:  # pragma: no cover - environment failure
-        raise LlmTransportError(f"cannot write call log: {exc}") from exc
+        raise LlmTransportError("call log write failed") from exc
+
+
+def _response_text(resp):
+    """Return the first 500 chars of ``resp.text`` or None if unavailable."""
+    text = getattr(resp, "text", None)
+    return text[:500] if isinstance(text, str) else None
 
 
 def _post(payload: dict):
@@ -142,26 +157,29 @@ def _post(payload: dict):
         raise LlmTransportError(
             "http %s" % resp.status_code,
             status_code=resp.status_code,
-            body=resp.text[:500],
+            body=_response_text(resp),
         )
 
     try:
         envelope = resp.json()
     except ValueError as exc:
         raise LlmTransportError(
-            "protocol: cannot parse response json: %s" % exc
+            "protocol: cannot parse response json: %s" % exc,
+            body=_response_text(resp),
         ) from exc
 
     try:
         content = envelope["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise LlmTransportError(
-            "protocol: malformed response envelope: %r" % (exc,)
+            "protocol: malformed response envelope: %r" % (exc,),
+            body=_response_text(resp),
         ) from exc
 
     if not isinstance(content, str):
         raise LlmTransportError(
-            "protocol: content is not a string: %r" % (type(content).__name__,)
+            "protocol: content is not a string: %r" % (type(content).__name__,),
+            body=_response_text(resp),
         )
 
     raw_usage = envelope.get("usage")
@@ -199,7 +217,7 @@ def extract(text: str, request_id=None) -> dict:
 
     def _line(**extra) -> dict:
         base = {
-            "input": text,
+            "input": _redact(text),
             "raw": None,
             "parsed": None,
             "error": None,
@@ -233,14 +251,10 @@ def extract(text: str, request_id=None) -> dict:
     try:
         raw, usage = _post(payload)
     except LlmTransportError as exc:
-        status_code = getattr(exc, "status_code", None)
-        if status_code is not None:
-            body = (getattr(exc, "body", "") or "")[:120]
-            error = "http %s: %s" % (status_code, body)
-        else:
-            error = str(exc)
+        error = failure_kind(exc)
+        body = _redact(exc.body) if exc.body is not None else None
         _append_log(_line(
-            request_made=True, usage_source="missing", error=error,
+            request_made=True, usage_source="missing", raw=body, error=error,
         ))
         raise
 
@@ -250,14 +264,14 @@ def extract(text: str, request_id=None) -> dict:
         # Log the failure, then let the caller decide (do not swallow).
         _append_log(_line(
             request_made=True, usage_source="missing",
-            raw=raw, parsed=None, error="not_json",
+            raw=_redact(raw), parsed=None, error="not_json",
         ))
         raise
 
     tokens = usage
     _append_log(_line(
         request_made=True, tokens=tokens, usage_source=_usage_source(tokens),
-        raw=raw, parsed=parsed,
+        raw=_redact(raw), parsed=None,
     ))
     if isinstance(parsed, dict):
         parsed["__call_id__"] = call_id

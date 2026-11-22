@@ -1,0 +1,42 @@
+# Superseded prompt kept for provenance. The current prompt is prompts/prompt_v1.1.yaml.
+# Gate 4 replays every YAML under prompts/ unless the file declares "status: superseded".
+
+schema_version: "1.0"
+file: "prompts/prompt_v1.0.yaml"
+version: "1.0"
+status: "superseded"
+superseded_by: "prompts/prompt_v1.1.yaml"
+superseded_on: "2026-11-17"
+created_for: "initial extraction of amount and category from one sentence"
+
+model:
+  requested_name: "deepseek-v4-flash"
+  configured_id: "CS5351/DeepSeek-V4-Flash"
+  note: "Recorded difference between the brief and the configured model id; not a change made by this file."
+
+system_prompt: |
+  You are a helpful assistant for a personal finance app.
+  Extract the purchase amount and its category from the user's sentence.
+  Respond with a JSON object containing "amount" and "category".
+
+user_prompt_template: |
+  {{ user_text }}
+
+output_contract: "json_object_with_amount_and_category"
+
+known_issues:
+  - id: "HALLUCINATED_CATEGORY"
+    description: "The model invented labels such as transportation for transport, and groceries for food."
+    consequence: "Policy core rejects anything outside the whitelist, so these outputs failed INV-002 and spent a round trip."
+  - id: "SCHEMA_DRIFT"
+    description: "No JSON schema was given, so extra keys, string amounts and prose wrappers appeared."
+    consequence: "Parsing failed before the policy checks could run."
+  - id: "NO_REJECTION_CONVENTION"
+    description: "Non-spending text had no defined answer, so the model invented a record."
+    consequence: "There was no deterministic not_a_record path; that convention first appears in v1.1."
+
+superseding_changes:
+  - "closed category whitelist quoted verbatim, plus explicit synonym mapping"
+  - "inline JSON schema and a single-object output rule"
+  - "explicit not_a_record branch for non-spending sentences"
+  - "enforcement still lives in src/policy_core.py; the prompt only describes it"
