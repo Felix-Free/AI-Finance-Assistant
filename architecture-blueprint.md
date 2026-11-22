@@ -38,32 +38,38 @@ deterministic code decides.
 ### 1.3 System boundary
 
 - **In boundary:** natural-language input → model parsing → schema/field checks →
-  deterministic business-rule validation → accept / reject / review → logging.
-- **Out of boundary (current version):** persistence, budget storage, UI, authentication,
-  bank connections, payments, investment advice, transfer, financial planning
+  deterministic business-rule validation → accept / reject / review → logging → **persist accepted
+  record** (`src/storage.py`).
+- **Out of boundary (current version):** budget storage/configuration (still caller-supplied), UI,
+  authentication, bank connections, payments, investment advice, transfer, financial planning
   (see `requirements.yaml` `scope.non_goals`).
 
 ### 1.4 Implementation status (three-state, mandatory distinction)
 
-**A. Implemented** (real code; all merged on `main` as of PR #9):
+**A. Implemented** (real code; merged on `main`; D storage/token work via PR #18, E tests via PR #20):
 
 | Capability | Location |
 |---|---|
-| Model call + fail-closed call log | `src/call_llm.py::extract`, `_post`, `_append_log` |
-| Static system prompt (JSON-only) | `src/call_llm.py::SYSTEM_PROMPT` |
+| Model call + fail-closed call log (call_id / request_id / session_id / tokens / usage_source) | `src/call_llm.py` (`extract`, `_post`, `_append_log`; internal usage/id helpers) |
+| Static system prompt (JSON-only, lists the 8-category whitelist) | `src/call_llm.py::SYSTEM_PROMPT` |
+| Failure classification (short, safe labels) | `src/failure_kind.py::failure_kind` |
 | Deterministic guards | `src/policy_core.py::enforce_amount`, `enforce_category`, `enforce_budget` |
 | Combined validation | `src/policy_core.py::validate_record` |
-| Orchestration + review log | `src/pipeline.py::process`, `_append_review` |
-| Smoke tests | `test/offline/test_policy_core_smoke.py`, `test/offline/test_pipeline_seam.py` |
+| Orchestration + rejection log | `src/pipeline.py::process`, `_append_rejection` |
+| Validated persistence (atomic append + lock + dedup; pipeline-authoritative & audit redaction) | `src/storage.py::append_validated`, `_append_from_pipeline`, `current_total`, `iter_records`, `StorageError` (ADR-003 / ADR-004) |
+| Token usage report (tooling) | `src/report_tokens.py::report`, `main` |
+| Measurement samplers (tooling) | `scripts/measure_latency.py`, `scripts/measure_tokens.py` |
+| Offline tests | `test/offline/test_policy_core_smoke.py`, `test_pipeline_seam.py`, `test_invariants.py`, `test_evidence_join.py`, `test_storage.py`, … |
 
 **B. Designed but NOT implemented:**
 
 - A standalone **Schema Validation** layer (today, structural checks are inlined in
   `validate_record` as `isinstance(raw, dict)` + key access; there is no JSON-Schema
   runtime validator in the request path).
-- **Persistence / storage** of accepted records.
-- **Budget limit storage/configuration** (`budget_limit` is passed in by the caller today).
-- Full boundary test suite `test/offline/test_invariants.py` (role E).
+- **Budget limit storage/configuration / budget store** (`budget_limit` is still passed in by the
+  caller; `pipeline.process` reads the running `spent` from storage when not supplied).
+- Retry / backoff on transport failure (single attempt today — PD-008 pending).
+- A continuous **Runtime Monitor** (the JSONL files are outputs, not a monitor).
 - CI pipeline: `.github/workflows/ci.yml` is configured on `main` (offline pytest, Ruff, AI-use-log
   checks); actual run history / latest success is **not** independently verified in this review.
 - Externalised / configurable prompt file (`Prompt.md` is still a TODO; the prompt lives
@@ -132,17 +138,18 @@ flowchart TD
     PIPE -->|"logs/review.jsonl<br/>one line per rejection"| LOG2["logs/review.jsonl"]
 
     INV3 -->|pass| ACC["Accepted record<br/>{amount, category, total}"]
-    ACC --> RET["Returned to caller<br/>(persistence NOT implemented)"]
+    ACC --> PIPE
+    PIPE -->|"storage.append_validated<br/>(re-check guards, lock, atomic write)"| STORE["src/storage.py"]
+    STORE -->|"data/records.jsonl<br/>one line per accepted record"| RECS["data/records.jsonl"]
+    RECS --> RET["Stored record returned to caller"]
 
     E -->|transport / non-200| TE["LlmTransportError (RP-002)"]
     E -->|non-JSON| JE["JSONDecodeError (RP-001)"]
 
     classDef untrusted fill:#fde,stroke:#c00,stroke-width:2px;
     classDef trusted fill:#dfd,stroke:#080,stroke-width:2px;
-    classDef planned fill:#eee,stroke:#999,stroke-dasharray:5 5;
     class RAW,JE,TE untrusted;
-    class ACC,INV1,INV2,INV3,V trusted;
-    class RET planned;
+    class ACC,INV1,INV2,INV3,V,STORE trusted;
 ```
 
 **Layer responsibilities**
@@ -153,8 +160,8 @@ flowchart TD
 | Model call (`call_llm`) | Send request, parse envelope, log, fail-closed | `requests`, gateway | produces untrusted output |
 | Schema/field check (in `validate_record`) | Reject non-dict / missing fields | `policy_core` | deterministic |
 | Policy (`policy_core`) | Enforce INV-001/002/003 | stdlib `decimal`, `math` | authoritative |
-| Pipeline (`pipeline`) | Ordering + review logging | `call_llm`, `policy_core` | deterministic |
-| Persistence | Store accepted record | — | **not implemented** |
+| Pipeline (`pipeline`) | Ordering + rejection logging + persist on success | `call_llm`, `policy_core`, `storage` | deterministic |
+| Persistence (`storage`) | Re-validate + atomic append accepted record; dedup | `policy_core` (guards), filesystem lock | deterministic |
 
 ---
 
@@ -162,20 +169,26 @@ flowchart TD
 
 | Component | Responsibility | Input | Output | Dependencies | Owner | Status |
 |---|---|---|---|---|---|---|
-| `src/call_llm.py::extract` | Single model entry point; call twice-free, parse JSON, log every path | `text: str` | parsed `dict` (UNVALIDATED) | `_post`, `_append_log` | D | implemented |
-| `src/call_llm.py::_post` | HTTP call + envelope parse; converts all transport/protocol failures to `LlmTransportError` | `payload: dict` | raw content `str` | `requests` | D | implemented |
+| `src/call_llm.py::extract` | Single model entry point; call once, parse JSON, log every path; attach call_id/request_id/session_id and tokens/usage_source (mapped from the gateway `usage` by internal helpers) and inject `__call_id__` | `text: str` | parsed `dict` (UNVALIDATED, carries `__call_id__`) | `_post`, `_append_log`, `failure_kind` | D | implemented |
+| `src/call_llm.py::_post` | HTTP call + envelope parse; maps `usage`; converts transport/protocol failures to `LlmTransportError` | `payload: dict` | **`(content: str, usage: dict|None)`** | `requests` | D | implemented |
 | `src/call_llm.py::_append_log` | Append exactly one JSONL line; fail-closed on OSError | `record: dict` | (writes `logs/llm_calls.jsonl`) | filesystem | D | implemented |
-| `src/call_llm.py::SYSTEM_PROMPT` | Static instruction: return only JSON `{amount, category}` | — | prompt string | — | D | implemented (constant) |
+| `src/call_llm.py::SYSTEM_PROMPT` | Static instruction: return only JSON `{amount, category}`, listing the 8-category whitelist | — | prompt string | — | D | implemented (constant) |
+| `src/failure_kind.py::failure_kind` | Short, safe failure label (no body/URL/repr) | exception | label `str` | `json` | D | implemented |
 | `src/policy_core.py::enforce_amount` | INV-001 guard | amount | amount / `PolicyError(policy:amount)` | `math`, `decimal` | D | implemented |
 | `src/policy_core.py::enforce_category` | INV-002 guard | category | category / `PolicyError(policy:category, review=True)` | `CATEGORY_WHITELIST` | D | implemented |
 | `src/policy_core.py::enforce_budget` | INV-003 guard | spent, amount, limit | new total / `PolicyError(policy:budget, review=True)` | `decimal` | D | implemented |
 | `src/policy_core.py::validate_record` | Structural check + ordered guards | raw, spent, budget_limit | `{amount, category, total}` / `PolicyError` | the guards | D | implemented |
-| `src/pipeline.py::process` | Orchestrate extract → validate; write review line on rejection | text, spent, budget_limit | validated record | `call_llm`, `policy_core` | D | implemented |
-| `src/pipeline.py::_append_review` | Append one `review.jsonl` line; fail-closed | record | (writes `logs/review.jsonl`) | filesystem | D | implemented |
+| `src/pipeline.py::process` | Orchestrate extract → validate → **persist**; the **persisted total** (`storage.current_total()`) is the authoritative budget input (a caller `spent` is advisory/pre-check only); persist via `append_validated(record, expected_spent=persisted, origin=storage._PIPELINE_ORIGIN)`; write rejection line on failure | text, spent (advisory), budget_limit | stored (canonical) record | `call_llm`, `policy_core`, `storage` | D | implemented |
+| `src/pipeline.py::_append_rejection` | Append one `review.jsonl` line (business fields forced to `None`); fail-closed (`StorageError`) | record | (writes `logs/review.jsonl`) | filesystem | D | implemented |
+| `src/storage.py::append_validated` | Dispatch by `origin`: `origin=_PIPELINE_ORIGIN` → `_append_from_pipeline`; else **direct** path (dedup `call_id`, check `expected_spent` vs persisted, re-run guards, **atomic append** lock + unique temp + `os.replace`) | record, expected_spent, origin | (writes `data/records.jsonl`) / `StorageError` | `policy_core`, `fcntl/msvcrt`, `tempfile` | D | implemented (ADR-003 / ADR-004) |
+| `src/storage.py::_append_from_pipeline` | Internal authoritative path: under the lock re-read `current_total()`, recompute `total=persisted+amount`, re-run INV-001/002/003; over budget → `PolicyError(policy:budget)` before any byte; returns the canonical locked record | record | canonical record / `PolicyError`/`StorageError` | `policy_core`, `_locked` | D | implemented (ADR-004) |
+| `src/storage.py::current_total` / `iter_records` | Sum stored amounts (INV-003 support); iterate stored records | — | total / iterator | filesystem | D | implemented |
+| `src/storage.py::StorageError` | Persistence failure (never a policy rejection) | — | exception | — | D | implemented |
+| `src/report_tokens.py::report` / `main` | **Tooling**: read `logs/llm_calls.jsonl`, print per-call/session/request token stats (read-only) | records | printed report | `json` | D/E | implemented (tooling) |
+| `scripts/measure_latency.py` / `measure_tokens.py` | **Tooling**: latency / token sampling against the live gateway | corpus/probe | measurement output (latency → `logs/latency.jsonl`) | `call_llm`, `scripts.failure_kind` | D/E | implemented (tooling) |
 | Schema Validator (standalone) | Validate JSON against a schema before field checks | raw | pass/fail | — | — | **planned, not implemented** |
-| Persistence | Store accepted records | record | stored | — | — | **not implemented** |
-| Budget store | Provide `budget_limit` | — | limit | — | — | **not implemented** |
-| Full boundary tests | Exhaustive INV boundary suite | — | tests | `pytest` | E | **planned** |
+| Budget store | Provide `budget_limit` (still caller-supplied today) | — | limit | — | — | **not implemented** |
+| Full boundary tests | Exhaustive INV boundary suite (`test/offline/test_invariants.py`, 12 tests on `main`) | — | tests | `pytest` | E | **implemented** |
 | CI | Run `pytest test/offline` on PRs | — | pass/fail | GitHub Actions | E | **configured** (`.github/workflows/ci.yml` on `main`); run status not verified |
 
 > The `Parser` in the requirement wording is `call_llm.extract` (envelope→JSON) plus the
@@ -195,32 +208,45 @@ sequenceDiagram
     participant PC as policy_core.validate_record
     participant LL as logs/llm_calls.jsonl
     participant RL as logs/review.jsonl
+    participant ST as storage.append_validated
+    participant RS as data/records.jsonl
 
-    U->>P: natural-language sentence (+ spent, budget_limit)
-    P->>L: extract(text)
+    U->>P: natural-language sentence (+ optional spent, budget_limit)
+    P->>P: generate request_id
+    P->>L: extract(text, request_id)
     Note over L: Build payload = system prompt + user text<br/>(no history, no project files)
     L->>G: POST /chat/completions (temperature=0, json_object)
-    G-->>L: response envelope
+    G-->>L: response envelope (+ usage)
     alt transport / HTTP / malformed envelope
-        L->>LL: append 1 line (error=transport|http|protocol)
+        L->>LL: append 1 line (error=transport|http|protocol via failure_kind)
         L-->>P: raise LlmTransportError
     else content is not JSON
         L->>LL: append 1 line (error=not_json)
         L-->>P: raise JSONDecodeError
     else success
-        L->>LL: append 1 line (input, raw, parsed)
-        L-->>P: return raw dict (UNVALIDATED)
+        L->>LL: append 1 line (input, raw, parsed, ids, tokens, usage_source)
+        L-->>P: return raw dict (UNVALIDATED, + __call_id__)
     end
     Note over P,PC: AI output is NOT trusted data.
-    P->>PC: validate_record(raw, spent, budget_limit)
-    PC->>PC: check dict + amount (INV-001) -> category (INV-002) -> budget (INV-003)
+    P->>P: pop __call_id__ (call_id); persisted = storage.current_total() (authoritative; caller spent is advisory)
+    P->>PC: validate_record(raw, persisted, budget_limit)
+    PC->>PC: check dict + amount (INV-001) -> category (INV-002) -> budget (INV-003)  [advisory pre-check]
     alt any invariant fails
         PC-->>P: raise PolicyError(code, review)
-        P->>RL: append 1 line (error, amount, category, spent, total, review)
-        P-->>U: rejection (PolicyError propagates)
+        P->>RL: _append_rejection: 1 line (call_id, request_id, error, ..., business fields None)
+        P-->>U: rejection (PolicyError propagates); nothing persisted
     else all pass
         PC-->>P: {amount, category, total}
-        P-->>U: validated record (persistence not implemented)
+        P->>ST: append_validated(record, expected_spent=persisted, origin=storage._PIPELINE_ORIGIN)
+        Note over ST: pipeline path -> _append_from_pipeline:<br/>lock, re-read persisted total, recompute,<br/>re-run guards, atomic os.replace (ADR-003/004)
+        alt lock-time over budget
+            ST-->>P: raise PolicyError(policy:budget) before any byte written
+            P-->>U: rejection (no record written)
+        else within budget
+            ST->>RS: append one canonical line (atomic)
+            ST-->>P: canonical stored record (locked total)
+            P-->>U: stored record
+        end
     end
 ```
 
@@ -235,6 +261,23 @@ add a second `llm_calls.jsonl` line.
 The AI layer and the policy layer are separated by a single API boundary:
 `call_llm.extract` returns an **unvalidated** dict; `policy_core.validate_record` is the only
 place that decides an outcome. This mirrors `AGENTS.md §3` and `structural-constraints.md §2`.
+
+After a record passes, `pipeline.process` calls `storage.append_validated`, which **re-runs the
+`policy_core` guards** before writing, so unvalidated data is never persisted; rejections are
+evidence only (`logs/review.jsonl`) and are never written to `data/records.jsonl`.
+
+**Budget authority & write control (ADR-004 — Proposed, pending role C confirmation).** The
+persisted total (`storage.current_total()`) is the **authoritative** budget input; a caller-supplied
+`spent` is advisory/pre-check only. `pipeline.process` passes
+`append_validated(record, expected_spent=persisted, origin=storage._PIPELINE_ORIGIN)`; `origin`
+selects the internal `storage._append_from_pipeline`, which under `_locked()` re-reads the persisted
+total, recomputes the total, and re-runs INV-001/002/003 — an over-budget record is rejected
+**before any byte is written**. `_PIPELINE_ORIGIN` is a **module-private marker**: it prevents
+accidental misuse (external callers keep the unchanged direct semantics) but is **not a hard
+security boundary** — in-process code that deliberately imports the private name could select the
+pipeline path. Audit logs (`logs/llm_calls.jsonl`, `logs/review.jsonl`) are **redacted committed
+evidence**; the business ledger (`data/records.jsonl`) keeps the real validated values and is not
+redacted — the two have different trust roles.
 
 **The AI MAY:**
 - Parse natural language.
@@ -361,7 +404,8 @@ All behaviours below are the real, implemented ones unless marked. Sources: RP-0
 | 10 | Prompt injection attempt | (not a distinct runtime detector) | neutralised architecturally: user text cannot change code rules; bad output fails validation | normal logs | rules still enforced by code |
 | 11 | Schema/field validation failure | inlined in `validate_record` | `PolicyError(policy:amount)` (#5) | `review.jsonl` | discarded |
 | 12 | Policy validation failure | `enforce_*` | `PolicyError`: `policy:amount` / `policy:category` / `policy:budget` | `review.jsonl` | discarded |
-| 13 | Logging fails | `_append_log` / `_append_review` OSError | raise (fail-closed); result not used | — | abort — RP-004 |
+| 13 | Logging fails | `_append_log` / `_append_rejection` OSError | raise (fail-closed); result not used | — | abort — RP-004 |
+| 14 | Audit-log content (redaction) | `call_llm._redact`; `pipeline._append_rejection` | `llm_calls.jsonl`: `input`/`raw` → `redacted:len=<n>`, `parsed`=None; `review.jsonl`: `amount`/`category`/`spent`/`total` → None; ids/`error`/`review` kept | redacted `llm_calls.jsonl` / `review.jsonl` | `data/records.jsonl` keeps real values (not redacted) — ADR-004 |
 
 > Note: there is **no** distinct "prompt injection detector" and **no** retry mechanism in the
 > code. Do not claim otherwise. Row 10 documents the architectural property, not a module.
@@ -370,16 +414,19 @@ All behaviours below are the real, implemented ones unless marked. Sources: RP-0
 
 ## 11. Dependencies and Technology Stack
 
-From `requirements.txt` (the only declared dependencies):
+From `requirements.txt` (declared dependencies), split by role:
 
-| Dependency | Purpose |
-|---|---|
-| `requests>=2.31` | HTTP to the model gateway (`call_llm` only) |
-| `python-dotenv>=1.0` | load `.env` (`BASE_URL`, `API_KEY`, `MODEL`) |
-| `pytest>=8.0` | tests under `test/offline` and `test/live` |
-| `pyyaml>=6.0` | parse `requirements.yaml` / `ai-use-log.yaml` |
+| Dependency | Kind | Purpose |
+|---|---|---|
+| `requests>=2.31` | runtime | HTTP to the model gateway (`call_llm` only) |
+| `python-dotenv>=1.0` | runtime | load `.env` (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`) |
+| `pyyaml>=6.0` | runtime/CI | parse `requirements.yaml` / `ai-use-log.yaml` |
+| `pytest>=8.0` | test | tests under `test/offline` and `test/live` |
+| `jsonschema>=4.19.2,<5` | CI/test | validate `requirements.yaml` against `req-schema.json` (Draft 2020-12) |
+| `ruff==0.17.4` | CI (dev) | static checks in the CI workflow |
 
-Runtime / stdlib used by code: `json`, `os`, `pathlib`, `sys`, `math`, `decimal`.
+Runtime / stdlib used by the runtime modules: `json`, `os`, `pathlib`, `sys`, `math`, `decimal`,
+`uuid`, plus `fcntl`/`msvcrt`, `tempfile`, `shutil` in `storage`.
 
 **Configuration variables:** `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (default
 `CS5351/DeepSeek-V4-Flash`). `.env` is gitignored; `.env.example` holds placeholders.
@@ -389,6 +436,24 @@ was observed in D's transcript — **pending confirmation (PD-006, owner D).**
 
 **Explicitly absent (do not assume):** database, web framework, auth, MCP servers, message
 queue, cache, or any service beyond the model gateway.
+
+---
+
+## 11a. Measurement & Reporting Tooling (not runtime)
+
+These are **reporting / evaluation / measurement** tools. They are **not** part of the core
+runtime transaction path (`pipeline` → `policy_core` → `storage`) and do not replace any of them.
+Running them successfully, or their output existing, does **not** by itself mean an NFR target is met.
+
+| Tool | Purpose | Notes |
+|---|---|---|
+| `src/report_tokens.py` | Read `logs/llm_calls.jsonl`; print per-call / per-session / per-request token stats and counters | Read-only; writes nothing |
+| `scripts/measure_latency.py` | Wall-clock latency sampling on a fixed probe; p50/p95/max | Appends samples to `logs/latency.jsonl`; failures counted, not fatal |
+| `scripts/measure_tokens.py` | Token-cost sampling over a varied corpus | Calls `call_llm.extract`; writes no own log |
+| `scripts/failure_kind.py` | Re-exports the shared classifier (`src.failure_kind`) for the samplers | Avoids duplicating label logic |
+
+Related: NFR-001/NFR-002 thresholds remain `pending_confirmation` (PD-007); committed run
+evidence for latency/token is still pending (see `docs/measurements/`).
 
 ---
 
@@ -405,10 +470,11 @@ Grounded in `requirements.yaml` (role B) and the real code.
 | FR-005 | `enforce_budget` | INV-003 / RP-005 | implemented |
 | FR-006 | `extract`, `_post` | RP-001, RP-002 | implemented |
 | FR-007 | `validate_record` ordering | RP-003 | implemented |
-| FR-008 | `_append_log`, `_append_review` | RP-004 | implemented |
-| Persistence | — | — | not implemented |
+| FR-008 | `_append_log`, `_append_rejection` | RP-004 | implemented |
+| Persistence | `storage.append_validated` (re-check guards, lock, atomic) | — | implemented |
 | Budget store | — | INV-003 source | not implemented |
-| Full boundary tests | — | INV-001/002/003 | planned (E) |
+| Full boundary tests | `test/offline/test_invariants.py` (12 tests on `main`) | INV-001/002/003 | implemented |
+| Token report / measurement tools | `src/report_tokens.py`; `scripts/measure_*` | — | implemented (tooling) |
 | CI | `.github/workflows/ci.yml` on `main` | — | configured (run status not verified) |
 
 ## Appendix B — Open questions handed to others
@@ -425,8 +491,9 @@ Grounded in `requirements.yaml` (role B) and the real code.
 - `feat/D-policy-core` merged into `main` as PR #9 (PD-005, resolved).
 
 **To E (tests/CI):**
-- Build `test/offline/test_invariants.py` full boundary suite (NFR-007); CI workflow is configured
-  on `main` — extend/adjust as needed, and confirm execution status on GitHub.
+- `test/offline/test_invariants.py` boundary suite **exists on `main`** (12 tests); E still owns
+  **confirming CI execution status on GitHub** and the NFR-007 sign-off (still `pending_confirmation`),
+  extending/adjusting the suite as needed.
 
 **Token budget (owner A/B):** per-request ceiling, per-session budget, max history, at-limit
 behaviour — all `pending_confirmation`.
