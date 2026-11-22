@@ -2,7 +2,9 @@
 
 > Purpose: the closed set of business invariants the application must enforce in
 > deterministic code (`src/policy_core.py`, implemented by D) before any model output
-> may affect stored data. The model proposes; code disposes.
+> may affect normal business data or the ledger. The raw model-output audit entry is written
+> before validation by design, but is redacted and cannot affect business state. The model
+> proposes; code disposes.
 >
 > Status: **Phase 1 · C-Security (transcript 60339160).** Specs only — role C defines the
 > rules; role D implements each guard as `enforce_<subject>` plus a negative test;
@@ -42,14 +44,16 @@ owns the specification. Consequences:
 > **Rejection evidence (decision 2026-11-09, option B; aligned in Phase 2 with the call-id contract).** Every policy
 > rejection — for all three invariants, including `C-INV-001` — attempts to append exactly
 > one line to `logs/review.jsonl` with the fields `error`, `amount`, `category`, `spent`,
-> `total`, `review`, `call_id` and `request_id`. If the review write fails, D surfaces
-> `StorageError` and does not persist the rejected record. With a writable call log,
+> `total`, `review`, `call_id` and `request_id`. Under the approved A′ policy, the four
+> business-value fields are `null`; IDs, safe policy code and review flag remain. If the
+> review write fails, D surfaces `StorageError` and does not persist the rejected record.
+> With a writable call log,
 > `logs/llm_calls.jsonl` keeps exactly one line per `extract` attempt, including a
 > pre-HTTP configuration failure (`runtime-policy-catalog.md` RP-004). A policy outcome
 > never adds a second line there. The
 > rejection line must carry the **same `call_id`** as the related `llm_calls` record, so a
 > rejection can be joined to its call. The rejection line does **not** duplicate the full input
-> text; the input remains on the `llm_calls` line that shares the `call_id`.
+> text; the call log stores only the A′ `redacted:len=<n>` descriptor and shares the `call_id`.
 
 ### C-INV-001 — amount must be a finite positive number
 
@@ -60,7 +64,7 @@ Threshold   : amount > 0; more than 2 decimal places is rejected (money is cents
 Exception   : PolicyError
 On failure  : reject  (record discarded; no persistence; one log line)
 Boundary    : -0.01, 0, 0.01, 0.005  (and non-numeric: "350", null, NaN, Inf, 100.001)
-Evidence    : logs/review.jsonl line with error="policy:amount" and review=false
+Evidence    : logs/review.jsonl line with error="policy:amount", review=false, call_id/request_id, and null business-value fields
 ```
 
 ### C-INV-002 — category must be in the closed whitelist
@@ -72,12 +76,14 @@ Threshold   : case-sensitive exact match against the whitelist defined in code
 Exception   : PolicyError
 On failure  : reject, flag REVIEW  (record discarded; no persistence)
 Boundary    : "Food", "餐饮", "meal", ""  (all rejected) vs each whitelisted value (accepted)
-Evidence    : logs/review.jsonl line with error="policy:category" and review=true
+Evidence    : logs/review.jsonl line with error="policy:category", review=true, call_id/request_id, and null business-value fields
 ```
 
 > The whitelist itself is defined in code (`src/policy_core.py`), never in a prompt, and
-> never inferred from the model. C does not fix the vocabulary here; D places it in code
-> and E tests every member.
+> never inferred from the model. **Final vocabulary (confirmed by role C, 2026-11-22):**
+> `food`, `transport`, `shopping`, `entertainment`, `housing`, `utilities`, `health`, `other`.
+> Matching is exact and case-sensitive. D implements the whitelist in code; E tests every
+> member.
 
 ### C-INV-003 — cumulative spending must never exceed the budget
 
@@ -89,8 +95,8 @@ Exception   : PolicyError
 On failure  : reject  (new record discarded; the existing total is unchanged); flag REVIEW
 Boundary    : budget-0.01 (accepted), budget (accepted), budget+0.01 (rejected)
               — proves the check is cumulative, not per-record, and has no off-by-one
-Evidence    : logs/review.jsonl line with error="policy:budget", amount and running total,
-              review=true
+Evidence    : logs/review.jsonl line with error="policy:budget", review=true, call_id/request_id,
+              and null amount/category/spent/total fields under A′
 ```
 
 > Rationale: the budget limit is the core safety property of a personal finance
@@ -107,5 +113,6 @@ Evidence    : logs/review.jsonl line with error="policy:budget", amount and runn
 - [ ] Raises `PolicyError` (the single rejection type, `structural-constraints.md §4`).
 - [ ] At least one test whose name contains the id and which **fails when the guard is
       removed**, covering every boundary value in its block.
-- [ ] Validation happens **before** any state change (`§2.2`, no write-then-check).
+- [ ] Validation happens **before** any normal business-data or ledger state change (`§2.2`, no write-then-check).
+      The redacted call-audit log is deliberately written before policy validation and is not a business-state mutation.
 - [ ] No rule is enforced by prompt text; only by code.

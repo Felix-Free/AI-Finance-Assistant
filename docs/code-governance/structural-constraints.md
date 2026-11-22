@@ -52,7 +52,7 @@ written by E. In the Phase 3 rotation, D reviews test coverage of core business 
 | `src/call_llm.py::extract()` is the **only** place that calls the model | one choke point makes logging auditable |
 | `src/policy_core.py` is the **only** place that decides an outcome from model output | the probabilistic component must never decide |
 | No module may import `requests` except `call_llm.py` | otherwise calls escape the log |
-| No module may write to persistent storage before `policy_core` validation passes | prevents contaminated data |
+| No module may write normal business data or the ledger before `policy_core` validation passes; the redacted call-audit line is intentionally written before validation | prevents contaminated business data while retaining a fail-closed audit trail |
 | `logs/` is append-only at runtime; no module deletes from it | auditability |
 
 ---

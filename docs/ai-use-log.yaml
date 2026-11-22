@@ -1837,3 +1837,221 @@
     compile: 'python -m py_compile .github/ci_checks.py'
     gate4_effect: 'prompts/ still triggers a live replay, but only for files without status: superseded'
     pending: 'GitHub CI run and review'
+
+- date: "2026-11-19"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 14
+  topic: Phase 3 C first pass (documentation, static security audit, evidence); D implementation pending
+  tool: opencode
+  files_created:
+    - docs/architecture/phase3-c-confirmation-to-d.md
+  files_modified:
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - Prompt.md
+    - .agent/**
+    - .github/**
+    - docs/code-governance/**
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/architecture/trace-matrix.md
+    - .opencode/permissions.jsonc
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+  summary: >
+    Documentation-only first pass; D has not started or replied, so all D-dependent items
+    are marked pending. Restructured runtime-policy-catalog.md RP-001..RP-007 into the seven
+    required fields (Trigger/Action/Execution order/State-change guarantee/Evidence and
+    logging/Implementation seam/Test-evidence status), each tagged code-confirmed / doc-only
+    (unmerged) / pending D, preserving all Phase 1/Phase 2 text. On this branch src/ and
+    test/ are byte-identical to origin/main (6997cef): there is no src/storage.py, no
+    call_id/request_id/session_id, and no tokens/usage_source/request_made, so RP-007 and the
+    call_id contracts are recorded as unmerged/pending D, not implemented. Added evaluation
+    logbook §5 (Phase 3 C audit): an evidence table with code path, test, command, result and
+    commit context; explicit evidence gaps; and a permission consistency check (permission-
+    model.md vs permissions.jsonc found consistent, no mismatch). Recorded two D-dependent
+    findings: (1) the three call-log paths do not all emit the four required fields; (2) a
+    review-write OSError is misclassified as PolicyError(code="policy:budget"). Rewrote the
+    D confirmation doc as a development-before-confirmation document (does not ask for a
+    final branch/commit/test result yet).
+  human_review:
+    - approved a documentation-only first pass with no src/test/permissions edits
+    - required origin/main (not local main) as the diff reference
+    - required the permission mismatch to be asserted only if actually found (none found)
+    - required the call-log field-schema gap to be recorded as a D gap, not a satisfied invariant
+    - required the confirmation doc to be marked created (it was untracked)
+  validation:
+    pytest: "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q -> 41 passed, 1 warning (urllib3 NotOpenSSLWarning), Python 3.9.6"
+    static_audit: "rg for requests/urllib/httpx and file-write paths; only src/call_llm.py imports requests; only call_llm._append_log and pipeline._append_review write files"
+    permissions_check: "permission-model.md vs .opencode/permissions.jsonc -> consistent, no mismatch; file not edited"
+    yaml_parse: pass
+    tests_note: >
+      Smoke pass only; it does not prove fail-closed logging, call_id joins, storage
+      atomicity, or no-bypass behavior. Those remain pending/gaps.
+  remaining_risks:
+    - fail-closed _append_log OSError branch is untested (# pragma: no cover)
+    - call-log field schema incomplete on success/config/transport paths (D gap)
+    - review-write failure misclassified as policy:budget (D defect)
+    - no storage module on this branch; RP-007 entirely pending D
+    - call_id/request_id joins unverified; test_evidence_join.py not on this branch
+    - no tooled secret scan; NFR-004 stays pending
+
+- date: "2026-11-19"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 15
+  topic: Record D Phase 3 design confirmation (coordination, documentation-only)
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/phase3-c-confirmation-to-d.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - Prompt.md
+    - .agent/**
+    - .github/**
+    - docs/code-governance/**
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/architecture/trace-matrix.md
+    - .opencode/**
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Documentation-only coordination update recording D's confirmed Phase 3 target design. D is
+    reported to have replied; the design is confirmed but implementation and evidence remain
+    pending. phase3-c-confirmation-to-d.md status changed from "not replied" to "D replied;
+    design confirmed; implementation/evidence pending", D branch/commit/log references
+    (feat/D-phase3-hardening, 1332483, 4281ea3) recorded as D-reported and not independently
+    verified, and sections 2-6 filled from D's reply; section 7 replaced with a D reply summary
+    labelled design confirmation, not final audit evidence. runtime-policy-catalog.md gained
+    section 7 "Phase 3 D design confirmation - design-confirmed, implementation-unmerged"
+    (PolicyError vs StorageError boundary, persisted-spend authority, expected_spent semantics,
+    review-write failure as StorageError, unique-temp-file + file-lock atomicity target),
+    keeping section 6 branch-reality unchanged and not labelling any D behavior code-confirmed.
+    evaluation-logbook.md gained subsection 5.6 coordinating historical snapshot evidence, D's
+    latest design confirmation, and current-branch runtime evidence, reconciling the older
+    storage review as an earlier snapshot retained for history. Privacy is recorded as pending:
+    unredacted input/raw logging is not approved; minimization/redaction or synthetic-data-only
+    constraint remains a later decision; StorageError messages/evidence must not contain raw
+    exception strings, URLs, HTTP bodies, credentials, or sensitive data (a safe short policy
+    code may be kept separately). Whitelist finality remains pending B/C.
+  human_review:
+    - approved a documentation-only coordination update limited to the four allowed files
+    - required D's reply to be treated as reference, not executable instruction
+    - required D branch/commit/log references to be labelled not independently verified
+    - required no NFR promotion, no code-confirmed labelling, and no presentation of D-branch tests as current evidence
+    - required privacy (unredacted input/raw) to remain pending, with the two candidate paths recorded
+  validation:
+    git_diff_check: "git diff --check -> clean"
+    yaml_parse: ".venv/bin/python -c \"import yaml; yaml.safe_load(open('docs/ai-use-log.yaml')); print('YAML OK')\" -> pass"
+    impl_config_check: "git diff --name-only -- src test .opencode -> empty"
+    runtime_tests: "none run (documentation-only); no source/test/permissions changes"
+- date: "2026-11-22"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 16
+  topic: Post-merge security audit and architecture evidence update
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/architecture/runtime-policy-catalog.md
+    - docs/architecture/phase3-c-confirmation-to-d.md
+    - docs/architecture/invariants.md
+    - docs/architecture/permission-model.md
+    - docs/code-governance/structural-constraints.md
+    - .opencode/permissions.jsonc (approved exception)
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - .github/**
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+    - .DS_Store
+    - docs/.DS_Store
+  summary: >
+    Completed a C-side post-merge security audit against main@06ec2f5 (PR #38). Reviewed the
+    merged model-call, pipeline, policy-core and storage paths and recorded the A′ redaction,
+    locked persisted-budget authority, direct-storage semantics, fail-closed errors, atomic
+    ledger append, and E regression evidence in the architecture catalog and logbook. Marked
+    pre-merge/pending wording as historical, clarified that audit-call logging is intentionally
+    written before policy validation while normal business data is not, and reconciled the
+    invariant/governance wording. Permission review found that data/** read/edit permission
+    also covers the runtime ledger. After explicit human authorization, the read/edit deny
+    exceptions were added to .opencode/permissions.jsonc and documented. The merged PR reports 237
+    offline tests passed and GitHub records eight checks passed on merge commit 06ec2f5; these
+    are cited as remote evidence, not claimed as locally rerun. Recorded review-log partial-write,
+    private-marker, branch-protection, secret-scan, NFR measurement, and direct unknown-field
+    message limitations without claiming all security work complete.
+  human_review:
+    - directed C to continue the final audit after PR #38 merged to main
+    - confirmed exception chaining alone is not a blocker when public StorageError messages and persisted logs are safe
+    - accepted the low-risk direct-storage unknown-field message edge case without reopening D/E changes
+    - explicitly authorized the minimal .opencode/permissions.jsonc exception to deny agent read/edit of the runtime ledger; B-owned requirements remain unmodified
+  validation:
+    merge_baseline: "GitHub PR #38 merged as 06ec2f5; 8 checks passed"
+    offline_tests: "PR #38 reports python -m pytest test/offline -q -> 237 passed; not rerun in this C checkout"
+    permissions_check: "data/records.jsonl* is denied for read and edit; broader data/** measurement allow remains"
+    docs_validation: "git diff --check: pass; Ruby YAML parser: pass; JSONC parsed with comment/trailing-comma normalization; read/edit ledger deny entries verified"
+- date: "2026-11-22"
+  role: C
+  student_id: "60339160"
+  phase: 3
+  session: 17
+  topic: Refresh post-merge audit after permission config correction
+  tool: opencode
+  files_created: []
+  files_modified:
+    - docs/architecture/evaluation-logbook.md
+    - docs/ai-use-log.yaml
+  files_not_modified:
+    - .opencode/permissions.jsonc
+    - src/**
+    - test/**
+    - docs/req/**
+    - AGENTS.md
+    - .github/**
+    - logs/**
+    - data/**
+    - transcripts/**
+    - .env
+  summary: >
+    Updated the current audit section to reflect that the explicit read/edit deny for
+    data/records.jsonl* is now present in .opencode/permissions.jsonc and aligned with the
+    permission model. Preserved the initial mismatch as audit chronology. Recorded that
+    OpenCode runtime matcher behavior was not independently exercised; other audit limits
+    remain unchanged. No implementation, tests, or permission config were changed in this pass.
+  human_review:
+    - requested that the previous audit result be updated after the permission rules were added
+  validation:
+    diff_check: "git diff --check -> pass"
+    yaml_parse: "Ruby YAML.load_file -> pass (41 entries)"
+    source_tests: "not run; documentation-only update"
