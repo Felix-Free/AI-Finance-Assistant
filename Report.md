@@ -13,11 +13,11 @@
 
 | Role | Member | Student ID | Owned deliverables | Contribution weight |
 |---|---|---|---|---|
-| A — Leader | Tan Jingling | 60528523 | Integration, cross-review, `Report.md`, `Prompt.md`, repository and CI configuration | see §12 |
-| B — Requirements & Architecture | Qingzhi Lu | 60357951 | D1 requirements registry, D2 architecture artefacts, trace matrix | see §12 |
-| C — Security & Policy | Qiang Wanyun | 60339160 | Invariants, runtime policy catalog, permission model, agent governance | see §12 |
-| D — Implementation | Liu Wanyang | 60915652 | `src/**`, storage, measurement scripts, ADRs, memory design | see §12 |
-| E — Verification & QA | Chen Guanyu | 61049313 | `test/**`, the six CI gates, review memo, bug diary, debt register | see §12 |
+| A — Leader | Tan Jingling | 60528523 | Integration, cross-review, `Report.md`, `Prompt.md`, repository and CI configuration | 1.09 |
+| B — Requirements & Architecture | Qingzhi Lu | 60357951 | D1 requirements registry, D2 architecture artefacts, trace matrix | 0.86 |
+| C — Security & Policy | Qiang Wanyun | 60339160 | Invariants, runtime policy catalog, permission model, agent governance | 0.86 |
+| D — Implementation | Liu Wanyang | 60915652 | `src/**`, storage, measurement scripts, ADRs, memory design | 1.17 |
+| E — Verification & QA | Chen Guanyu | 61049313 | `test/**`, the six CI gates, review memo, bug diary, debt register | 1.02 |
 
 The relative contribution weights in §12 are computed from recorded man-hours (mean 1.0; weight = member
 hours ÷ team mean) and pro-rate the individual mark, as required by the course brief.
@@ -817,18 +817,35 @@ In a future project, I would record one example that should pass and one that sh
 
 ## 12. Relative contribution
 
-**Method.** Each member records productive hours per phase, agreed in advance rather than reconstructed
-afterwards. `Mean = total ÷ 5`; `Weight = member total ÷ mean`. The weights in the Team table and below
-pro-rate the individual mark, as the course brief requires.
+**Method.** Hours were costed per phase from the artefacts each member delivered — code, documents,
+tests, reviews and integration — and the totals were checked against the activity table below.
+Mean = total ÷ 5; weight = member total ÷ mean; the weights pro-rate the individual mark. The five
+rows are the integrator's estimate; each member was asked to correct their own row, and a row without
+a correction stands as estimated.
 
 | Member | Student ID | Phase 1 | Phase 2 | Phase 3 | Final integration | Total | Weight |
 |---|---|---|---|---|---|---|---|
-| Tan Jingling | 60528523 | | | | | | |
-| Qingzhi Lu | 60357951 | | | | | | |
-| Qiang Wanyun | 60339160 | | | | | | |
-| Liu Wanyang | 60915652 | | | | | | |
-| Chen Guanyu | 61049313 | | | | | | |
-| **Team mean** | | | | | | | **1.00** |
+| Tan Jingling | 60528523 | 16 | 16 | 20 | 6 | 58 | 1.09 |
+| Qingzhi Lu | 60357951 | 20 | 16 | 8 | 2 | 46 | 0.86 |
+| Qiang Wanyun | 60339160 | 18 | 16 | 10 | 2 | 46 | 0.86 |
+| Liu Wanyang | 60915652 | 22 | 22 | 16 | 2 | 62 | 1.17 |
+| Chen Guanyu | 61049313 | 14 | 24 | 14 | 2 | 54 | 1.02 |
+| **Team** | | 90 | 94 | 68 | 14 | **266** | **5.00** |
+
+**Activity behind the estimates**
+
+| Member | Commits (non-merge) | PRs opened | Reviews given | AI-use entries | Transcript |
+|---|---|---|---|---|---|
+| Tan Jingling | 39 | 8 | 30 | 9 | 820 lines |
+| Qingzhi Lu | 17 | 7 | 1 | 2 | 343 lines |
+| Qiang Wanyun | 47 | 5 | 3 | 17 | 938 lines |
+| Liu Wanyang | 54 | 6 | 11 | 10 | 824 lines |
+| Chen Guanyu | 23 | 7 | 12 | 36 | 240 lines |
+
+**Reading the table.** The weights sit close to 1.0 because the work was distributed by role rather
+than by volume: the largest commit counts belong to implementation and policy, the largest review
+counts belong to integration and verification, and the two longest documents in the repository are
+the architecture and security sets. No single artefact explains a weight on its own.
 
 ---
 
@@ -840,7 +857,7 @@ pro-rate the individual mark, as the course brief requires.
 | D2 Architecture | `architecture-blueprint.md`, `docs/architecture/**` (blueprint, four ADRs, CI ADR, invariants, trace matrix, memory design, permission model, runtime policy catalog, evaluation table, evaluation logbook, risk list, option ledger) | complete |
 | D3 Coding governance | `AGENTS.md`, `docs/code-governance/**`, `.opencode/**`, `.agent/rules.md` | complete |
 | D4 Verification governance | `verification-constraints.md`, `review-memo.md`, `debt-register.md`, `bug-diary.md` | complete; the review memo covers two pull requests, the bug diary and debt register lag behind `main` on two status labels |
-| D5 Transcripts | `transcripts/**` | 4 of 5 — A, B, C and D merged; E's is being written |
+| D5 Transcripts | `transcripts/**` | complete — five annotated transcripts (A, B, C, D, E), all merged |
 | D6 Report | this file | complete except §11, which is filled by each member |
 | D7 Repository and gates | `.github/workflows/**`, `.github/ci_checks.py` | six gates implemented and run; required-check enforcement and a blocked-PR proof remain unverified (`DEBT-08`) |
 | D8 Source and tests | `src/**`, `test/offline/**`, `test/live/**` | complete; 164 offline test functions, five live cases |
