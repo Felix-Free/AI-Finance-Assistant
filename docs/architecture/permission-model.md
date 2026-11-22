@@ -41,6 +41,7 @@
 | `logs/**` | ✅ | ❌ | runtime | produced by the application |
 | `transcripts/**` | ✅ | ❌ | A | human-authored evidence |
 | `data/**` | ✅ | ✅ | C (Phase 2) | measurement inputs; see §3.1 |
+| `data/records.jsonl*` | ❌ | ❌ | runtime | financial ledger, lock and atomic-append temp files; never expose to the agent |
 | `scripts/**` | ✅ | ✅ | C (Phase 2) | measurement scripts; see §3.1 |
 | `docs/measurements/**` | ✅ | ✅ | C (Phase 2) | measurement reports; see §3.1 |
 | `main` branch | — | ❌ | — | protected; never push/commit |
@@ -64,12 +65,14 @@ becomes a `deny`, and every ⚠️ becomes `ask` (human confirmation per use).
 
 ### 3.1 Measurement permissions
 
-Phase 2 measurement work needs the agent to read and write measurement material. The measurement permissions add
-exactly three path trees and three command patterns to the config:
+Phase 2 measurement work needs the agent to read and write measurement material. The
+measurement permissions add three path trees and three command patterns, with a specific
+deny for runtime ledger artifacts:
 
 | Scope | Kind | Permission |
 |---|---|---|
 | `data/**` | path | read `allow`, edit `allow` |
+| `data/records.jsonl*` | path exception | read `deny`, edit `deny` |
 | `scripts/**` | path | read `allow`, edit `allow` |
 | `docs/measurements/**` | path | read `allow`, edit `allow` |
 | `pytest*` | bash | `allow` |
@@ -86,6 +89,10 @@ Constraints that this expansion does not relax:
   the agent write measurement scratch/output there; committing those files is a human
   decision and they are expected to be excluded from version control. The agent may not
   create or commit runtime data.
+- The runtime ledger `data/records.jsonl`, its `.lock` sidecar and its
+  `records.jsonl.*.tmp` atomic-write files are sensitive business data/artifacts. The
+  specific `data/records.jsonl*` deny must override the broader `data/**` measurement allow
+  for both read and edit.
 - The **default-deny** rule (`"*": "deny"`) is unchanged.
 - **Deny overrides allow** is unchanged; no earlier `deny` is weakened by the new
   `allow` entries.
@@ -94,8 +101,11 @@ Constraints that this expansion does not relax:
   `transcripts/**`, `logs/**`, `main`) are unchanged.
 - Every other `deny`/`ask` rule and default in the config is unchanged.
 
-`.opencode/permissions.jsonc` remains the **machine-readable configuration**; this section
-documents the same change so the document and the config stay in agreement.
+`.opencode/permissions.jsonc` remains the **machine-readable configuration**. Following the
+post-PR-#38 C audit and explicit human authorization, both `read` and `edit` now deny
+`data/records.jsonl*`; this covers the ledger, its lock sidecar, and same-prefix atomic-write
+temporary files. The measurement allow for other `data/**` paths remains in place, and the
+specific deny takes precedence as declared by the permission model.
 
 ---
 

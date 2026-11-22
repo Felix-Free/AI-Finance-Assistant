@@ -171,16 +171,16 @@ Recorded here, **not fixed** in this PR.
 
 ---
 
-## 7. Pending decisions (must be re-checked at PR time)
+## 7. Decision status: C-side confirmed, B-side sync pending
 
-- **PD-002** — category whitelist final vocabulary — is `status: pending_confirmation` (owner C)
-  in `docs/req/requirements.yaml`. **Pending; not confirmed.**
-- **INV-PENDING-01** — exact category whitelist membership final — is `NOT_VERIFIED`
-  ("finality unconfirmed", owner C) in `docs/architecture/trace-matrix.md`. **Pending; not
-  confirmed.**
-
-This document does not claim either is confirmed. If the owners later confirm them in
-`invariants.md` / the trace matrix, the status is re-checked at PR time.
+- **C-side evidence:** C confirmed the final eight-category vocabulary in
+  `docs/architecture/invariants.md` on **2026-11-22** (PR #43):
+  `food, transport, shopping, entertainment, housing, utilities, health, other`.
+- **B-side sync still pending:** `docs/req/requirements.yaml` still shows PD-002 as
+  `pending_confirmation` (line 572), and `docs/architecture/trace-matrix.md` still shows
+  INV-PENDING-01 as `NOT_VERIFIED` / `pending_confirmation` (line 128). B's PR #37 will
+  perform that sync. This audit records the C-side file evidence; it does **not** claim the
+  B-side rows are already updated.
 
 ---
 
@@ -193,7 +193,7 @@ This document does not claim either is confirmed. If the owners later confirm th
 | Secrets | Clean; `agent.env` gitignore gap is an owner decision, unchanged |
 | Storage fail-closed | Delivered by #30 and #38; not re-implemented |
 | Demo | D segment prepared and sent 2026-11-22 |
-| Pending decisions | PD-002 / INV-PENDING-01 still pending |
+| Pending decisions | C confirmed in `invariants.md` (2026-11-22, PR #43); B's requirements/trace sync still pending (#37) |
 
 Issue #24's repository change is therefore this audit document plus one AI-use-log entry; no
 product code is changed.

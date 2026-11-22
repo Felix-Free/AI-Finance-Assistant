@@ -34,8 +34,8 @@ MCP tools; it may read or write them under the normal path permissions.
 | EP-001 | `src/call_llm.py::extract` | the only path that calls the model | gateway only | D |
 | EP-002 | `src/policy_core.py::validate_record` and `enforce_*` | deterministic record validation and its guard functions | none | D/E |
 | EP-003 | `src/storage.py::append_validated(record)` | record append with field/type and duplicate-id checks (single `record` argument; no `expected_spent`) | none | D |
-| EP-004 | `src/measure_tokens.py` — `python -m src.measure_tokens` | token-usage measurement entry point | gateway | D/E |
-| EP-005 | `src/measure_latency.py` — `python -m src.measure_latency` | model-call latency measurement entry point | gateway | D/E |
+| EP-004 | `scripts/measure_tokens.py` — `python -m scripts.measure_tokens` | token-usage measurement entry point | gateway | D/E |
+| EP-005 | `scripts/measure_latency.py` — `python -m scripts.measure_latency` | model-call latency measurement entry point | gateway | D/E |
 | EP-006 | `src/report_tokens.py` — `python -m src.report_tokens` | read-only token-usage report (reads `logs/llm_calls.jsonl`, writes nothing) | none | D/E |
 | EP-007 | `src/pipeline.py::process(text, spent=None, budget_limit=1000.0)` | normal model → policy validation → persistence/rejection workflow | gateway via EP-001 | D |
 | EP-008 | `src/storage.py::current_total()` and `iter_records()` | read persisted records and cumulative amount; malformed data raises `StorageError` | none | D |
