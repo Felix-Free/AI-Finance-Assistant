@@ -374,3 +374,43 @@ def test_gate1_no_approval_rejected(git_history, capsys):
     )
     assert result != 0
     assert "no valid" in capsys.readouterr().out.lower()
+
+
+def test_semantic_scope_replays_only_current_prompts(tmp_path):
+    """A prompt marked `status: superseded` is not replayed; anything else still is."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, ["init", "-q"], _BASE_TIME)
+    _write(repo, "README.md", "fixture\n")
+    base = _commit(repo, "base", _BASE_TIME)
+
+    _write(
+        repo,
+        "prompts/prompt_v1.0.yaml",
+        "status: superseded\nsystem_prompt: |\n  old prompt\n",
+    )
+    _write(
+        repo,
+        "prompts/prompt_v1.1.yaml",
+        "status: current\nsystem_prompt: |\n  new prompt\n",
+    )
+    _write(
+        repo,
+        "prompts/prompt_candidate.yaml",
+        "system_prompt: |\n  candidate prompt\n",
+    )
+    head = _commit(repo, "prompts", _TEST_TIME)
+
+    module = runpy.run_path(str(CI_CHECKS))
+
+    required, prompts = module["classify_semantic_paths"](
+        base, head, ["prompts/prompt_v1.0.yaml"], cwd=str(repo)
+    )
+    assert required is True
+    assert prompts == ["prompts/prompt_candidate.yaml", "prompts/prompt_v1.1.yaml"]
+
+    required, prompts = module["classify_semantic_paths"](
+        base, head, ["README.md"], cwd=str(repo)
+    )
+    assert required is False
+    assert prompts == []
