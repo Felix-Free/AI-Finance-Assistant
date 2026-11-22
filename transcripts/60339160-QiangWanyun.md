@@ -786,8 +786,8 @@ exceptions for `data/records.jsonl*` and documented them. The audit cited the PR
 eight GitHub checks passed on `06ec2f5`; neither was claimed as rerun in this C checkout.
 Documentation checks and verification of the read/edit deny entries were recorded as passed.
 
-**Open handoffs.** The audit recorded its verification boundaries and items requiring
-separate review; this session did not open a new D/E implementation request.
+**Open handoffs.** The audit recorded its verification boundaries; this session did not
+open a new D/E implementation request.
 
 ---
 
