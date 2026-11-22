@@ -767,3 +767,57 @@ suite ends at 158 passed, 4 skipped; mypy is clean on the default and 3.9 target
 
 **Left to others.** Five documents still name the old `src/measure_*` paths. They are owned by roles C
 and B, so they were reported rather than edited — the same boundary that kept the migration reviewable.
+
+## 2026-11-19–22 · Phase 3: atomic append, the locked budget, and the audit
+
+Phase 3 turned the same pattern into a harder test: E wrote the regression tests first, I directed
+OpenCode to implement, and the reviewer had to catch cases where a green test did not prove the
+property it claimed.
+
+**2026-11-19 — the append that could leave half a line.** The #27 tests were written by E as a
+test-only commit and approved before I allowed any implementation. The first atomic-append test was
+not enough: it passed without ever reaching `os.replace`, because the injected failure happened at
+the old `Path.open("a")` call. E and I rejected that version and asked for the fault at the commit
+point instead. OpenCode then implemented a same-directory temporary file, `fsync`, and
+`os.replace`, with a rollback path that removes the temporary file and leaves the original ledger
+byte-identical. The same round moved the failure classifier into `src/failure_kind.py` and reduced
+the log `error` field to the closed vocabulary. The lesson was that a fault-injection test is only
+as good as its injection point.
+
+**2026-11-20 — the lost record under two writers.** The first concurrency implementation used a
+fixed temporary filename. E reproduced the failure: two writers shared the temporary file, one
+reported success, and its record disappeared. OpenCode had not considered that two writers could
+read the same old state. The fix was a unique `mkstemp` file plus a sidecar lock covering read,
+duplicate check, budget check, write, and replace. A successful `os.replace` became the commit
+point; pre-commit I/O errors became `StorageError`, and teardown reports release/close failures
+best-effort. I also removed the silent process-local fallback. The concurrency test passed three
+consecutive runs, and the full offline suite was green.
+
+**2026-11-22 — the security follow-up and the audit.** C's final audit found three gaps: unredacted
+`input`/`raw` in the call log, review business fields with real values, and a stale-spend path that
+turned a concurrent budget rejection into a `StorageError`. E wrote the test-only head `b2332d6`
+with eighteen expected-red cases; C approved that head before I added production code. OpenCode
+implemented `redacted:len=<n>` for `input`/`raw`, `parsed=null`, review fields `null`, and a safe
+`error` code. For the budget, C required the persisted total to be authoritative under the storage
+lock, while the public `append_validated` had to keep its direct `expected_spent < persisted`
+semantics. OpenCode first reached for a public `stale_ok` flag; C rejected that as a bypass. The
+final design uses a private `_append_from_pipeline` path behind `_PIPELINE_ORIGIN`, with the
+pipeline passing through the public function only to satisfy the frozen Gate 2 static check. ADR-004
+records this as a controlled internal marker, not a privilege boundary. The same PR records the
+deferred review-append atomicity, the private-API coupling, the capped `resp.text[:500]` length, and
+the now-advisory `spent` argument as known limitations rather than claiming they are solved.
+
+**The #24 audit.** After the security PR merged, I re-ran the original #24 checks read-only on
+`main 8533465`: 238 passed, measurement scripts and both evidence files present, no
+TODO/FIXME/breakpoint/pdb, only intentional CLI/report/`__main__` prints, no committed `.env`, and
+no safe cleanup to delete. The NFR evidence was measured at `06ec2f5` with 237 passed; I recorded
+that separately from the current 238 rather than conflating the two. The audit document also records
+the stale DEBT-01/02 statuses, the known limitations, and the fact that C confirmed the final
+eight-category vocabulary in `invariants.md` on 2026-11-22 while B's requirements/trace sync was
+still pending. I appended only the D11 entry and did not edit earlier AI-use rows.
+
+**What I would do differently.** I would ask for the atomic fault injection at the commit call before
+accepting the first test, and I would settle the direct-versus-internal storage boundary before
+writing tests, rather than after a public `stale_ok` proposal. The useful habit was to stop the
+agent at the exact claim that was not demonstrated — a passing test, a fixed temporary file, a
+"safe" error message — and require evidence for that claim, not for the surrounding story.

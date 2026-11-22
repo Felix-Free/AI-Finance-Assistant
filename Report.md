@@ -171,7 +171,10 @@ leader's own merge of PR #20 — the clearest possible evidence that the gate is
 
 **Review was parallelised by role, with integration serialised.** Five members reviewing their own areas in
 parallel, and one leader merging, matched how the work actually partitioned. The cost is a bottleneck at the
-leader; the benefit is that every merge had one person who had read the whole diff.
+leader; the benefit is that every merge had one person who had read the whole diff. In practice
+that meant thirty reviews on thirty-three pull requests — nineteen approvals, seven change
+requests and four comments — and thirty-three of the fifty-eight merge commits on `main`, at
+the time of writing.
 
 **Figure 2 — the pull-request gate pipeline.**
 

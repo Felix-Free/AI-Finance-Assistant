@@ -105,14 +105,16 @@ Rationale summary (each tied to a criterion):
   tests, `_append_rejection` rejection logging (see `trace-matrix.md` §2 and §4; 36 formal requirements).
 - **Design-only (not implemented):** ADR-001 context assembly/injection; ADR-002 compression/budget.
 - **Merged into `main` via PR #18 (D):** `src/storage.py`, `src/report_tokens.py`,
-  `scripts/measure_latency.py`, token capture, `call_id` threading, and `_append_rejection`. The
-  `test/offline/test_evidence_join.py` file is on `main` but its **4 test functions are all skipped**
-  (module-level `pytestmark = pytest.mark.skip(...)` plus per-test `pytest.skip`); the join
-  **implementation is merged**, while the **join test is still skipped — no passing-test evidence yet**.
-- **Still unmerged (not `main` evidence):** E's `feat/e-phase2-verification` (`cab1901`) adds a fuller
-  `test_invariants.py` (12 INV tests, guard-removal) and un-skips the join test; it is **not** an
-  ancestor of `main`, so its results are not `main`/CI evidence. Branch state verified against
-  `origin/main` (`f2442c2`); the online PR status was not re-verified this pass (no `gh`).
+  `scripts/measure_latency.py`, token capture, `call_id` threading, and `_append_rejection`.
+- **Merged into `main` via PR #20 (E):** `test/offline/test_evidence_join.py` is on `main` and
+  currently defines **17 `def test_` functions** (static code count, **not** a run result); the
+  source has **no `pytest.skip`/`pytest.mark.skip`** markers, so it is no longer a skipped skeleton.
+  `test/offline/test_invariants.py` statically defines **12 `def test_` functions** (also a static
+  count). These are statements about the code present on `main`; **test execution / CI pass is not
+  asserted here** (no run record was inspected).
+- **Branch state:** verified against `origin/main` (`8d0251a`, 2026-11-21); PR #18/#19/#20 are all
+  merged (D/C/E tips `df729a9`/`01e3bc7`/`cab1901` are ancestors of `main`). Online PR status was
+  not re-verified this pass (no `gh`).
 - **`Pending Validation`:** token-cost and latency numbers (no committed runtime evidence; PD-007);
   `user_request_count` metric (not implemented); NFR-006 numeric coverage threshold (PD-008).
 - **Non-claims:** no numeric score, pass rate, benchmark, or CI-run result is asserted here; a skipped
