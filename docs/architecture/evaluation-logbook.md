@@ -277,3 +277,5 @@ tests are skipped, so the join remains unverified.
   problem (a synthetic HTTP error body copied into the call log).
 - **Pending.** Live (real-gateway) verification, human test-first approval, and merge
   blocking all remain pending; nothing here is promoted to a merge-gate result.
+
+**2026-11-22 — Final NFR verification (role E, commit 06ec2f59).** Recorded the final NFR evidence run in [final-nfr-verification.md](../measurements/final-nfr-verification.md): a 20-attempt synthetic latency session (p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms; 20/20 complete, 125/12/137 tokens per request), five real extract error paths passing, a clean secret-scan in local and hosted CI, the OFFLINE NFR-005/006 ledger run (16 accepted, 48/48 logged, all joins verified), and NFR-007 mutation coverage 3/3 = 1.0. This entry supersedes older pending rows only for the cases measured here; unmeasured cases remain unchanged.
