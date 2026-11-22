@@ -653,3 +653,285 @@ remains pending.
 HTTP call still logs; a missing token is still a key set to `null`; a `not_called` row still
 exists but must not be counted as a usage failure. Writing the nulls explicitly is what keeps
 the statistics honest.
+
+---
+
+## Session 13
+
+**Date.** 2026-11-16 · Phase 2 C: refresh D implementation status and reconcile Phase 2 records
+
+**Context.** D's `df729a9` branch implemented `expected_spent` validation and `request_id`
+aggregation, but those changes had not yet merged into `main`.
+
+**My instruction to the agent.**
+
+```text
+Refresh the Phase 2 C documentation against D's df729a9 implementation report. Record
+expected_spent validation and request_id aggregation as present on D's branch, but keep
+them explicitly unmerged and do not describe them as mainline behavior. Update the runtime
+policy catalog, evaluation logbook and C handoff so their implementation/evidence status
+does not overstate what this checkout contains. Preserve the existing ai-use-log.yaml
+history and append this C session; do not rewrite earlier entries. Keep the pass
+documentation-only and report the actual validation performed.
+```
+
+**Agent output (summary).**
+
+```text
+Updated runtime-policy-catalog.md, evaluation-logbook.md and phase2-c-handoff.md to
+describe D's expected_spent validation and request_id aggregation as branch-reported,
+unmerged Phase 2 work. Kept current-main and D-branch evidence distinct, then appended
+the session record to docs/ai-use-log.yaml without replacing earlier entries. The work
+was documentation-only; YAML parsing and git diff --check passed, and runtime tests were
+not run.
+```
+
+**What I caught.** Branch implementation status must not be presented as mainline status.
+
+**My correction.** Keep D's branch status distinct from the current `main` evidence.
+
+**Result.** Updated `runtime-policy-catalog.md`, `evaluation-logbook.md` and
+`phase2-c-handoff.md`; appended the C session to `docs/ai-use-log.yaml`. No files were
+created.
+
+**Validation.** YAML parsing and `git diff --check` passed. Tests were not run; this was a
+documentation-only session with no runtime behavior change.
+
+---
+
+## Session 14
+
+**Date.** 2026-11-19 · Phase 3 C first pass: documentation, static security audit and evidence
+
+**Context.** D had not started or replied with the Phase 3 implementation, so D-dependent
+items remained pending.
+
+**My instruction to the agent.**
+
+```text
+Make a documentation-only Phase 3 C first pass using origin/main (not a stale local main)
+as the code comparison baseline. First establish which implementation and tests actually
+exist on this branch. Restructure RP-001 through RP-007 using the required fields—Trigger,
+Action, Execution order, State-change guarantee, Evidence and logging, Implementation seam,
+and Test-evidence status—and label each claim by provenance (current-code evidence,
+historical/unmerged documentation, or pending D). Add an evidence table and explicit gaps
+to evaluation-logbook.md. Record that the call-log paths do not all satisfy the four-field
+schema and that review-write OSError handling is misclassified; do not present either as
+fixed. Keep storage, call_id joins and other D-dependent work pending. Create/update the
+C-to-D confirmation document as a development handoff, including its untracked status.
+Do not modify src/, test/, .opencode/permissions.jsonc or B-owned requirements. Preserve
+the distinction between a smoke test and proof of the security properties.
+```
+
+**Agent output (summary).**
+
+```text
+Compared the branch with origin/main@6997cef and recorded that src/ and test/ were
+byte-identical; this snapshot had no src/storage.py or call_id/request_id/session_id and
+no tokens/usage_source/request_made fields. Restructured RP-001–RP-007 into the seven
+required fields with provenance labels. Added the §5 evidence table, historical baseline,
+static path findings and evidence gaps to evaluation-logbook.md, and created the
+development-before-confirmation handoff. Static inspection found call_llm.py was the only
+requests importer and identified incomplete call-log fields plus review-write error
+misclassification. No source, test or permissions file changed. The recorded offline
+smoke run was 41 passed with one urllib3 NotOpenSSLWarning under Python 3.9.6; the report
+explicitly did not treat that run as proof of storage, joins, fail-closed behavior or
+no-bypass.
+```
+
+**What I caught.** At baseline `6997cef`, the C branch's `src/` and `test/` matched
+`origin/main`; storage and Phase 2 correlation fields were absent. The call-log schema and
+review-write classification were gaps, not satisfied invariants.
+
+**My correction.** Do not claim a permission mismatch when the comparison finds none, and
+do not treat the 41-test smoke run as proof of fail-closed logging, evidence joins, storage
+atomicity or no-bypass behavior.
+
+**Result.** Restructured RP-001–RP-007 in `runtime-policy-catalog.md` into seven
+fields—Trigger, Action, Execution order, State-change guarantee, Evidence and logging,
+Implementation seam, and Test-evidence status—with provenance labels distinguishing
+code-confirmed facts, unmerged documentation and D-dependent items. Added an evidence table
+and explicit gaps to `evaluation-logbook.md`. Rewrote the D confirmation document as a
+development-before-confirmation handoff.
+
+**Validation.** The recorded offline run was
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest test/offline -q` → 41 passed, 1
+`NotOpenSSLWarning` under Python 3.9.6. The log explicitly limits what this smoke run proves.
+Static path inspection, YAML parsing and the permission-document comparison were also
+recorded as passed; no implementation or tests were changed.
+
+**Open handoffs.** Storage, Phase 2 evidence joins, complete logging-schema coverage,
+review-write error classification and a dedicated secret scan remained pending or
+unverified.
+
+---
+
+## Session 15
+
+**Date.** 2026-11-19 · Phase 3 C coordination: record D's confirmed design
+
+**Context.** D replied with the confirmed Phase 3 target design; implementation and evidence
+were still pending.
+
+**My instruction to the agent.**
+
+```text
+Use D's written reply as the source for the confirmed design decisions. Update the C-to-D
+confirmation, runtime policy catalog and evaluation logbook, but distinguish design
+confirmation from implementation and test evidence. Record D's branch, commit and log
+references as D-reported and not independently verified. Keep the current C-branch
+snapshot intact; do not label D behavior code-confirmed, promote any NFR to measured, or
+use D-branch results as current-branch evidence. Record the agreed PolicyError/StorageError
+boundary, persisted-budget authority and expected_spent rules, review-write failure
+behavior, no-retry rule, call_id lifecycle, and atomic-write/locking target. Keep privacy
+redaction and final whitelist membership pending. This pass is documentation-only; do not
+change implementation, tests, permissions or B-owned requirements.
+```
+
+**Agent output (summary).**
+
+```text
+Marked D as having replied and recorded the reply as a design confirmation, not final
+audit evidence. Filled the confirmation document's design answers, including pipeline as
+the sole business entry; policy_core as deterministic authority; storage defense-in-depth;
+persisted spend as budget authority; equality accepted and over-budget requests routed to
+PolicyError(policy:budget, review=True); independent StorageError handling; no automatic
+retry; and system-generated call_id removal before policy validation. Recorded D-reported
+branch/commit/log references without independent verification. Added a design-confirmed,
+implementation-unmerged section to the runtime policy catalog and a coordination-evidence
+subsection to the logbook; kept the earlier branch-evidence section unchanged. Privacy
+redaction and whitelist finality remained pending. No source, test or permission files
+changed, no NFR was promoted, and no runtime tests were run.
+```
+
+**What I caught.** A design confirmation does not establish that the design has been
+implemented or verified on the current branch.
+
+**My correction.** Keep privacy and whitelist finality pending, and separate the confirmed
+design from implementation status.
+
+**Result.** Updated `phase3-c-confirmation-to-d.md` and the policy catalog to record
+D's confirmed target design while keeping implementation and evidence pending. D's branch,
+commit and log references were labelled as reported by D and not independently verified.
+The catalog recorded the agreed `PolicyError`/`StorageError` boundary, persisted-spend
+authority, `expected_spent` semantics, review-write failure handling, and the unique-temp-file
+plus file-lock atomicity target. The logbook coordinated the historical snapshot and design
+confirmation without presenting D's branch as current code evidence. Privacy and whitelist
+finality remained pending.
+
+**Validation.** `git diff --check` and YAML parsing passed. No runtime tests were run, and
+the recorded source, test and permission paths were unchanged.
+
+**Open handoffs.** D implementation and evidence, privacy finalization and whitelist
+confirmation remained pending.
+
+---
+
+## Session 16
+
+**Date.** 2026-11-22 · Phase 3 C post-merge security audit and architecture evidence
+
+**Context.** PR #38 had merged as `main@06ec2f5`; the C-side final audit and evidence update
+followed.
+
+**My instruction to the agent.**
+
+```text
+Continue the final C security audit against the implementation merged by PR #38 as
+main@06ec2f5. Review the model-call, pipeline, policy_core and storage paths for policy
+authority, A′ redaction, budget concurrency, direct-storage behavior, fail-closed error
+handling and atomic ledger writes; record the associated E tests and evidence in the
+architecture docs. Reconcile earlier pre-merge/pending wording with the merged state,
+while preserving historical context. Check permission-model.md against
+.opencode/permissions.jsonc and the ledger path. After I explicitly authorize it, add only
+the read/edit deny for data/records.jsonl* while preserving the broader data/** measurement
+allow. Do not change source, tests, B-owned requirements or unrelated permissions. Report
+PR/CI/test results as remote evidence and do not say they were rerun locally.
+```
+
+**Agent output (summary).**
+
+```text
+Reviewed the merged call_llm, pipeline, policy_core and storage paths and updated the
+runtime policy catalog, evaluation logbook, confirmation handoff, invariants, permission
+model and structural constraints. Recorded the redacted call logs, persisted-budget
+authority under lock, direct-storage semantics, fail-closed behavior, atomic ledger append
+and E regression coverage. The initial permission comparison found that data/** read/edit
+also covered the runtime ledger; after explicit authorization, added read/edit denies for
+data/records.jsonl* and documented the exception. The PR report's 237 offline tests and
+eight merge checks were recorded as remote results, not local reruns. No source or test
+files changed.
+```
+
+**What I caught.** The broad `data/**` read/edit permission also covered the runtime ledger.
+The audit separately recorded its verification scope for review-log behavior, the private
+marker, branch protection, secret scanning, NFR measurements and direct-storage error
+messages. These notes describe what was reviewed and the scope of the conclusions; they do
+not classify each item as a defect.
+
+**My correction.** Clarified the scope of the safe-error requirement: public `StorageError`
+messages and persisted evidence must remain safe; exception chaining may remain for internal
+diagnostics. The audit described direct-storage shape-validation behavior separately from
+the normal pipeline path. I explicitly authorized the minimal ledger permission exception.
+
+**Result.** Audited the merged implementation at `main@06ec2f5` (PR #38) and recorded
+the A′ log redaction, locked persisted-budget authority, direct-storage semantics, fail-closed
+errors, atomic ledger append and E regression evidence in the architecture catalog and
+logbook. Marked pre-merge statements as historical, clarified that raw-output audit logging
+precedes policy validation while normal business data does not, and reconciled the relevant
+invariant and governance wording. After explicit human authorization, added read/edit deny
+exceptions for `data/records.jsonl*` and documented them. The audit cited the PR's reported
+237 offline tests and eight merge checks as remote evidence, not as locally rerun results.
+
+**Validation.** The PR report recorded `python -m pytest test/offline -q` → 237 passed and
+eight GitHub checks passed on `06ec2f5`; neither was claimed as rerun in this C checkout.
+Documentation checks and verification of the read/edit deny entries were recorded as passed.
+
+**Open handoffs.** The audit recorded its verification boundaries; this session did not
+open a new D/E implementation request.
+
+---
+
+## Session 17
+
+**Date.** 2026-11-22 · Phase 3 C: refresh audit after permission correction
+
+**Context.** The current audit needed to reflect the explicit ledger permission correction
+without removing the earlier mismatch from the audit history.
+
+**My instruction to the agent.**
+
+```text
+Refresh the current evaluation-logbook audit after the ledger-specific permission rule has
+been added. State the current read/edit deny for data/records.jsonl* and its alignment with
+permission-model.md, but retain the initial broad data/** finding as part of the audit
+chronology. Keep this pass documentation-only: do not edit .opencode/permissions.jsonc,
+source, tests or B-owned requirements. Report only the checks actually run.
+```
+
+**Agent output (summary).**
+
+```text
+Updated evaluation-logbook.md so the current audit reflects read/edit denial for
+data/records.jsonl* and alignment between the permission model and machine configuration,
+while preserving the earlier mismatch as chronology. The session changed no source,
+tests or permission configuration. git diff --check and YAML parsing passed; runtime tests
+were not run because the change was documentation-only.
+```
+
+**What I caught.** The initial mismatch is historical; the current configuration denies
+read and edit access to `data/records.jsonl*`.
+
+**My correction.** Keep the permission configuration unchanged in this pass and do not imply
+that OpenCode's runtime matcher was independently tested.
+
+**Result.** Updated the current audit section to show that read and edit access to
+`data/records.jsonl*` is denied and aligned with the permission model, while retaining the
+initial mismatch as audit chronology. Recorded that OpenCode's runtime matcher had not been
+independently exercised. No implementation, tests or permission configuration were changed.
+
+**Validation.** `git diff --check` and YAML parsing passed; source tests were not run for this
+documentation-only update.
+
+**Open handoffs.** Independent verification of OpenCode's runtime permission matcher remained
+unverified.

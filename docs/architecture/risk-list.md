@@ -36,7 +36,7 @@
   condition no longer holds **and** current merged state is evidenced; a resolved item is still kept (with its
   Assumption and Review Trigger) so it can be re-opened if that evidence changes. `Resolved` is scope-narrow
   (see each item's Assumption) — it does not claim the whole domain is risk-free.
-- **Nothing here approves** PD-002, PD-007, or PD-008, and nothing asserts unmerged code is on
+- **Nothing here approves** PD-007 or PD-008, and nothing asserts unmerged code is on
   `main`, that skipped tests passed, or that measurements are verified.
 - Related design context: ADR-001 (context structure) and ADR-002 (token budget); requirement
   rows: `requirements.yaml` NFR-001/002/006/007; status labels: `trace-matrix.md` §1.3.

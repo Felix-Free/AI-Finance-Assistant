@@ -137,11 +137,10 @@ functional_requirements:
     verification_method: "test_policy_core_smoke::test_inv002_*."
     priority: high
     status: approved
-    # NEEDS CONFIRMATION (owner: C) -> PD-002
     notes: >-
-      The exact whitelist membership is fixed in code (currently 8 values:
+      The exact whitelist membership is fixed in code (8 values:
       food, transport, shopping, entertainment, housing, utilities, health, other).
-      Whether this set is final is pending confirmation by C (see pending_decisions).
+      C confirmed on 2026-11-22 that this set is final (recorded as approved in INV-PENDING-01).
 
   - id: FR-005
     title: Budget rule check
@@ -318,14 +317,13 @@ invariants:
     owner_impl: D
     status: approved
   - id: INV-PENDING-01
-    source_ref: "pending"
+    source_ref: "docs/architecture/invariants.md#INV-002"
     rule: "Exact membership of the category whitelist (currently 8 code-defined values)"
     enforcement: "src/policy_core.py::CATEGORY_WHITELIST"
     owner_spec: C
     owner_impl: D
-    status: pending_confirmation
-    # NEEDS CONFIRMATION (owner: C) -> PD-002
-    notes: "C must confirm the final vocabulary. Do not treat the current 8 values as approved permanently."
+    status: approved
+    notes: "C confirmed on 2026-11-22 that the 8-category whitelist is final: food, transport, shopping, entertainment, housing, utilities, health, other."
 
 data_requirements:
   layers:
@@ -566,13 +564,6 @@ pending_decisions:
     owner: A
     verification: "Compare the worksheet date with the Issue due date; record any mismatch. Not verified (images unavailable)."
     notes: "NEEDS CONFIRMATION (owner: A). Do NOT change any deadline until confirmed."
-  - id: PD-002
-    topic: "Category whitelist final vocabulary"
-    question: "Is the current 8-value whitelist final, or should it change?"
-    status: pending_confirmation
-    owner: C
-    verification: "C confirms in invariants.md; E tests every member."
-    notes: "NEEDS CONFIRMATION (owner: C). Current values: food, transport, shopping, entertainment, housing, utilities, health, other."
   - id: PD-003
     topic: "Budget limit value and storage"
     question: "What is the budget limit, per what period, and where is it stored/read?"
