@@ -238,17 +238,67 @@ tests are skipped, so the join remains unverified.
 
 ---
 
-## 5. Phase 3 C audit and evidence
+## 5. Phase 2 E observations (2026-11-14)
 
-> Scope: `feat/c-phase3-policy-60339160`. On this branch `src/` and `test/` are
-> **byte-identical to `origin/main`** (`6997cef`): `git diff origin/main -- src test` is
-> empty and the `git ls-tree` blob hashes match. There is **no `src/storage.py`**, no
-> `call_id` / `request_id` / `session_id`, no `tokens` / `usage_source` / `request_made` on
-> this branch. The evidence below is what a reader can re-check on this branch; it is
-> **not** a measurement of NFR-001/002/005/006 on this historical C snapshot. Their later
-> merged-main measurements are recorded in §2, §3 and §6.3.
+> Appended by role E. **This section adds evidence only; it does not change C's entries in
+> §1–§4 or any earlier value.** Baseline: `main f73e9b4` + D #18 `eec1724` + C #19
+> `6808d7e`. Implemented with OpenCode and verified by separate local QA runs. The detailed run record is
+> `docs/measurements/phase2-qa-evidence.md`. Items not run are marked not verified; nothing
+> here is promoted to `measured` beyond what was actually observed.
 
-### 5.1 How this evidence was produced
+- **NFR-007 — offline guard-removal negatives (measured, local).** Network disabled, `pytest
+  test/offline -q` → **201 passed**. With each guard individually disabled, the selected
+  corresponding test failed: `test_inv001_rejects_negative_amount`,
+  `test_inv002_rejects_unknown_category`, `test_inv003_rejects_one_cent_over_budget`. The
+  run produced no repository `logs/` or `data/` files. This is local offline evidence, not a
+  GitHub CI run.
+- **Semantic extraction (local, simulated).** This is semantic-layer evidence only: the
+  built-in prompt and a candidate YAML each passed 5 extraction cases, and a simulated wrong
+  amount produced 4 failures. **No real gateway run was performed.**
+- **NFR-006 (offline, local).** Separately from the semantic simulation above, offline
+  evidence exists for the call-id joins: accepted records join `llm_calls` to storage, and
+  rejected decisions join `llm_calls` to review, with the recorded paths and the fail-closed
+  write failures exercised. The semantic simulation is **not** counted as a log-traceability
+  result.
+- **Gate 1 (local, simulated GitHub reviews).** Run against a real local Git history plus
+  simulated GitHub reviews: a cross-timezone approval passed; a docs-only approval, a late
+  approval, a self-approval, a dismissed approval, a non-member approval, and an approval on
+  a newly modified test were each rejected.
+- **Schema (local).** The real requirements registry validates against the Draft 2020-12
+  schema; deleting a required field makes validation fail.
+- **NFR-001 / NFR-002 (pending).** The original latency and token samples are missing, so no
+  measurement is recorded here. If D's self-reported figures are mentioned, they must be
+  labelled as D-reported and kept distinct from an E measurement; they are not treated as a
+  measured result.
+- **Open code issues (distinct, not merged).** Two separate problems are tracked apart: a
+  storage partial-write (partial bytes on an interrupted append) and a log error-body
+  problem (error text reaching the call log). They are not the same defect and neither is
+  resolved by the other.
+
+## 6. Phase 2 E recheck (2026-11-16)
+
+> Appended by role E. **Evidence only; §1–§5 and all earlier C/E entries are unchanged.**
+> These are fresh results and are kept distinct from the older measurements above. Baseline:
+> `main 94b0ec4` + D #18 `df729a9` + C #19 `6808d7e`.
+
+- **Recheck (local).** With the network blocked, E reran `mypy` across eight files with no
+  errors, and `pytest test/offline -q` → **201 passed**. This is a new local run, not the
+  older §5 figure and not a GitHub CI run.
+- **Fault injections (local, re-reproduced).** Both prior defects still reproduce: the
+  storage partial-write (16 partial bytes on an interrupted append) and the log error-body
+  problem (a synthetic HTTP error body copied into the call log).
+- **Pending.** Live (real-gateway) verification, human test-first approval, and merge
+  blocking all remain pending; nothing here is promoted to a merge-gate result.
+
+**2026-11-22 — Final NFR verification (role E, commit 06ec2f59).** Recorded the final NFR evidence run in [final-nfr-verification.md](../measurements/final-nfr-verification.md): a 20-attempt synthetic latency session (p50 2422.222 ms, p95 2850.720 ms, max 3072.404 ms; 20/20 complete, 125/12/137 tokens per request), five real extract error paths passing, a clean secret-scan in local and hosted CI, the OFFLINE NFR-005/006 ledger run (16 accepted, 48/48 logged, all joins verified), and NFR-007 mutation coverage 3/3 = 1.0. This entry supersedes older pending rows only for the cases measured here; unmeasured cases remain unchanged.
+
+---
+
+## 7. Phase 3 C audit and evidence
+
+> **Historical scope:** This section records the pre-merge C snapshot based on `main@6997cef`. At that snapshot, `src/` and `test/` were byte-identical to `origin/main`, with no `src/storage.py` or Phase 2 correlation/usage fields. It is historical evidence, not a description of the current branch. Current merged-main evidence is in §8.
+
+### 7.1 How this evidence was produced
 
 - **Static inspection** (`rg`, `git ls-tree`, `git diff origin/main -- src test`, `ast` import
   scan) of `src/call_llm.py`, `src/policy_core.py`, `src/pipeline.py`, `test/offline/*.py`.
@@ -257,7 +307,7 @@ tests are skipped, so the join remains unverified.
   `NotOpenSSLWarning`), interpreter `Python 3.9.6` (`/usr/bin/python3`). A 41-test smoke pass
   is **not** proof of fail-closed logging, `call_id` joins, storage atomicity, or no-bypass.
 
-### 5.2 Evidence table (description / policy → code path → test → command → result → status)
+### 7.2 Evidence table (description / policy → code path → test → command → result → status)
 
 | Item | Code path | Test(s) | Command | Result | Status |
 |---|---|---|---|---|---|
@@ -274,7 +324,7 @@ tests are skipped, so the join remains unverified.
 | Rejected records not persisted | on this branch there is no storage write at all; rejection re-raises after the review line | inferred from `src/pipeline.py:49-66` (no storage call) | — | code path shows no persistence | code only (trivially holds: no storage) |
 | Secret scanning (NFR-004) | tracked files | — | `git grep -E 'sk-[A-Za-z0-9]{16,}|Bearer [A-Za-z0-9]{20,}…'` this pass | no match | partial scan, not a full tooled scan |
 
-### 5.3 Remaining evidence gaps (must not be read as satisfied)
+### 7.3 Remaining evidence gaps (must not be read as satisfied)
 
 1. **Logging field-schema (RP-004 / FR-008).** The success path (`extract` at
    `src/call_llm.py:156`) omits `error`; the config-failure path (`:124`) and the
@@ -301,44 +351,40 @@ tests are skipped, so the join remains unverified.
 7. **Secret scan.** Only an ad-hoc `git grep` pattern scan was run this session; no dedicated
    secret-scanning tool/result is recorded, so NFR-004 stays `pending`.
 
-### 5.4 Historical permission consistency check
+### 7.4 Historical permission consistency check
 
 In this earlier C snapshot, `permission-model.md` and `.opencode/permissions.jsonc` were
 compared and found consistent under the rules then documented. That check predates the
 runtime-ledger deny for `data/records.jsonl*`; it does not describe the current configuration.
-The post-merge permission review and correction are recorded in §6.1 and §6.3. No config
+The post-merge permission review and correction are recorded in §8.1 and §8.3. No config
 edit was made during the historical check.
 
-### 5.5 Historical NFR status at this audit
+### 7.5 Historical NFR status at this audit
 
 At the time of this branch-only audit, NFR-001/002/003/005/006 were `pending` for lack of
 independent measurement on this branch; NFR-004 had no tooled scan; and the NFR-007
 guard-removal mapping had not been run here. This is a historical status snapshot. Current
-merged-main measurements are recorded in §2, §3 and §6.3.
+merged-main measurements are recorded in §2, §3 and §8.3.
 
-## 6. Post-merge C security audit — `main@06ec2f5`
+## 8. Post-merge C security audit — `main@06ec2f5`
 
-> **Audit baseline.** PR [#38](https://github.com/Felix-Free/AI-Finance-Assistant/pull/38)
-> was merged by C into `main` as `06ec2f5` on 2026-11-22. This section supersedes the
-> pre-merge status statements in §5 for the current mainline. The C branch used to edit this
-> logbook still has the older source snapshot; the evidence below is based on review of the
-> merged PR/source and its recorded checks, not a local test run on this C checkout.
+> **Audit baseline.** PR [#38](https://github.com/Felix-Free/AI-Finance-Assistant/pull/38) was merged into `main` as `06ec2f5` on 2026-11-22. This section supersedes the pre-merge status statements in §7 for the mainline at that audit baseline. Evidence is based on review of the merged PR/source and its recorded checks.
 
-> **Historical gap disposition.** The issues recorded in §5.3 were resolved in the merged
-> mainline; their implementation and verification are summarized in §6.1–§6.2 and the NFR
+> **Historical gap disposition.** The issues recorded in §7.3 were resolved in the merged
+> mainline; their implementation and verification are summarized in §8.1–§8.2 and the NFR
 > evidence in §2–§3.
 
-### 6.1 Evidence and verification source
+### 8.1 Evidence and verification source
 
 | Evidence | Source / command | Observed result |
 |---|---|---|
 | Final offline regression | D's PR report: `python -m pytest test/offline -q` on the implementation head | **237 passed** |
 | Merge-head CI | GitHub checks attached to merge commit `06ec2f5` | **8 checks passed** |
 | E regression additions | `test/offline/test_evidence_join.py`, `test/offline/test_pipeline_seam.py`; existing storage/invariant regression selection | Included in the reported 237-pass offline suite |
-| Code path review | `src/call_llm.py`, `src/pipeline.py`, `src/policy_core.py`, `src/storage.py` at the PR #38 merge head | Findings in §6.2 |
+| Code path review | `src/call_llm.py`, `src/pipeline.py`, `src/policy_core.py`, `src/storage.py` at the PR #38 merge head | Findings in §8.2 |
 | Permission alignment | `docs/architecture/permission-model.md` compared with `.opencode/permissions.jsonc` and the merged storage path | The initial comparison found the ledger deny missing. After explicit human authorization, both `read` and `edit` now deny `data/records.jsonl*`; the broader `data/**` measurement allow remains. JSONC structure and both rule entries were checked. **Configuration and document are aligned.** |
 
-### 6.2 Final policy and security evidence
+### 8.2 Final policy and security evidence
 
 | Invariant / policy | Final code path and test evidence | Audit result |
 |---|---|---|
@@ -350,7 +396,7 @@ merged-main measurements are recorded in §2, §3 and §6.3.
 | Ledger atomicity / locking | Storage holds the OS file lock over read, duplicate check, budget enforcement, and write/replace; it writes through a unique same-directory temporary file, flushes/fsyncs, then `os.replace`s. The E fault test targets `mkstemp` and checks prior ledger bytes remain unchanged. | **Implemented and fault-tested** for the tested write failure. This evidence does not cover every possible filesystem/crash mode. |
 | Safe error messages and evidence | I/O `StorageError` and review-write messages use fixed safe wording; logged failures use allowlisted error codes. Exception causes remain chained internally; C's accepted contract covers the public message and persisted evidence/log, not the internal `__cause__`. | **Meets the confirmed C wording** for messages and logs. A malformed direct-storage record with an arbitrary unknown field name can still have that field name echoed in a shape-error message; this is a low-risk, non-pipeline edge case accepted for this merge, not a universal guarantee for arbitrary direct callers. |
 
-### 6.3 Revised limitations
+### 8.3 Revised limitations
 
 - NFR-001/002/003/004/005/006/007 have measured results recorded in PR #42's
   [final NFR report](../measurements/final-nfr-verification.md) and summarized in §2 and §3.
