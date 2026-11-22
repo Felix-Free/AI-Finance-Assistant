@@ -663,9 +663,20 @@ the statistics honest.
 **Context.** D's `df729a9` branch implemented `expected_spent` validation and `request_id`
 aggregation, but those changes had not yet merged into `main`.
 
-**My instruction to the agent.** Record these behaviors as implemented on D's branch but
-not yet merged. Preserve the existing AI-use log history and append this C session without
-rewriting earlier entries.
+**My instruction to the agent.**
+
+```text
+Record expected_spent validation and request_id aggregation as implemented on D's
+df729a9 branch but not yet merged into main. Preserve the existing AI-use log history
+and append this C session without rewriting earlier entries.
+```
+
+**Agent output (summary).**
+
+```text
+Updated the policy catalog, evaluation logbook and C handoff with the unmerged status,
+and appended the session to the AI-use log.
+```
 
 **What I caught.** Branch implementation status must not be presented as mainline status.
 
@@ -687,9 +698,20 @@ documentation-only session with no runtime behavior change.
 **Context.** D had not started or replied with the Phase 3 implementation, so D-dependent
 items remained pending.
 
-**My instruction to the agent.** Keep this pass documentation-only; use `origin/main` as the
-comparison baseline; record the call-log schema gap as a D gap; and mark the confirmation
-document as created even though it was untracked.
+**My instruction to the agent.**
+
+```text
+Keep the pass documentation-only and compare against origin/main. Mark D-dependent
+items as pending, record the call-log schema and review-write classification gaps, and
+mark the confirmation document as created even while it is untracked.
+```
+
+**Agent output (summary).**
+
+```text
+Restructured RP-001..RP-007 with provenance labels, added the Phase 3 evidence and gaps
+to the logbook, and updated the D confirmation handoff. No source or test files changed.
+```
 
 **What I caught.** At baseline `6997cef`, the C branch's `src/` and `test/` matched
 `origin/main`; storage and Phase 2 correlation fields were absent. The call-log schema and
@@ -725,9 +747,20 @@ unverified.
 **Context.** D replied with the confirmed Phase 3 target design; implementation and evidence
 were still pending.
 
-**My instruction to the agent.** Treat D's reply as reference material, label branch, commit
-and log details as not independently verified, and do not promote NFRs or mark D behavior as
-code-confirmed.
+**My instruction to the agent.**
+
+```text
+Use D's reply as design input. Label branch, commit and log details as not independently
+verified; keep implementation and evidence pending; do not promote NFRs or mark D behavior
+as code-confirmed.
+```
+
+**Agent output (summary).**
+
+```text
+Updated the C-to-D confirmation document, runtime policy catalog and evaluation logbook
+to record the confirmed design separately from implementation evidence.
+```
 
 **What I caught.** A design confirmation does not establish that the design has been
 implemented or verified on the current branch.
@@ -759,8 +792,21 @@ confirmation remained pending.
 **Context.** PR #38 had merged as `main@06ec2f5`; the C-side final audit and evidence update
 followed.
 
-**My instruction to the agent.** Continue the final audit and update the architecture
-evidence to reflect the merged implementation and permission review.
+**My instruction to the agent.**
+
+```text
+Continue the final C audit against the merged implementation. Update the architecture
+evidence and permission review, preserve the distinction between remote evidence and
+tests rerun locally, and make only the explicitly authorized ledger permission change.
+```
+
+**Agent output (summary).**
+
+```text
+Updated the runtime policy catalog and evaluation logbook with the post-merge audit,
+recorded the permission finding and correction, and cited the PR's test and CI results
+as remote evidence.
+```
 
 **What I caught.** The broad `data/**` read/edit permission also covered the runtime ledger.
 The audit separately recorded its verification scope for review-log behavior, the private
@@ -798,7 +844,21 @@ open a new D/E implementation request.
 **Context.** The current audit needed to reflect the explicit ledger permission correction
 without removing the earlier mismatch from the audit history.
 
-**My instruction to the agent.** Update the audit after the permission rules were added.
+**My instruction to the agent.**
+
+```text
+Update the audit after adding the ledger permission rules. Record the current alignment
+while preserving the initial mismatch as chronology; do not claim the OpenCode runtime
+matcher was independently tested.
+```
+
+**Agent output (summary).**
+
+```text
+Updated the current audit text to reflect the read/edit deny for data/records.jsonl*
+and noted that the runtime matcher had not been independently exercised. No source,
+test or permission configuration changed.
+```
 
 **What I caught.** The initial mismatch is historical; the current configuration denies
 read and edit access to `data/records.jsonl*`.
