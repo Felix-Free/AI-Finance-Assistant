@@ -183,13 +183,11 @@ flowchart TD
     G5 --> OK
     G6 --> OK
     G4 --> OK
-    OK -. "required-check enforcement unverified (DEBT-08)" .-> MERGE["merge button"]
+    OK -. "six required checks + one approval" .-> MERGE["merge button"]
     MERGE -. "one admin merge observed (#32)" .-> EXC["documented exception"]
 ```
 
-The dotted edges are the honest part of the diagram: the six checks exist and run, but their status as
-*required* checks on `main` is not verified, and one merge (#32) was completed while Gate 1 was red. That
-episode is treated as a first-class piece of evidence in §6.2 and §9, not as an embarrassment to be omitted.
+The dotted edges record what the gates now require: six gates that exist, run, and are required on `main`, with administrator bypass disabled. One merge was completed while Gate 1 was red (#32), and it is kept as a dated exception. That episode is treated as a first-class piece of evidence in §6.2 and §9, not as an embarrassment to be omitted.
 
 ---
 
@@ -519,14 +517,14 @@ decision "is this change semantic?" belongs to the gate that reads the diff, not
 
 ### 6.2 Enforcement versus intention
 
-The six checks exist, run on real pull requests, and have produced real verdicts — Gate 4 has executed live evaluations in the protected environment (five cases passing on the PR #20 path), and Gate 1 has blocked the leader's own merge. Since 23 November they are also *required* checks on `main`: the merge button stays disabled until every required check passes and one approval is recorded, and administrator bypass is disabled in the branch rule.
+The six gates exist, run on real pull requests, and have produced real verdicts — Gate 4 has executed live evaluations in the protected environment (five cases passing on the PR #20 path), and Gate 1 has blocked the leader's own merge. Since 23 November they are also *required* checks on `main`: the merge button stays disabled until every required check passes and one approval is recorded, and administrator bypass is disabled in the branch rule.
 
 That gap was real and is now closed. `DEBT-08` tracked it, and the acceptance test it named was run: a deliberately failing pull request ([#50](https://github.com/Felix-Free/AI-Finance-Assistant/pull/50)) is kept as evidence — Gate 1 failed on the missing test-first approval, Gate 2 on a second model entry point and Gate 6 on the missing session, and GitHub left the merge button disabled with **Required checks failing** and **1 approval required**.
 
 Three things follow, and the report states them plainly because a reader who checks the repository will find them anyway:
 
 1. **The pipeline is implemented, demonstrated and now enforced.** The merge button was observed disabled on a pull request whose required checks failed, and on any pull request without an approval; administrator bypass is disabled.
-2. **One documented exception does not establish a policy.** The #32 exception is recorded in the review memo and in `DEBT-08`; it does not mean the six checks are optional.
+2. **One documented exception does not establish a policy.** The #32 exception is recorded in the review memo and in `DEBT-08`; it does not mean the six gates are optional.
 3. **The remediation is recorded, not promised.** The branch rule, the failing demo pull request and the closed `DEBT-08` entry together are the acceptance test for D7.
 
 ### 6.3 What was actually run
@@ -574,9 +572,7 @@ Two status lines in the register lag behind `main`, and the report corrects them
 `BUG-03` and `BUG-04`, and therefore `DEBT-01` and `DEBT-02`, were fixed on `main` — atomic append via
 PR #30, log redaction and budget re-checking under the lock via PR #38 — but the diary and register still
 carry "pending main" against them. The fixes are verified by tests named in the entries; the labels simply
-have not been refreshed. `DEBT-08` (required-check enforcement) remains genuinely open, and `DEBT-03`
-(guard-removal negatives observed only locally) is open in the narrow sense that the negatives have not been
-re-run inside hosted CI.
+have not been refreshed. `DEBT-08` (required-check enforcement) was the last substantial open item and is now closed against the blocked pull request in §6.2, and `DEBT-03` (guard-removal negatives observed only locally) is open in the narrow sense that the negatives have not been re-run inside hosted CI.
 
 ---
 
@@ -680,9 +676,14 @@ co-evolution stick is not good intentions but two gates that cannot be skipped: 
 
 **Measurement limits.** `NFR-001` and `NFR-002` have no committed evidence. The scripts exist and the procedure is written, but no sample was captured, and the logbook refuses to substitute another metric for the missing one. That is the largest evidence gap in the project.
 
-**What we would change with another sprint, in priority order.** (1) Configure the six checks as required on `main` and demonstrate one genuinely blocked pull request — this closes the only D7 item that is still open and turns the #32 exception into a dated footnote. (2) Capture and commit one latency and one token measurement with a written threshold, which moves two requirements out of `NOT_VERIFIED`. (3) Complete the fifth annotated transcript and add role B's Phase 1 sessions to the log, which closes the two remaining traceability gaps. (4) Backfill the two AI-use rows that the log is missing (PR #40 and #37) and add the regression test for a malformed prompt file, so the evidence trail has no known holes.
+**What we would change with another sprint, in priority order.** (1) Capture and commit one latency and
+one token measurement with a written threshold; that is the only requirement group still `NOT_VERIFIED`.
+(2) Add the two pieces of evidence the suite and the log still lack: the regression test for a malformed
+prompt file, as a test-only pull request, and role B's Phase 1 sessions. (3) Turn the two remaining manual checks — secret scanning, and the entry-point import check beyond `policy_core` — into CI gates.
+(4) Package the classroom artefacts (demo video, slide deck) with the repository so the presentation
+evidence survives the submission.
 
-None of these is a redesign. They are the difference between a system that is *built and demonstrated* and one that is *enforced and measured* — which is precisely the gap the course's blocking-gate requirement is designed to expose.
+None of these is a redesign. They are the difference between a system that is now *enforced* and one that is also *measured*.
 
 ---
 
