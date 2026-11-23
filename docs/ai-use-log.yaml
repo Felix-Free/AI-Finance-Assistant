@@ -2140,3 +2140,76 @@
     nfr_status: 'NFR-001/002 threshold null pending (PD-007); NFR-007 pending; unchanged'
     unverified: 'GitHub CI run and committed latency/token run evidence not independently verified (no gh)'
     pending: 'human review of this record and the final commit'
+
+- date: '2026-11-22'
+  role: A
+  student_id: '60528523'
+  phase: 3
+  session: 1
+  topic: 'D5 transcript consolidation and D6 report finalization'
+  tool: opencode
+  files_modified:
+  - Report.md
+  - transcripts/60528523-TanJingling.md
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/**
+  - test/**
+  - docs/req/**
+  - prompts/**
+  summary: >
+    Consolidated Role A's Phase 3 supervision work into the D5 transcript and replaced the report
+    framework with the final D6 draft. The transcript went from 11 to 33 sessions: 21 sessions kept
+    in a separate working document were appended and renumbered, three near-duplicate entries about
+    the PR #20 approval episode were merged into one, and three sessions from this week were added
+    (progress audit and report framework, the PR #28 gate diagnosis, and the append-only log repair).
+    The D6 report was then written against `main`: twelve sections with per-section evidence
+    citations, two diagrams and eleven tables, every status line (D5 4/5, D7 unverified required
+    checks, D9 prompt locations) checked against the repository rather than asserted. PR #40 itself
+    carried no session row because `transcripts/` is not a Gate 6 trigger path; that gap is
+    disclosed in the report rather than reconstructed after the fact.
+  human_review:
+  - rejected an earlier draft that described branch protection as enabled and NFR-001/002 as measured, because the repository's own debt register contradicts both
+  - required every report claim to cite a file, a commit, a pull request or a CI run instead of an intention
+  - required the transcript to keep the human decisions rather than a narrative of activity, and to mark what remained unverified at the end
+  - corrected two factual errors in the report draft (Phase 1 requirement counts, and the number of days in the development window)
+  - required the log backfill to leave every existing row byte-identical and to use a new session key
+  validation:
+    transcript_sessions: '33 sessions, sequential, no duplicates; near-duplicate PR #20 entries merged'
+    report_length: 'approximately 7,300 words excluding diagrams and tables'
+    report_status_lines: 'D5 4/5, D7 required checks unverified (DEBT-08), D9 both prompt versions present'
+    gate_effect: 'transcripts/ and docs/ are not Gate 6 trigger paths; this row is a traceability backfill, not a gate requirement'
+    commit_identity: '38b90f4, daa32ad and 2a44cba were applied from patch files under a local tooling identity during the PR #41 integration; the work and the review are Role A''s'
+    pending: 'individual reflections (§11) and the relative-contribution table (§12) to be filled by the members'
+
+- date: '2026-11-22'
+  role: A
+  student_id: '60528523'
+  phase: 3
+  session: 2
+  topic: 'Cross-review series across Phase 1-3: consolidated record of the leader review work'
+  tool: opencode
+  files_modified:
+  - docs/ai-use-log.yaml
+  files_not_modified:
+  - src/**
+  - test/**
+  - docs/req/**
+  summary: >
+    Consolidated record of the leader's review work, which was not logged session by session while
+    it happened. Across the project I opened 8 pull requests and reviewed 30: 19 approvals, 7 change
+    requests and 4 comments on 33 pull requests, and 33 of the 58 merge commits on `main` are mine.
+    The per-session detail exists in `transcripts/60528523-TanJingling.md` (33 annotated sessions,
+    written at the time); this row exists so that the review work is visible in the log as well,
+    without inventing entries for days that were never logged.
+  human_review:
+  - rejected three pull requests outright (requirements contradicting the branch history, a missing traceability matrix, a CI gate that accepted a docs-only approval) instead of approving them with comments
+  - required a reachable evidence claim in every review: a file, a commit, a review or a CI run, never a statement of intent
+  - adjudicated the one merge that bypassed a red gate (PR #32) by recording it as a dated exception in the debt register rather than reverting the CI helper
+  - kept integration serialised so that every merge had one reviewer who had read the whole diff
+  validation:
+    basis: 'counts taken from the GitHub API and git history at 2026-11-22; per-session detail in transcripts/60528523-TanJingling.md'
+    reviews: '30 reviews on 33 pull requests: 19 approved, 7 changes requested, 4 commented'
+    merges: '33 of 58 merge commits on main'
+    authored: '8 pull requests'
+    not_logged: 'the two documentation-only PRs #37 and #40 remain unlogged and are disclosed in the report (§9)'

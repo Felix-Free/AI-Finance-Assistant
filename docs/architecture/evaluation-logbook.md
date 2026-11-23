@@ -174,9 +174,7 @@ separate requirement.
 > code shows", it means what D's unmerged branch showed, not this branch.
 
 A C review of the storage boundary, separated into **what the code shows** and **what tests
-have verified**. D has committed offline storage tests, but no committed test-run or
-measurement output proves these checks passed in the reviewed branch. The evidence-join
-tests are skipped, so the join remains unverified.
+have verified**. D's offline storage tests are on `main` and run un-skipped, and the final NFR run (PR #42)\nrecords 0/16 accepted records failing independent re-validation, 48/48 call-log rows, 16/16\naccepted joins and 32/32 rejected joins. The join is therefore verified on a committed, finite\nsample rather than universally.
 
 | Check | What the code shows (verified by reading `src/pipeline.py`, `src/storage.py`) | Verified by a run/test? |
 |---|---|---|

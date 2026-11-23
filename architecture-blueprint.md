@@ -63,17 +63,11 @@ deterministic code decides.
 
 **B. Designed but NOT implemented:**
 
-- A standalone **Schema Validation** layer (today, structural checks are inlined in
-  `validate_record` as `isinstance(raw, dict)` + key access; there is no JSON-Schema
-  runtime validator in the request path).
-- **Budget limit storage/configuration / budget store** (`budget_limit` is still passed in by the
-  caller; `pipeline.process` reads the running `spent` from storage when not supplied).
+- A standalone **Schema Validation** layer (today, structural checks are inlined in `validate_record` as `isinstance(raw, dict)` + key access; there is no JSON-Schema runtime validator in the request path).
+- **Budget limit storage/configuration / budget store** (`budget_limit` is still passed in by the caller; `pipeline.process` reads the running `spent` from storage when not supplied).
 - Retry / backoff on transport failure (single attempt today — PD-008 pending).
 - A continuous **Runtime Monitor** (the JSONL files are outputs, not a monitor).
-- CI pipeline: `.github/workflows/ci.yml` is configured on `main` (offline pytest, Ruff, AI-use-log
-  checks); actual run history / latest success is **not** independently verified in this review.
-- Externalised / configurable prompt file (`Prompt.md` is still a TODO; the prompt lives
-  only in the `SYSTEM_PROMPT` constant).
+- Nothing in this list now covers CI or the prompt. Both closed after this blueprint was written: `main` runs two workflows with six PR gates that are required on the branch, with a deliberately failing pull request (#50) kept as the blocked-merge proof; and the prompt is externalised in `Prompt.md` plus the versioned `prompts/prompt_v1.0.yaml` and `prompts/prompt_v1.1.yaml`, with the `SYSTEM_PROMPT` constant retained as the fallback.
 
 **C. Not approved / not in scope:** database, front end, user auth, MCP servers, external
 services beyond the model gateway, any feature absent from `requirements.yaml`.
