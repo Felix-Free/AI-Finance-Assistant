@@ -293,10 +293,10 @@ pretending otherwise.
 
 **The metric thresholds (`PD-007`).** `NFR-001` (latency) and `NFR-002` (token usage) are expressed as
 metric + threshold + verification, as the brief requires, but the thresholds are `null` because no approved
-budget exists. The evaluation logbook therefore records both as `pending` and explicitly forbids substituting
-pytest duration for measurement. This is the least satisfying outcome in the project and the most honest:
-the measurement code is merged (`scripts/measure_latency.py`, `scripts/measure_tokens.py`,
-`src/report_tokens.py`), the procedure is written down, and the number is missing.
+budget exists. The evaluation logbook therefore records both as `measured` with `null` thresholds, and it
+forbids substituting pytest duration for measurement. Twenty committed calls give p50 2,422 ms, p95 2,851 ms
+and 125/12/137 tokens per request: the numbers describe the system, but without an approved budget they
+cannot certify it. That is the least satisfying outcome in the project, and the most honest.
 
 The loop that connects these is deliberate: an ambiguity noticed in review becomes a `PD` item; a `PD` item
 becomes either a requirement change (which Gate 3 revalidates) or a documented risk; and the trace matrix row
