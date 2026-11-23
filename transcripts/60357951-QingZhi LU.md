@@ -230,113 +230,378 @@ human-only path — i.e., the CI edit was outside role B's authorization. It off
 
 ## Session 2 — 2026-11-21/22 · Phase 3 Role B Architecture Documentation & Cross-Document Review
 
-**Record scope.** This is a **summary-style** entry reconstructed from the actual Phase 3 working
-session (OpenCode interaction). Full verbatim chat is not reproduced; the entry records the real
-work bursts, the real prompt intent I gave the agent, what the agent produced, and what I decided.
-No user or agent sentences are fabricated; where a specific fact/command result is cited it is one
-the agent actually reported during the session.
+**Record scope.** This is a **summary-style** annotated entry reconstructed from the actual Phase 3
+working session (OpenCode interaction). Full verbatim chat is **not** reproduced. Each stage records
+the real work burst: the intent of the prompt I gave the agent (marked `My instruction (summary)`
+where a verbatim prompt is unavailable), what the agent reported or produced (`Reported findings` /
+`Agent output (summary)`), what I caught or decided, and what actually changed on disk. Where a
+specific fact, commit, or command result is cited, it is one that the agent reported during the
+session **or** one I can verify today from the resulting Git history — the 2026-11-22 commit
+`3702bef` ("docs: finalize Phase 3 Role B architecture documentation") is the artefact this session
+produced, and its diff against the four Role B documents plus the `docs/ai-use-log.yaml` entry of the
+same date are the concrete evidence behind the stages below. No verbatim dialogue is presented as
+original when it cannot be recovered; reconstructed instructions and outputs are explicitly labelled
+as summaries.
 
-### Conversation Transcript (interaction summary)
+**Evidence sources used to reconstruct this entry.** (1) the existing summary of the session; (2) the
+Git diff of `3702bef` and its parent for `architecture-blueprint.md`, `docs/architecture/option-ledger.md`,
+`docs/architecture/risk-list.md`, `docs/architecture/evaluation-table.md`; (3) the matching
+`docs/ai-use-log.yaml` 2026-11-22 Role B entry (its `summary`, `human_review`, and `validation`
+fields record the real constraints I imposed); (4) the current state of the files on `main`. What I
+**cannot** reconstruct is the exact wording of each prompt and each agent reply, so those appear as
+summaries, not quotes.
 
-**Work burst 1 — Repository audit (Stage 0).** I asked for a read-only audit of the repo and the
-four Role B architecture documents against Issue #13 / Phase 3 deliverables, with an explicit
-"do not modify anything" constraint. The agent inspected git state, `docs/architecture/`, `src/`,
-and the existing option-ledger / risk-list / evaluation-table / blueprint, and reported: the
-blueprint lives at **repo root** (not `docs/architecture/`); option-ledger/risk-list/evaluation-table
-already existed but contained stale branch/SHA/merge claims; and several Role B artifacts were
-incomplete or inconsistent with the merged code.
+---
 
-**Work burst 2 — Branch setup + snapshot refresh (Stage 1).** I instructed: create an independent
-Phase 3 branch from the latest `origin/main`, keep the untracked junk files, do **not** cherry-pick
-the PD-002 PR, and only refresh stale Git/merge snapshots in the three docs. The agent fetched main
-and found it had advanced (`f941dd6` → `8d0251a`), created `docs/phase3-architecture-60357951`,
-verified PR #18/#19/#20 and D/C/E tips were merged into main, and updated the branch/SHA snapshots
-in option-ledger, risk-list, and evaluation-table.
+### Stage 0 — Initial repository and Role B deliverables audit
 
-**Work burst 3 — Risk List fields (Stage 2).** I asked to add `Assumption` and `Review Trigger` to
-RISK-001..008, keeping IDs/status/Owner, not inventing scores, and being honest about uncertainty.
-The agent widened the table to 10 columns, grounded each assumption/trigger in code/git evidence
-(e.g. `git grep user_request_count` = 0, no retry loop in `_post`), and I reviewed that Resolved
-risks stayed scope-narrow.
+**Context.** Before touching any document I needed a ground-truth picture: which Role B artefacts
+existed, where they lived, and whether their claims still matched the merged code. Phase 3 was the
+documentation/consolidation phase for Role B (owner of the option ledger, risk list, evaluation
+table, traceability matrix, ADRs and `architecture-blueprint.md`), so an audit had to come first.
 
-**Work burst 4 — Option Ledger triggers (Stage 3).** I asked to add a `Reconsideration Trigger` per
-OPT-001..007, tied to real code/PD status, not template text. The agent added a dedicated
-`## Reconsideration Triggers` subsection. During the edit the agent accidentally dropped the
-`## Notes and non-claims` heading; I required it to stop and report, then had it restored (one line)
-before continuing.
+**My instruction (summary).** Perform a **read-only** audit of the repository and the four Role B
+architecture documents against the Phase 3 deliverables; do **not** modify anything; report what
+exists, what is stale, and what is missing, with a clear "not yet verified" marker for anything the
+agent could not check.
 
-**Work burst 5 — Blueprint ↔ code audit and revision (Stage 4A/4B/4B.1).** I asked for a full
-read-only Blueprint-to-code inventory first. The agent inspected every runtime module
-(`call_llm`, `pipeline`, `policy_core`, `storage`, `report_tokens`, `failure_kind`) and `scripts/`,
-and reported major staleness: persistence wrongly marked "not implemented"; `_append_review`
-(actual `_append_rejection`); `_post` returning a tuple `(content, usage)`; missing
-storage/`failure_kind`/token-id helpers/report/measurement tooling; data-flow and dependency graphs
-missing the storage node. I then authorized a targeted revision: fix statuses/names, add the
-implemented components, update both diagrams, add a `jsonschema`/`ruff` dependency split, add a
-separate "Measurement & Reporting Tooling" section (kept out of the runtime path), cite ADR-003
-only after verifying it was Accepted. In 4B.1 I required two最小 fixes: (a) Appendix B "To E" must
-distinguish "suite exists on main" from "CI/NFR-007 verified"; (b) §4 tooling/helper granularity be
-consolidated to component level.
+**Reported findings.** The agent inspected `git` state, `docs/architecture/`, `src/`, and the
+existing option-ledger / risk-list / evaluation-table / blueprint, and reported:
+- the blueprint lives at **repo root** (`architecture-blueprint.md`), not under `docs/architecture/`;
+- option-ledger / risk-list / evaluation-table already existed but carried **stale branch/SHA/merge
+  claims** that predated the D/C/E merges;
+- several Role B artefacts were incomplete or inconsistent with the merged code.
 
-**Work burst 6 — Cross-document consistency (Stage 5) + OPT-004 fix (Stage 5.1).** I asked for a
-read-only cross-document consistency review with a matrix and evidence. The agent found one MAJOR
-(F1): OPT-004 still said "implemented partly on main … on D branch (records) — join unverified"
-while OPT-005/006 and the Blueprint already said "on main". I authorized a one-line minimal fix
-only for OPT-004's Status/Evidence, explicitly forbidding the agent to touch M1–M3 / N1–N4 or any
-other document.
+**What I decided.** That these findings justified a staged, write-gated plan rather than a single
+mass edit. The audit itself was read-only; no file was changed in Stage 0.
 
-**Work burst 7 — Final audit (Stage 6A).** I asked for a final read-only audit and a PASS/PASS-WITH-
-NOTES/FAIL verdict before any record-keeping or commit. The agent verified the 4-doc diff scope,
-OPT-004 final wording, no stale terms, and evidence facts (storage on main, evidence_join 10 tests
-0 skip, test_invariants 12), and returned PASS WITH NOTES with M1–M3 / N1–N4 retained.
+---
+
+### Stage 1 — Branch setup and Git snapshot refresh
+
+**Context.** The audit showed the documents described branch states that no longer held. Before any
+content change, the work needed its own branch off the current `origin/main`, and the snapshot text
+(branch names, SHAs, merged-vs-unmerged wording) had to reflect reality.
+
+**My instruction (summary).** Create an independent Phase 3 branch from the latest `origin/main`;
+keep the existing untracked working-tree files (junk such as `.DS_Store`, `.bak`, and the draft
+`.pptx`/`.docx`); do **not** cherry-pick the PD-002 PR; and in this stage only refresh the stale
+Git/merge snapshots in the three tracking documents.
+
+**Agent output (summary).** The agent fetched `main` and found it had advanced (`f941dd6` →
+`8d0251a`), created the working branch `docs/phase3-architecture-60357951`, verified that PR
+#18/#19/#20 and the D/C/E tips were ancestors of `main`, and updated the branch/SHA snapshots in
+option-ledger, risk-list and evaluation-table (baseline now `8d0251a`, 2026-11-21; D/C/E merged via
+PR #18/#19/#20).
+
+**Result (verified today from `3702bef`).** The header blocks of `option-ledger.md`, `risk-list.md`
+and `evaluation-table.md` were rewritten from "sources are the verified *unmerged* branches
+`df729a9`/`cab1901`/`01e3bc7` (verified 2026-11-16)" to "sources are current `main` (`8d0251a`),
+where the Phase 2 D/C/E branches have since been **merged** … (verified 2026-11-21)". This matches
+the merge facts: PR #18 (`f2442c2`), #19 (`c71610c`), #20 (`064acc5`).
+
+**Distinction I kept.** These were **read-only Git verifications** plus snapshot text edits. The
+environment-level Git operations in this stage were fetching the updated remote references and
+creating the working branch; no merge, push, or cherry-pick was performed. The remaining actions were
+read-only checks and document edits. The untracked junk files were left untouched.
+
+---
+
+### Stage 2 — Risk List refinement (Assumption and Review Trigger)
+
+**Context.** The risk register listed risks with Likelihood/Impact `TBD` but no explicit statement
+of *what assumption kept each risk open* or *what observable change would trigger a re-review*. That
+made it hard to tell an evidenced claim from a judgement, and hard to know when a "resolved" risk
+should be re-opened.
+
+**My instruction (summary).** Add an `Assumption` column and a `Review Trigger` column to
+RISK-001..008; keep every existing ID / Owner / Status; **do not** invent Likelihood/Impact scores;
+be honest about what is evidence versus what is judgement.
+
+**Agent output (summary).** The agent widened the table from 8 to 10 columns, and grounded each
+assumption/trigger in verifiable code/git facts (e.g. `git grep user_request_count` = 0;
+`src/call_llm.py::_post` has no retry loop). It also separated the three formerly-`Open` risks that
+the merges had actually resolved (RISK-001, RISK-003, RISK-008) from the genuinely open ones, and
+wrote each `Resolved` status to be **scope-narrow** (e.g. RISK-003 "Resolved" means *the file is on
+`main` and un-skipped*, **not** that CI ran green).
+
+**What I caught / decided.** I reviewed that the `Resolved` labels stayed scope-narrow and did not
+leak into "the whole domain is risk-free"; every non-resolved risk kept `TBD` scores; and the
+`RISK-003` trigger was written as "re-open if any skip count > 0, the file is removed, or it loses
+`pytest.mark.offline`" rather than a vague "if things change".
+
+**Result (verified from the diff).** `risk-list.md` risk table gained `Assumption` and `Review
+Trigger` columns; the status vocabulary section gained an explicit `Resolved` definition ("the
+specific historical condition no longer holds **and** current merged state is evidenced … can be
+re-opened if that evidence changes"); RISK-001/003/008 moved to `Resolved`, RISK-002/004/005/006/007
+stayed `Open`; no scores were asserted.
+
+---
+
+### Stage 3 — Option Ledger reconsideration triggers
+
+**Context.** The option ledger recorded each design option's selected status, but not *what would
+make the team re-examine it*. Without a trigger, a "Selected" option quietly becomes permanent.
+
+**My instruction (summary).** Add a `Reconsideration Trigger` per OPT-001..007, each tied to a real
+code fact or a PD (pending-decision) status — not generic template text. Keep every OPT id,
+rationale and status intact.
+
+**Agent output (summary) / what happened.** The agent added a dedicated `## Reconsideration
+Triggers` subsection (7 bullets, one per OPT), and during the same edit **accidentally dropped the
+existing `## Notes and non-claims` heading**.
+
+**What I caught / decided.** I noticed the lost `## Notes and non-claims` heading, required the agent
+to **stop and report** before continuing, and then had it **restore** that heading (one line) so the
+non-claims section was not silently merged into the new subsection. Only after the restore did the
+edit continue.
+
+**Result (verified from the diff).** `option-ledger.md` now contains `## Reconsideration Triggers`
+(OPT-001 tied to PD-008; OPT-002 to `user_request_count`/usage-source changes; OPT-003 to PD-007;
+OPT-004 to capability/transactional needs vs the current lock+atomic append; OPT-005 to schema
+evolution; OPT-006 to traceability/join needs; OPT-007 to PD-007/ADR-001 evidence), and the
+`## Notes and non-claims` section is present and intact beneath it.
+
+---
+
+### Stage 4A — Blueprint-to-code read-only audit
+
+**Context.** The blueprint was the largest Role B artefact and the one most likely to be stale,
+because the implementation had moved (storage, token capture, `call_id` threading, the failure
+classifier, report/measurement tooling) since the blueprint was written.
+
+**My instruction (summary).** Do a **full read-only** Blueprint-to-code inventory first — do not
+edit yet. Compare the blueprint's claims against the actual runtime modules and report every
+inconsistency, old name, missing component and missing data-flow element.
+
+**Reported findings.** The agent inspected `call_llm`, `pipeline`, `policy_core`, `storage`,
+`report_tokens`, `failure_kind` and `scripts/`, and reported the blueprint was materially stale:
+- persistence was wrongly marked **"not implemented"** although `src/storage.py` exists on `main`;
+- it used the old name `_append_review` where the code has `_append_rejection`;
+- it described `_post` as returning a raw `str`, while the code returns a tuple `(content, usage)`;
+- it omitted `storage`, `failure_kind`, the internal token/id helpers, the `report_tokens` tool and
+  the measurement scripts;
+- the data-flow diagram and the layer tables had **no storage node**, and the dependency section did
+  not distinguish runtime vs CI/test/runtime-tooling dependencies.
+
+**What I decided.** That the blueprint genuinely needed revision (not cosmetic polish), and that the
+revision should be **targeted to the confirmed code facts**, staged so I could review each block
+before moving on. This stage was read-only; it changed nothing.
+
+---
+
+### Stage 4B — Architecture Blueprint revision
+
+**Context.** With the inventory in hand, the blueprint needed to describe the *actual* merged
+pipeline (`extract → validate → persist`, with re-validation under a storage lock) instead of the
+old one.
+
+**My instruction (summary).** Revise the blueprint to reflect the confirmed implementation: fix
+statuses and names; add the implemented components (`storage`, `failure_kind`, token/id helpers,
+`report_tokens`, measurement scripts); update **both** diagrams (data-flow and sequence) to include
+the storage node; split the dependency table into runtime / test / CI-dev kinds (`requests`,
+`python-dotenv`, `pyyaml` vs `pytest` vs `jsonschema`, `ruff`); add a separate "Measurement &
+Reporting Tooling" section kept **out of** the runtime transaction path; and cite ADR-003 **only
+after** verifying that ADR-003 is actually Accepted (not merely Proposed).
+
+**Agent output (summary) / result (verified from the diff).**
+- §1.3 boundary: added "persist accepted record (`src/storage.py`)".
+- §1.4 implemented table: added `failure_kind.py`, `storage.py` (atomic append + lock + dedup,
+  pipeline-authoritative, ADR-003/ADR-004), `report_tokens.py`, `scripts/measure_*`, and the full
+  offline test set; renamed `_append_review` → `_append_rejection`.
+- §4 component table and both diagrams gained the storage node, `_post (content, usage)`,
+  `failure_kind`, `_append_rejection` with business fields forced to `None`, and the ADR-004
+  pipeline-origin/redaction note.
+- §11 dependency table split by kind (`requests`/`python-dotenv`/`pyyaml` runtime; `pytest` test;
+  `jsonschema`/`ruff` CI-dev).
+- New §11a "Measurement & Reporting Tooling (not runtime)" describing `report_tokens` and the
+  `scripts/measure_*` samplers as tools that do not prove an NFR is met.
+- Appendix A/B updated: persistence now "implemented", full boundary tests "implemented (12 tests on
+  `main`)" but CI run status still "not verified".
+
+**What I decided (not a blanket acceptance).** I did not adopt the agent's framing wholesale: I set
+the scope to what the merged code actually supports, kept `budget store` and standalone schema
+validation as **"not implemented"**, kept CI as **"configured, run status not verified"**, and
+required ADR-003 to be cited only after confirming its Accepted status (verified: ADR-003 is
+*Accepted — role C confirmed 2026-11-19*, whereas ADR-004 is *Proposed — pending role C*). The
+blueprint therefore cites ADR-003 as settled and ADR-004 explicitly as "Proposed, pending role C
+confirmation".
+
+---
+
+### Stage 4B.1 — Minimal Blueprint follow-up corrections
+
+**Context.** After the main revision I found two places where the new wording over-reached the
+evidence or was too fine-grained.
+
+**My instruction (summary).** Make two **minimal** corrections, nothing more: (a) in Appendix B the
+"To E" item must **distinguish** "the boundary suite already exists on `main`" from "CI execution /
+NFR-007 is verified"; (b) consolidate §4 component/helper granularity so over-specified helper-level
+rows are described at an appropriate **component** level.
+
+**Result (verified from the diff).** Appendix B "To E" now says the suite *exists on `main` (12
+tests)* but E still owns *confirming CI execution status on GitHub* and the NFR-007 sign-off (still
+`pending_confirmation`). The component-level rows were kept consistent with the runtime modules
+rather than proliferating per-helper entries. This stage was deliberately small — it did not reopen
+the whole revision.
+
+---
+
+### Stage 5 — Cross-document consistency review
+
+**Context.** Each document had been refreshed in its own stage; the risk was that the same fact was
+described differently across `architecture-blueprint.md`, `option-ledger.md`, `risk-list.md` and
+`evaluation-table.md`.
+
+**My instruction (summary).** Do a **read-only** cross-document consistency review, produce a matrix
+comparing the status/evidence of the same entities across the four documents, and cite evidence for
+each conflict found.
+
+**Reported findings.** The agent found one **MAJOR** inconsistency (labelled F1): `OPT-004`'s status
+still read *"implemented partly on `main` (call/review) and on D branch (records) — join
+unverified"* while OPT-005, OPT-006 and the blueprint already said the join/records were **on
+`main`**. In other words, OPT-004's Status/Evidence cell had not been updated with the others during
+the snapshot refresh. Within the reviewed scope, no additional inconsistency was reported among the
+other relevant OPT entries and the Blueprint.
+
+**What I decided.** That F1 was a real stale-cell defect worth a **single targeted fix**, not a
+reason to rewrite the ledger; and that the non-blocking observations (M1–M3 / N1–N4) should be
+**retained as notes**, not "fixed" by widening scope.
+
+---
+
+### Stage 5.1 — Minimal OPT-004 status and evidence correction
+
+**Context.** F1 needed a fix that touched exactly one cell (plus the status phrase), and nothing
+else.
+
+**My instruction (summary).** Authorize a **one-line minimal** correction to OPT-004's Status and
+Evidence only; explicitly **forbid** touching M1–M3 / N1–N4, the other OPT rows, or any other
+document.
+
+**Result (verified from the diff).** OPT-004's status changed from "implemented partly on `main`
+(call/review) and on D branch (records) — join unverified" to "implemented on `main` (call/review/
+records; join tests on `main`)", and its Evidence now cites `src/pipeline.py`, `src/storage.py` (on
+`main`) and `test/offline/test_evidence_join.py` (on `main`). The OPT-004 *reconsideration trigger*
+bullet (added in Stage 3) was left intact; M1–M3 / N1–N4 were untouched.
+
+---
+
+### Stage 6A — Final read-only audit
+
+**Context.** Before any record-keeping or commit, I wanted a single read-only pass over the whole
+change with an explicit verdict.
+
+**My instruction (summary).** Run a final **read-only** audit: verify the change scope is exactly the
+four Role B documents (plus log/transcript), re-check OPT-004 is now aligned with OPT-005/006 and the
+blueprint, scan for leftover stale terms (old `_append_review`, "not implemented" persistence,
+"unmerged" wording), and state evidence facts — then return a **PASS / PASS-WITH-NOTES / FAIL**
+verdict.
+
+**Reported findings.** The agent confirmed the intended scope of four Role B architecture documents,
+together with the AI-use log and transcript updates, that OPT-004 was now aligned,
+that no stale "unimplemented persistence" / `_append_review` / "unmerged" terms remained in the
+relevant sections, and cited the evidence facts it could check statically:
+- `src/storage.py` is on `main`;
+- `test/offline/test_evidence_join.py` at the audit baseline (`8d0251a`) defined **10** offline test
+  functions with **0** skips;
+- `test/offline/test_invariants.py` defined **12** test functions.
+
+It returned **PASS WITH NOTES**, retaining M1–M3 / N1–N4 as non-blocking notes.
+
+**What I decided / what remains unverified.** I accepted PASS-WITH-NOTES and kept the notes open
+rather than expanding scope. Critically, the evidence facts above are **static counts and file
+presence**, not a test run: I did **not** independently re-execute the suite in this session, and no
+CI run is claimed. The "10 tests / 0 skips" figure is correct **for the audit baseline `8d0251a`**;
+`test/offline/test_evidence_join.py` has since grown to **17** `def test_` functions on the current
+`HEAD` because of later E work — that later count is **not** what this 2026-11-21/22 audit asserted.
+Latency/token measurement evidence and the live GitHub CI run status remained unverified by me.
+
+---
 
 ### 【人类批注】
 
-1. **干预目的**: Keep the AI strictly on documentation that reflects the *actual* merged code, not
-   on plausible-sounding but unverified claims, and prevent it from silently overreaching or
-   fabricating status/evidence.
+1. **干预目的 (Intervention purpose)**: Use the AI to *review and reconcile documentation against the
+   actual merged implementation* — not to design the architecture for me. I wanted the blueprint,
+   option ledger, risk list and evaluation table to state only what the code on `main` supports,
+   to expose stale claims, and to add decision/trigger metadata (Assumption, Review Trigger,
+   Reconsideration Trigger). The architectural *decisions* (what is implemented, what stays
+   "design-only", which ADR is Accepted) stayed mine.
 
-2. **发现的问题**:
-   - The blueprint was materially stale: it described persistence as "not implemented", used the
-     old `_append_review` name, and omitted storage / `failure_kind` / token-id helpers / report /
-     measurement tooling, plus the storage data-flow.
+2. **发现的问题 (Problems discovered)**:
+   - The blueprint was materially stale: persistence described as "not implemented", the old
+     `_append_review` name, `_post` described as returning a `str` instead of `(content, usage)`,
+     and storage / `failure_kind` / token-id helpers / report / measurement tooling plus the storage
+     data-flow all missing.
    - option-ledger / risk-list / evaluation-table carried stale "unmerged branch / old SHA" text
-     after D/C/E were merged.
-   - OPT-004 status contradicted OPT-005/006 and the Blueprint.
-   - During an edit the agent dropped the `## Notes and non-claims` heading.
+     after D/C/E were already merged.
+   - The risk list had no explicit Assumption or Review Trigger, so "open" vs "resolved" was a
+     judgement with no re-open condition.
+   - During one edit the agent **accidentally dropped the `## Notes and non-claims` heading**.
+   - Across documents, `OPT-004`'s status/evidence contradicted OPT-005/006 and the blueprint
+     (F1: it still said the records were on D's branch and the join "unverified").
 
-3. **具体干预**:
-   - Forced a read-only audit before any write, at every stage.
-   - Fixed the branch/scope: independent branch off latest `origin/main`; no PD-002 cherry-pick.
-   - Constrained each stage to named files/fields; forbade inventing thresholds/scores/metrics and
-     forbade upgrading evidence (skipped≠passed, merged≠correctness-verified, CI-configured≠CI-run).
-   - Required the agent to verify against code/git (not the report) before editing.
-   - Caught the dropped heading and required restore.
-   - Reviewed OPT-004 wording to ensure it matches main evidence without overclaiming CI/NFR.
-   - Decided to retain non-blocking M1–M3 / N1–N4 rather than widen scope.
+3. **具体干预 (Specific human interventions)**:
+   - Forced a **read-only audit before any write**, at every stage (0, 4A, 5, 6A were strictly
+     read-only).
+   - Fixed the branch/scope: an independent Phase 3 branch off the latest `origin/main`; no PD-002
+     cherry-pick; untracked junk left untouched.
+   - Constrained each stage to named files/fields; forbade inventing thresholds/scores/metrics, and
+     forbade upgrading evidence (skipped ≠ passed, merged ≠ correctness-verified, CI-configured ≠
+     CI-run-verified, tool-exists ≠ NFR-met).
+   - Required the agent to verify against **code/git**, not its own summary, before editing.
+   - **Caught the dropped heading** and required an immediate stop-and-report, then a restore before
+     continuing.
+   - Authorized only a **one-line** OPT-004 status/evidence fix (Stage 5.1) and forbade touching
+     M1–M3 / N1–N4 or any other document.
+   - Required ADR-003 to be cited **only after** confirming it was Accepted (ADR-004 kept as
+     "Proposed").
 
-4. **干预效果**: The agent switched to code/`git`-verified claims, corrected the blueprint against
-   the real modules, kept measurement tooling out of the runtime path, and produced a single minimal
-   OPT-004 fix instead of broad rewrites.
+4. **干预效果 (Intervention effects)**:
+   - The agent switched to code/`git`-verified claims; the blueprint was corrected against the real
+     modules; measurement tooling was kept out of the runtime path; and the cross-document review
+     produced a **single minimal** OPT-004 fix rather than broad rewrites.
+   - The restored `## Notes and non-claims` section and the scope-narrow `Resolved` labels kept the
+     documents honest about what was and was not verified.
+   - I did **not** claim that all risk/uncertainty was eliminated: the M1–M3 / N1–N4 notes stayed
+     open, and measurement/CI evidence stayed unverified.
 
-5. **人工判断**: I decided the phased plan, the file/field boundaries, what counts as acceptable
-   evidence, that C stays "design-only", that D/C/E merged facts replace stale "unmerged" text, and
-   to leave M1–M3/N1–N4 open. The agent executed inspections, edits, and diff checks. Open items for
-   human decision: reconciling this branch's transcript numbering with the Phase 2 transcript on the
-   unmerged branch; PD-002 cross-branch state; CI-run and committed latency/token evidence remain
-   unverified by me.
+5. **人工判断 (Human judgment)**:
+   - **Human decided:** the phased plan and per-stage boundaries; that the blueprint's persistence
+     description must be corrected to "implemented"; that ADR-003 is cited as *Accepted* while
+     ADR-004 stays *Proposed*; that non-blocking notes are retained rather than "fixed"; that F1 is
+     a one-cell defect; and that measurement/CI evidence is not asserted.
+   - **Agent (suggested/executed):** the read-only inventories, the column additions, the blueprint
+     rewrite blocks, the cross-document matrix, and the mechanical edits/diff checks.
+   - **Verified from Git (`3702bef`):** the underlying Phase 3 documentation changes described in this
+     entry are reflected in the commit diff. This commit serves as evidence for the documented
+     architecture work; the present transcript expansion is a separate, uncommitted documentation
+     change.
+   - **Still unverified / open:** the live GitHub CI run status, committed latency/token measurement
+     evidence, and the final leader review/merge. The transcript-numbering reconciliation with the
+     Phase 2 record and the PD-002 cross-branch state also remained open items for human decision
+     at the time of this session.
 
 ### Human-in-the-Loop Stage
 
-- **Requirements**: kept NFR-001/002/007 status pending; forbade inventing thresholds; kept C
-  design-only; kept PD-002/007/008 as their actual states (did not confirm on C's behalf).
-- **Architecture**: directed the Blueprint-to-code reconciliation, the storage/failure_kind/tooling
-  corrections, the ADR-003 citation (only after verifying Accepted), and the runtime-vs-tooling
-  separation.
-- **Planning**: split into staged, scope-limited prompts (0, 1, 2, 3, 4A, 4B, 4B.1, 5, 5.1, 6A),
-  authorizing each separately.
-- **Construction**: constrained edits to specific files/fields; required restoring the dropped
-  heading; required minimal OPT-004 fix; preserved 4 doc modifications + 5 untracked files.
-- **Verification**: required `git diff --check`/`--name-only`, evidence cross-checks, consistency
-  matrix, and a final read-only PASS/PASS-WITH-NOTES/FAIL audit; insisted on distinguishing
-  read-only inspection vs previously reported test evidence vs (not) re-run tests.
+- **Requirements** — I kept NFR-001/002/007 status **pending**, forbade inventing thresholds, kept
+  the ADR-001/002 design-only claims, and kept PD-002/007/008 in their actual states (did not confirm
+  a decision on role C's behalf). I required the docs to distinguish evidence classes rather than
+  merge them.
+- **Architecture** — I directed the Blueprint-to-code reconciliation (storage / `failure_kind` /
+  token-id helpers / tooling corrections), the data-flow and sequence-diagram storage node, the
+  runtime-vs-tooling separation, and the ADR-003 (Accepted) vs ADR-004 (Proposed) distinction. I
+  reviewed the agent's architecture *analysis* of component responsibilities, data flow, storage and
+  validation, and decided which suggestions to accept within the confirmed implementation.
+- **Planning** — I split the work into staged, scope-limited prompts (0, 1, 2, 3, 4A, 4B, 4B.1, 5,
+  5.1, 6A), requiring each stage's read-only findings before authorizing the next write.
+- **Construction** — The construction in this session was **documentation**, not application source
+  code: the agent edited the four Role B Markdown documents. I constrained those edits to specific
+  files/fields, required restoring the dropped `## Notes and non-claims` heading, required the
+  minimal OPT-004 fix, and kept the untracked working-tree files untouched. No `src/` or `test/` file
+  was edited by me or by the agent in this session.
+- **Verification** — I required `git diff --check` / `--name-only`, evidence cross-checks, a
+  cross-document consistency matrix, and a final read-only PASS / PASS-WITH-NOTES / FAIL audit, and
+  I insisted on distinguishing **read-only inspection** vs **previously reported test evidence** vs
+  **tests I did (not) re-run**. The `test_evidence_join` (10 at `8d0251a`) and `test_invariants` (12)
+  figures are static counts reported by the agent, not a run I performed.
