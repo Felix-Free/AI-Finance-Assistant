@@ -221,7 +221,8 @@ question, an owner and a verification method — for example `PD-007` ("what lat
 are approved?"). `PD-002`, the category vocabulary, was confirmed on 22 November. The registry states explicitly
 that a `pending_confirmation` item must not be read as approved. This convention did real work: when the
 team later wrote the evaluation logbook, `NFR-001` and `NFR-002` could not be quietly marked "met" because
-their thresholds are `null` and their measurements were never committed.
+their thresholds are `null` and no measurement was available at the time. The 20 school-gateway calls
+recorded in PR #42 are now committed; the acceptance thresholds remain unapproved.
 
 The registry is enforced in CI by Gate 3, which validates it against the Draft 2020-12 schema on every pull
 request. Deleting a required field makes the gate fail; that negative case is part of the gate's own
@@ -776,7 +777,7 @@ rename was mechanical yet not local: it touched the registry, the invariant regi
 blueprint and the code, and a partial rename would have made the trace matrix cite identifiers
 the registry no longer defined. The other volatility was deliberate: `pending_confirmation`
 stayed a first-class status, so `NFR-001`/`NFR-002` could not be quietly marked "met" when their
-thresholds were `null` and no measurement had been committed.
+thresholds were `null` and no measurement had yet been recorded.
 
 **Artifact Co-evolution.** In Phase 3 the blueprint had drifted from the code in ways that were
 only visible by reading both side by side. It still described persistence as "not implemented"
