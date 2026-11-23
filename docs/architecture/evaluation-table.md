@@ -115,7 +115,7 @@ Rationale summary (each tied to a criterion):
 - **Branch state:** verified against `origin/main` (`8d0251a`, 2026-11-21); PR #18/#19/#20 are all
   merged (D/C/E tips `df729a9`/`01e3bc7`/`cab1901` are ancestors of `main`). Online PR status was
   not re-verified this pass (no `gh`).
-- **`Pending Validation`:** token-cost and latency numbers (no committed runtime evidence; PD-007);
+- **`Pending Validation`:** token-cost and latency numbers (measured in `docs/measurements/final-nfr-verification.md`, no approved budget: PD-007);
   `user_request_count` metric (not implemented); NFR-006 numeric coverage threshold (PD-008).
 - **Non-claims:** no numeric score, pass rate, benchmark, or CI-run result is asserted here; a skipped
   test is never treated as passing and unmerged code is never described as `main` implementation.
