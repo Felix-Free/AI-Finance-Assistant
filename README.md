@@ -56,4 +56,4 @@ The live suite needs a real gateway: set `LLM_BASE_URL` and `LLM_API_KEY` (and o
 - **`offline-regression`** — Gate 5: full offline suite.
 - **`ai-use-log`** — Gate 6: append-only AI-use development sessions (a PR-level record, not the runtime `logs/llm_calls.jsonl`).
 
-**Enforced:** the six PR checks and at least one approval are required on `main`, and administrator bypass is disabled. Enforcement is demonstrated by a deliberately failing pull request that GitHub refused to merge ([#50](https://github.com/Felix-Free/AI-Finance-Assistant/pull/50)): Gate 1 failed on the missing test-first approval, Gate 2 on a second model entry point and Gate 6 on the missing AI-use session, and the merge button stayed disabled.
+**Enforced:** the six PR gates and at least one approval are required on `main`, and administrator bypass is disabled. Enforcement is demonstrated by a deliberately failing pull request that GitHub refused to merge ([#50](https://github.com/Felix-Free/AI-Finance-Assistant/pull/50)): Gate 1 failed on the missing test-first approval, Gate 2 on a second model entry point and Gate 6 on the missing AI-use session, and the merge button stayed disabled.
