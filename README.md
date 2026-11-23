@@ -1,6 +1,8 @@
 # AI-Finance-Assistant
 An AI-powered personal finance assistant that helps users track spending, understand their budgets, and receive actionable financial guidance — with a hard safety boundary between what the model *says* and what may ever be *persisted*.
 
+**Repository:** https://github.com/Felix-Free/AI-Finance-Assistant
+
 ## Architecture & Safety Boundary
 
 The system is intentionally split into two halves:
