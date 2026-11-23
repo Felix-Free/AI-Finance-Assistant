@@ -5,7 +5,7 @@
 **Course:** CS5351 Agentic Software Engineering · City University of Hong Kong
 **Submission date:** 23 November 2026
 **Baseline:** `main` at `20417a7` · 239 commits · 59 merge commits · development window 6–23 November 2026
-**Length:** approximately 9,200 words excluding diagrams and tables.
+**Length:** approximately 9,900 words excluding diagrams and tables.
 
 ---
 
@@ -42,8 +42,9 @@ The model (`DeepSeek-V4-Flash`, reached through a single module, `src/call_llm.p
 `src/policy_core.py` validates that proposal against three invariants written in code — a finite positive
 amount with at most two decimals (`INV-001`), a category drawn from a closed whitelist (`INV-002`), and a
 cumulative spend that does not exceed the budget (`INV-003`). Only a record that survives those checks may
-reach `src/storage.py`. A rejection is not an exception to be swallowed; it is the system working, and it is
-recorded. No business rule is ever enforced by prompt text, and no model output ever reaches disk without
+reach `src/storage.py`. A pipeline policy rejection is not an exception to be swallowed: it is the system working, written once
+to `logs/review.jsonl`. Direct storage calls keep their own error semantics and do not create pipeline
+review evidence. No business rule is ever enforced by prompt text, and no model output ever reaches disk without
 passing the deterministic layer.
 
 This is a genuine AI component rather than decoration. The input is free-form natural language in Chinese and
@@ -85,9 +86,11 @@ flowchart LR
 ```
 
 Two logging streams run alongside the data path and are part of the safety property rather than an
-afterthought. `logs/llm_calls.jsonl` receives exactly one line per model call — input, raw reply, parsed
-object, error, identifiers and token usage — and the call is treated as failed if that line cannot be
-written (`RP-004`, fail-closed). `logs/review.jsonl` receives every policy rejection with its short error
+afterthought. `logs/llm_calls.jsonl` receives exactly one redacted line per model-call attempt. The schema preserves
+`input`, `raw`, `parsed` and `error`, but `input` and any available `raw` content are stored as
+`redacted:len=<n>`, `parsed` is `null`, and only safe error codes and approved metadata (`call_id`,
+`request_id`, `session_id`, `tokens`, `usage_source`, `request_made`) remain. A call whose audit line
+cannot be written is treated as failed (`RP-004`, fail-closed). `logs/review.jsonl` receives every policy rejection with its short error
 code. The audit trail is therefore complete by construction: there is no code path that calls the model
 without logging, because the only code path that can call the model is `src/call_llm.py`.
 
@@ -106,7 +109,8 @@ each path. `docs/req/**`, `.opencode/**`, `.agent/**`, `.github/**`, `transcript
 human-only; `src/**` and `test/**` are writable inside an approved task; `.env` is readable by nobody.
 
 The separation proved its worth repeatedly. The clearest case is role B's agent editing `.github/workflows/ci.yml`
-to fix a runner problem: the change was technically correct and entirely outside B's authority. The
+to fix a runner problem: the change was technically correct, entirely outside B's authority, and it
+happened in role B's Phase 2 session. The
 transcript (`transcripts/60357951-QingZhi LU.md`) records the challenge — *"which role owns this document?"* —
 and the agent's admission that the path was human-only. A single ownership table in `AGENTS.md` §3 turned a
 silent boundary violation into a two-line conversation.
@@ -212,9 +216,9 @@ and the rule that each guard must have a test that fails when the guard is remov
 criterion cannot be checked is a wish, and the schema makes that visible.
 
 **`pending_confirmation` is a first-class status.** Fifteen status fields in the registry are not
-`approved`. Eight of them are collected as formal open decisions, `PD-001`..`PD-008`, each with a question,
-an owner and a verification method — for example `PD-002` ("is the current eight-value category whitelist
-final?") and `PD-007` ("what latency and token thresholds are approved?"). The registry states explicitly
+`approved`. Seven of them remain as formal open decisions, `PD-001` and `PD-003`..`PD-008`, each with a
+question, an owner and a verification method — for example `PD-007` ("what latency and token thresholds
+are approved?"). `PD-002`, the category vocabulary, was confirmed on 22 November. The registry states explicitly
 that a `pending_confirmation` item must not be read as approved. This convention did real work: when the
 team later wrote the evaluation logbook, `NFR-001` and `NFR-002` could not be quietly marked "met" because
 their thresholds are `null` and their measurements were never committed.
@@ -248,19 +252,22 @@ reference.
 
 Volatility was also not uniformly bad. The registry grew a `status` vocabulary that distinguishes
 `IMPLEMENTED_AND_TESTED` from `IMPLEMENTED_NOT_TESTED`, `PARTIALLY_IMPLEMENTED` and `NOT_VERIFIED`, and the
-current distribution over the 36 formal requirements is:
+current distribution over the requirement rows that carry a status is:
 
 | Verification status | Count | Examples |
 |---|---|---|
 | `IMPLEMENTED_AND_TESTED` | 22 | `FR-001`..`FR-008`, `INV-001`..`INV-003`, `AI-REQ-001/002/003/004/006/007`, `ERR-001/002/003/005`, `SEC-003`, `NFR-007` |
 | `IMPLEMENTED_NOT_TESTED` | 5 | `AI-REQ-005`, `AI-REQ-008`, `SEC-002`, `ERR-004`, `SEC-005` |
 | `PARTIALLY_IMPLEMENTED` | 6 | `NFR-003`, `NFR-004`, `NFR-005`, `NFR-006`, `SEC-001`, `SEC-004` |
-| `NOT_VERIFIED` | 3 | `NFR-001`, `NFR-002`, and the non-formal placeholder `INV-PENDING-01` |
+| `NOT_VERIFIED` | 2 | `NFR-001`, `NFR-002` — both have descriptive samples now, neither has an approved threshold |
+
+Thirty-five rows carry a status; `INV-PENDING-01`, now confirmed by role C, is tracked as a placeholder and
+excluded from the 36 formal requirements.
 
 That table is the project's most useful single page of self-assessment. It says, without decoration, that
 roughly three fifths of the requirements are implemented and tested, that five are implemented but not
 covered by a test that would notice their removal, that six are partial, and that the two performance
-requirements have no committed evidence at all. A report that presented this as "all requirements met"
+requirements have measured samples but no approved threshold. A report that presented this as "all requirements met"
 would be contradicted by its own repository in one `grep`.
 
 ### 3.3 Ambiguity resolution
@@ -268,13 +275,14 @@ would be contradicted by its own repository in one `grep`.
 Ambiguity was handled by making it explicit rather than resolving it by assumption. Three examples show the
 loop from ambiguity to artefact.
 
-**The category whitelist (`PD-002`).** The implementation defines eight categories — `food`, `transport`,
+**The category vocabulary (`PD-002`).** The implementation defines eight categories — `food`, `transport`,
 `shopping`, `entertainment`, `housing`, `utilities`, `health`, `other` — and the prompt, the tests and
-`policy_core` all depend on that set. Whether the set is *final* is a product decision, not an engineering
-one. Rather than freezing it silently, the registry records `PD-002` as pending, owned by role C, with the
-verification method "C confirms in `invariants.md`; E tests every member". The consequence is visible in the
-trace matrix: the whitelist membership is exercised by tests, but its finality is marked
-`NOT_VERIFIED` under a placeholder row that is excluded from the formal count.
+`policy_core` all depend on that set. Whether the set was *final* was a product decision rather than an
+engineering one, so the registry carried it as a pending decision owned by role C instead of freezing it
+silently. On 22 November role C confirmed the vocabulary in `invariants.md`, and the registry now records
+the decision as approved in `INV-PENDING-01`, a placeholder row excluded from the 36 formal requirements.
+What remains is the traceability detail rather than the product decision: matching stays exact and
+case-sensitive, and E's tests exercise every member of the set.
 
 **The budget value and its storage (`PD-003`).** `INV-003` compares cumulative spend to a budget, but what
 that budget is, over what period, and where it is stored were never specified. The registry records the
@@ -311,7 +319,9 @@ three places, each of which would have to fail for a bad record to reach disk.
    caller whether a human should look at it.
 2. **`src/storage.py` re-validates and re-reads under a lock.** A record that arrives at the storage layer is
    checked again, and — since ADR-004 — the budget decision is taken against the *persisted* total inside the
-   writer's lock, not against a caller-supplied number. The caller's `spent` is an advisory pre-check.
+   writer's lock, not against a caller-supplied number. The caller's `spent` is an advisory pre-check. For a
+   direct `append_validated` call, `expected_spent` is a validation parameter rather than persisted data, and
+   a direct policy failure raises `PolicyError` without creating pipeline review evidence.
 3. **`src/call_llm.py` is the only module that may speak to the model.** No other module imports a transport
    library; Gate 2 scans for exactly that. Every call logs exactly one line, and a call whose log line cannot
    be written is treated as failed rather than successful (`RP-004`).
@@ -409,11 +419,13 @@ Its honesty is in what it refuses to fill in. The Runtime Monitor column is `—
 continuous monitor exists: log files are outputs, not monitors. Rather than inventing a monitor to complete
 the grid, the matrix states the gap. Likewise, a requirement is `IMPLEMENTED_AND_TESTED` only when its cited
 test is on `main`; evidence that exists only on a branch is labelled `PENDING_MERGE` in the remarks and never
-promoted to the status column. Those two conventions are why the distribution in §3.2 can be trusted as a
-description of `main` rather than of the team's hopes.
+promoted to the status column. The two `NOT_VERIFIED` rows are `NFR-001` and `NFR-002`: both now carry
+descriptive samples, neither has an approved threshold. Those conventions are why the distribution in §3.2
+can be trusted as a description of `main` rather than of the team's hopes.
 
-The matrix also records the known gaps in one place: no committed latency or token measurement, an untested
-fail-closed logging branch, no automated secret scan (manual verification only), and only `policy_core`
+The matrix also records the known gaps in one place: `NFR-001` and `NFR-002` have descriptive measurements
+but no approved budget, the fail-closed logging branch is exercised by simulation rather than by a failing
+environment, secret scanning covers tracked readable files rather than history, and only `policy_core` is
 import-checked for the single-entry-point rule. Each gap names an owner, which is the difference between a
 known limitation and an unknown one.
 
@@ -491,7 +503,7 @@ Reviews in this project had a fixed, short checklist, and each item exists becau
 |---|---|
 | Does the plan match the diff? | scope creep hidden inside an approved plan |
 | Does `CHANGED FILES` match `git status`? | files edited but not reported, and vice versa |
-| Was a read-only path touched? | role B editing `.github/workflows/ci.yml`; the agent admitted the path was not its own |
+| Was a read-only path touched? | role B editing `.github/workflows/ci.yml` (Phase 2); the agent admitted the path was not its own |
 | Does the new test fail when the guard is removed? | a "negative" test that passed without the guard — the guard was never exercised |
 | Is any rule enforced by prompt text rather than code? | a proposed enforcement that lived only in the prompt |
 
@@ -518,7 +530,7 @@ can be unit-tested offline at all.
 
 | Gate | What it blocks | How it decides | Known weakness |
 |---|---|---|---|
-| 1 · test-approval | implementation without a prior human approval on a test-only commit | reads GitHub review state; the approved commit must change tests and nothing else, and must precede the first implementation commit | one merge observed with the gate red (#32); required on `main` since 23 November (see §6.2) |
+| 1 · test-approval | implementation without a prior human approval on a test-only commit | reads GitHub review state; the approved commit must change tests and nothing else, and must precede the first implementation commit | one merge observed with the gate red (#32); required on `main` since 23 November (see §6.2); upstream-sync approvals preserved since PR #36 |
 | 2 · static-analysis | a second model entry point, an API-shape change, a missing ADR for a security-critical path, a credential in a tracked path | `ruff`, `mypy`, `pip check`, a secret scan, an AST scan of transport imports, permission-path checks | `mypy` runs over `src` only; the secret scan inspects paths and content patterns, not history |
 | 3 · schema-validation | a registry that no longer validates | Draft 2020-12 validation of `requirements.yaml` against `req-schema.json`, and of the schema itself | validates shape and required fields, not meaning |
 | 4 · semantic-eval | a prompt or model change that degrades extraction quality | replays the live extraction set in the protected `semantic-eval` environment, five cases including the `not_a_record` branch | runs only when Gate 1 flags a semantic change; credentials are a single point of failure |
@@ -548,14 +560,16 @@ claim can be re-run rather than trusted.
 
 | What | Command / environment | Result | Where it is recorded |
 |---|---|---|---|
-| Offline suite | `pytest test/offline -q`, network blocked | 211 collected cases passed on `main` at `35f580d`; the suite now holds 164 test functions | `docs/bug-diary.md`, PR #34 evidence |
+| Offline suite | `pytest test/offline -q`, network blocked | 211 collected cases passed on `main` at `35f580d`; the final hosted run reported 237 passed | `docs/bug-diary.md`, `docs/measurements/final-nfr-verification.md` |
 | Live semantic set | `pytest test/live/test_live_model.py` in the protected environment | 5 passed, including the `not_a_record` case | Gate 4 run on the PR #20 path |
 | Static analysis | `ruff check --select E9,F63,F7,F82`, `mypy --disable-error-code import-untyped src` | clean across eight source files at `df729a9`; later eleven | `docs/measurements/phase2-qa-evidence.md` |
 | Schema | Draft 2020-12 validation of `requirements.yaml` | pass; deleting a required field fails | Gate 3 |
 | Guard-removal negatives | one invariant at a time, guard disabled | the corresponding test fails in each case | `docs/measurements/phase2-qa-evidence.md` §2 |
 | Atomic append | fault injection at the replace step, plus three concurrent writers | original bytes preserved on failure; both concurrent records retained | `test/offline/test_phase3_concurrency.py` |
 
-The list of things that were **not** run is equally important: no merge-time live execution against the protected environment, and no committed latency or token measurement. Required-check enforcement and the blocked pull request are no longer on this list (§6.2).
+What remains on the not-run list is narrower than it was: no merge-time live execution against the
+protected environment, and no approved numerical threshold for the latency and token samples.
+Required-check enforcement and the blocked pull request have left the list (§6.2).
 
 ### 6.4 Defect trends and the debt register
 
@@ -665,8 +679,9 @@ every reference, the registry became the naming authority, and Gate 3 revalidate
 and the runtime documentation kept pointing at the old paths. The stale references were found by review, not
 by a test, and fixed in a two-line change (PR #31) that survived a merge conflict with a later cleanup of the
 same file — a conflict whose resolution was to keep the cleanup and drop the now-obsolete path fix in that one
-document. The same drift still exists in `docs/code-governance/mcp-tool-manifest.md`, whose two endpoint rows
-name `src/measure_*`; it is recorded for role C rather than quietly fixed.
+document. The last stale reference was in `docs/code-governance/mcp-tool-manifest.md`, whose two endpoint rows still
+named `src/measure_*`. Rather than patch another role's file, I routed it to its owner, and role C
+corrected it to `scripts/measure_latency.py` and `scripts/measure_tokens.py` in the Phase 3 audit.
 
 **The append-only log.** `docs/ai-use-log.yaml` is written by five people into one append-only file, and it
 conflicted three times before the team adopted a procedure: rebuild the file from `main` and re-append the new
@@ -686,18 +701,24 @@ co-evolution stick is not good intentions but two gates that cannot be skipped: 
 
 **Technical limits.** The budget itself is not stored: `INV-003` compares against a caller-supplied limit, so the system enforces a rule it does not own (`PD-003`). There is no continuous runtime monitor; log files are outputs, not monitors, and every trace-matrix row says so. Live semantic evaluation runs only when a change is classified as semantic, and it depends on a protected environment whose credentials are a single point of failure. The model is reached through one provider; a gateway change is a human decision, not a fallback.
 
-**Process limits.** Required-check enforcement on `main` was verified only at the end (`DEBT-08`), closed with the blocked pull request in §6.2), and one merge is known to have bypassed a red gate before that (#32). Administrators can no longer bypass the rule, but a maintainer can still edit it, so the gates remain a strong convention rather than an outside guarantee. The AI-use log proves that a session was recorded and that earlier rows were not altered; it cannot prove that the entry is a good description of what happened. Role B's Phase 1 work has no AI-use entry, so that part of the trace is thin. Two documentation-only pull requests (#37, #40) were also merged without a session row: neither `docs/` nor `transcripts/` is a Gate 6 trigger path, so nothing forced an entry at the time. They are disclosed here rather than backfilled, because the log's value is that it is written when the work happens; a row reconstructed days later would be weaker evidence than a stated gap.
+**Process limits.** Required-check enforcement on `main` was verified only at the end (`DEBT-08`), closed with the blocked pull request in §6.2), and one merge is known to have bypassed a red gate before that (#32). Administrators can no longer bypass the rule, but a maintainer can still edit it, so the gates remain a strong convention rather than an outside guarantee. The AI-use log proves that a session was recorded and that earlier rows were not altered; it cannot prove that the entry is a good description of what happened. Role B's Phase 1 work has no AI-use entry — that phase predates the log gate — so that part of the trace is
+thin; role B's Phase 2 and Phase 3 sessions are both logged. Two documentation-only pull requests (#37, #40) were also merged without a session row: neither `docs/` nor `transcripts/` is a Gate 6 trigger path, so nothing forced an entry at the time. They are disclosed here rather than backfilled, because the log's value is that it is written when the work happens; a row reconstructed days later would be weaker evidence than a stated gap.
 
-**Measurement limits.** `NFR-001` and `NFR-002` have no committed evidence. The scripts exist and the procedure is written, but no sample was captured, and the logbook refuses to substitute another metric for the missing one. That is the largest evidence gap in the project.
+**Measurement limits.** `NFR-001` and `NFR-002` now have committed descriptive samples — 20 gateway calls,
+p50 2,422 ms, p95 2,851 ms, and 125 input / 12 output / 137 total tokens per call — but no approved
+numerical budget, so the figures describe behaviour rather than certify a threshold. The other evidence is
+finite-scope too: 48/48 logged calls, 16/16 accepted joins, 32/32 rejected joins and 3/3 guard-removal
+negatives.
 
-**What we would change with another sprint, in priority order.** (1) Capture and commit one latency and
-one token measurement with a written threshold; that is the only requirement group still `NOT_VERIFIED`.
-(2) Add the two pieces of evidence the suite and the log still lack: the regression test for a malformed
-prompt file, as a test-only pull request, and role B's Phase 1 sessions. (3) Turn the two remaining manual checks — secret scanning, and the entry-point import check beyond `policy_core` — into CI gates.
-(4) Package the classroom artefacts (demo video, slide deck) with the repository so the presentation
-evidence survives the submission.
+**What we would change with another sprint, in priority order.** (1) Approve latency and token thresholds
+if the course requires a numerical pass/fail criterion; the samples exist, the budget does not. (2) Add the
+malformed-prompt regression test as a test-only pull request. (3) Turn the two remaining manual checks —
+secret scanning and the entry-point import check beyond `policy_core` — into CI gates. (4) Package the
+classroom artefacts (demo video, slide deck) with the repository so the presentation evidence survives the
+submission.
 
-None of these is a redesign. They are the difference between a system that is now *enforced* and one that is also *measured*.
+None of these is a redesign. They are the difference between a system that is *enforced and measured* and one whose numbers have also
+been *approved*.
 
 ---
 
@@ -715,9 +736,10 @@ made the agent useful rather than merely fast. Without them the agent wrote plau
 plausible claims about it; with them, every claim had somewhere to be checked and some of the claims failed.
 The gates were worth their cost the first time one of them blocked a merge by the person who wrote it.
 
-The project is also honest about its limits. The two performance requirements have no measurement, the
-required-check enforcement is unproven, one merge bypassed a red gate, and one of five transcripts is still
-being written. Those gaps are recorded in the repository rather than in a paragraph that could be edited away,
+The project is also honest about its limits. `NFR-001` and `NFR-002` have measured descriptive samples but no
+approved budget; the secret scan and the traceability results are finite-scope evidence rather than
+universal guarantees; and the gate enforcement was verified late, by the blocked pull request in §6.2,
+after one documented bypass (#32). All five annotated transcripts are present. Those gaps are recorded in the repository rather than in a paragraph that could be edited away,
 which is why the report can state them without weakening its argument.
 
 The thesis the work finally supports is the one it started from, with one clause added:
@@ -733,7 +755,7 @@ The thesis the work finally supports is the one it started from, with one clause
 
 I came into this project expecting to write code, but I spent most of it deciding what counted as done.
 
-**Process Quality & Requirement Volatility.** Our registry held 36 formal requirements, and the ones that moved were not the features, but the names and criteria. Renaming `C-INV-###` to `INV-###` touched the registry, its schema and the trace matrix in one afternoon, and the C-owned documents kept an explicit `C-INV-###` to `INV-###` mapping so that historical references stayed readable. The other volatility was deliberate: eight open decisions were recorded rather than guessed, seven are still open, and one of them, the category whitelist (PD-002), was confirmed only on the last day. That discipline cost us speed but bought us a report we could defend line by line: 22 of 36 requirements implemented and tested, five implemented without a test that would notice their removal, six partial, three unverified — and the report states it in those terms.
+**Process Quality & Requirement Volatility.** Our registry held 36 formal requirements, and the ones that moved were not the features, but the names and criteria. Renaming `C-INV-###` to `INV-###` touched the registry, its schema and the trace matrix in one afternoon, and the C-owned documents kept an explicit `C-INV-###` to `INV-###` mapping so that historical references stayed readable. The other volatility was deliberate: eight open decisions were recorded rather than guessed, seven are still open, and one of them, the category whitelist (PD-002), was confirmed only on the last day. That discipline cost us speed but bought us a report we could defend line by line: 22 of 36 requirements implemented and tested, five implemented without a test that would notice their removal, six partial, two unverified — and the report states it in those terms.
 
 **Artifact Co-evolution.** When the measurement scripts moved from `src/` to `scripts/`, the documentation kept pointing to the old paths. PR #31 fixed two files, and I routed the same drift in `mcp-tool-manifest.md` to its owner, who fixed it in the Phase 3 audit. The prompt history is another example: v1.0 hallucinated category labels, so v1.1 closed the vocabulary. However, the version file itself then broke the semantic gate, not because the prompt was wrong, but because the YAML lacked a top-level `system_prompt` key for the evaluator to read. Gate 4 failed in zero seconds, and I first misread it as a model-quality problem. Reading the fixture took ten minutes; reading my own assumption took longer.
 
@@ -743,7 +765,44 @@ What I believe now: supervision is mostly the work of keeping two descriptions o
 
 ### 11.2 Qingzhi Lu — 60357951 (Role B, Requirements & Architecture)
 
-*(to be completed by the member)*
+My deliverables were the requirements registry (D1), the architecture set (D2) and the trace
+matrix. Most of that work happened in Phase 1 and Phase 2; in Phase 3 my job was not to add new
+architecture but to **reconcile the documents with the code that had actually been merged**, and
+to make sure every status line still told the truth.
+
+**Process Quality & Requirement Volatility.** The registry went through a small number of changes,
+but they were the expensive kind — names and criteria, not features. The `C-INV-###` → `INV-###`
+rename was mechanical yet not local: it touched the registry, the invariant register, the
+blueprint and the code, and a partial rename would have made the trace matrix cite identifiers
+the registry no longer defined. The other volatility was deliberate: `pending_confirmation`
+stayed a first-class status, so `NFR-001`/`NFR-002` could not be quietly marked "met" when their
+thresholds were `null` and no measurement had been committed.
+
+**Artifact Co-evolution.** In Phase 3 the blueprint had drifted from the code in ways that were
+only visible by reading both side by side. It still described persistence as "not implemented"
+although `src/storage.py` was on `main`; it used the old name `_append_review` where the code has
+`_append_rejection`; and it presented `_post` as returning a string when the implementation
+returns `(content, usage)`. Once the audit made those visible, the fix was not to rewrite the
+documents from memory but to correct them against the merged modules and to keep the measurement
+and reporting tooling *outside* the runtime transaction path. The same review also caught a
+cross-document inconsistency the per-file edits had left behind: `OPT-004` still said the records
+lived on D's branch and the join was "unverified", while `OPT-005`, `OPT-006` and the blueprint
+already said "on `main`". That is the co-evolution failure §8 describes, and it was fixed with one minimal edit.
+
+**Human Oversight vs Agent.** Working in documentation rather than code changed the failure modes
+but not the lesson. The agent was fast and locally correct, and still globally unaware: during one
+edit it silently dropped an existing `## Notes and non-claims` heading, and it left `OPT-004` out
+of step with the sibling rows. Both were caught by comparing the result against the other
+artefacts, not by trusting the agent's summary. My working rule became the same one the rest of
+the team arrived at: require a **read-only audit before any write**, authorise each stage
+separately, keep every change to the named files and fields, and refuse to upgrade evidence —
+"skipped" is not "passed", "merged" is not "correctness-verified", "CI configured" is not
+"CI run". The most useful habit was asking the agent to prove a claim against `git` and the code
+rather than against its own report.
+
+What I believe now: in an architecture role the scarce skill is not producing a document, it is
+keeping several descriptions of one system from drifting apart — and the agent is very good at
+producing one of them.
 
 ### 11.3 Qiang Wanyun — 60339160 (Role C, Security & Policy)
 
@@ -757,15 +816,48 @@ This experience taught me that AI is useful for organizing complex information, 
 
 ### 11.4 Liu Wanyang — 60915652 (Role D, Implementation)
 
-My main responsibility was to turn the agreed design into working code and to integrate it without breaking the existing ledger. The work centred on three changes: making the record append atomic, replacing the raw HTTP error text in the log with a short, secret-safe code, and making concurrent appends safe.
+My responsibility was to turn the agreed design into working code and integrate it without
+breaking the ledger. The work centred on four changes: making the record
+append atomic, replacing raw HTTP error text with a short secret-safe code, making
+concurrent appends safe, and closing the final audit's redaction and budget gaps.
 
-The first difficulty was a correctness bug rather than a missing feature. The original writer appended directly to the JSONL file, so an interruption could leave a partial line. I used OpenCode to implement a same-directory temporary file, `fsync`, and `os.replace`, and to add regression tests that inject a failure at the replace step. The second difficulty was a requirement change. The old test expected the error field to contain the response body (`http 500: err`), but the security contract required a short code such as `http 503 (LlmTransportError)`. This was a real contract collision, not a test failure to silence. I stopped the implementation, separated the test change into its own test-only commit, and asked the reviewer to approve that commit before the implementation continued.
+The first difficulty was a correctness bug rather than a missing feature. The original
+writer appended directly to the JSONL file, so an interruption could leave a partial line.
+I used OpenCode to implement a same-directory temporary file, fsync and os.replace, and to
+add regression tests that inject a failure at the replace step. The second difficulty was a
+contract collision: the old test expected the error field to contain the response body,
+while the security contract required a short code such as "http 503
+(LlmTransportError)". I stopped the implementation, separated the test change into its own
+test-only commit, and asked the reviewer to approve it before implementation continued.
 
-The most valuable difficulty was concurrency. My first implementation used a fixed temporary file name and no lock. The reviewer reproduced a lost record: two writers shared the temporary file, one reported success, but its record disappeared. The AI had not considered that two writers could read the same old state. I used OpenCode again to add a unique `mkstemp` temporary file and a sidecar file lock covering read, duplicate check, budget check, write, and replace. I also asked it to compare several lock designs rather than accept the first one.
+The most valuable difficulty was concurrency. My first implementation used a fixed temporary
+file name and no lock. The reviewer reproduced a lost record: two writers shared the
+temporary file, one reported success, but its record disappeared. The AI had not considered
+that two writers could read the same old state. I used OpenCode again to add a unique
+mkstemp temporary file and a sidecar lock covering read, duplicate check, budget check,
+write and replace, and asked it to compare several lock designs rather than accept the
+first.
 
-Human supervision caught several things the AI missed. The reviewer found the concurrency failure that the AI's tests did not cover. The reviewer also rejected `warnings.warn` for a post-commit unlock failure, because `-W error` could turn the warning into an exception and make a committed append look failed; we switched to a module logger. I caught a documentation error: the AI wrote that the temporary path was bound before the `try`, while the code still assigned it inside. I also had to reject a test that passed without reaching the atomic path, and a stale test mock that still intercepted `Path.open("a")` after the writer had moved to `os.replace`.
+The final security round tested a different muscle. C's audit found unredacted log fields
+and a stale-spend path that turned a budget rejection into a StorageError. E wrote eighteen
+expected-red tests; I implemented the redaction, the locked persisted-total budget and safe
+public errors. When the agent proposed a public stale flag, C rejected it as a bypass; the
+final design hides the internal path behind a controlled marker and records the trade-off
+in ADR-004. I then re-ran the #24 audit read-only on the merged main: 238 passed, no safe
+cleanup, and the remaining debt recorded rather than hidden.
 
-My main lesson is that AI is effective at producing a plausible implementation and a large number of tests, but it does not reliably question its own assumptions about failure modes, ordering, or contracts. The human role is to define the contract, design adversarial checks, and verify that the evidence matches the claim. In this project, the most important human contribution was not writing more code, but stopping the AI at the right moment and asking for a different design.
+Human supervision caught what the AI missed. The reviewer found the concurrency failure,
+rejected warnings.warn for a post-commit unlock failure under -W error, and rejected the
+public stale flag. I caught a documentation error: the AI wrote that the temporary path was
+bound before the try, while the code assigned it inside. I also rejected a test that passed
+without reaching the atomic path, and a stale mock that still intercepted Path.open("a").
+
+My main lesson is that AI is effective at producing a plausible implementation and a large
+number of tests, but it does not reliably question its own assumptions about failure modes,
+ordering or contracts. The human role is to define the contract, design adversarial checks,
+and verify that the evidence matches the claim. In this project, the most important human
+contribution was not writing more code, but stopping the AI at the right moment and asking
+for a different design.
 
 ### 11.5 Chen Guanyu — 61049313 (Role E, Verification & QA)
 
@@ -801,7 +893,7 @@ a correction stands as estimated.
 | Member | Commits (non-merge) | PRs opened | Reviews given | AI-use entries | Transcript |
 |---|---|---|---|---|---|
 | Tan Jingling | 39 | 8 | 30 | 9 | 820 lines |
-| Qingzhi Lu | 17 | 7 | 1 | 2 | 343 lines |
+| Qingzhi Lu | 17 | 7 | 1 | 2 | 343 lines (607 after PR #51) |
 | Qiang Wanyun | 47 | 5 | 3 | 17 | 938 lines |
 | Liu Wanyang | 54 | 6 | 11 | 10 | 824 lines |
 | Chen Guanyu | 23 | 7 | 12 | 36 | 240 lines |
