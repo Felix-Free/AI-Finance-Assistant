@@ -504,7 +504,7 @@ can be unit-tested offline at all.
 
 | Gate | What it blocks | How it decides | Known weakness |
 |---|---|---|---|
-| 1 · test-approval | implementation without a prior human approval on a test-only commit | reads GitHub review state; the approved commit must change tests and nothing else, and must precede the first implementation commit | required-check enforcement unverified (`DEBT-08`); one merge observed with the gate red (#32) |
+| 1 · test-approval | implementation without a prior human approval on a test-only commit | reads GitHub review state; the approved commit must change tests and nothing else, and must precede the first implementation commit | one merge observed with the gate red (#32); required on `main` since 23 November (see §6.2) |
 | 2 · static-analysis | a second model entry point, an API-shape change, a missing ADR for a security-critical path, a credential in a tracked path | `ruff`, `mypy`, `pip check`, a secret scan, an AST scan of transport imports, permission-path checks | `mypy` runs over `src` only; the secret scan inspects paths and content patterns, not history |
 | 3 · schema-validation | a registry that no longer validates | Draft 2020-12 validation of `requirements.yaml` against `req-schema.json`, and of the schema itself | validates shape and required fields, not meaning |
 | 4 · semantic-eval | a prompt or model change that degrades extraction quality | replays the live extraction set in the protected `semantic-eval` environment, five cases including the `not_a_record` branch | runs only when Gate 1 flags a semantic change; credentials are a single point of failure |
