@@ -519,28 +519,15 @@ decision "is this change semantic?" belongs to the gate that reads the diff, not
 
 ### 6.2 Enforcement versus intention
 
-The six checks exist, run on real pull requests, and have produced real verdicts — Gate 4 has executed live
-evaluations in the protected environment (five cases passing on the PR #20 path), and Gate 1 has blocked the
-leader's own merge. What is **not** verified is that they are *required* checks on `main`.
+The six checks exist, run on real pull requests, and have produced real verdicts — Gate 4 has executed live evaluations in the protected environment (five cases passing on the PR #20 path), and Gate 1 has blocked the leader's own merge. Since 23 November they are also *required* checks on `main`: the merge button stays disabled until every required check passes and one approval is recorded, and administrator bypass is disabled in the branch rule.
 
-That gap is recorded rather than glossed. `DEBT-08` in the debt register states that the enforced
-required-check status is unverified and that a real blocked-PR proof is still pending. It also records the
-event that made the gap undeniable: **PR #32 was merged while Gate 1 was red and Gate 4 was skipped**, by an
-administrator, under deadline pressure after the gate was reported as blocking progress. The merge decision
-was explicit, not accidental, and the code it carried — the CI helper, the verification constraints, the bug
-diary — is now the foundation of the gate system itself. Reverting it would remove the evidence along with the
-offence.
+That gap was real and is now closed. `DEBT-08` tracked it, and the acceptance test it named was run: a deliberately failing pull request ([#50](https://github.com/Felix-Free/AI-Finance-Assistant/pull/50)) is kept as evidence — Gate 1 failed on the missing test-first approval, Gate 2 on a second model entry point and Gate 6 on the missing session, and GitHub left the merge button disabled with **Required checks failing** and **1 approval required**.
 
-Three things follow, and the report states them plainly because a reader who checks the repository will find
-them anyway:
+Three things follow, and the report states them plainly because a reader who checks the repository will find them anyway:
 
-1. **The pipeline is implemented and demonstrated; the branch protection is not proven.** The merge button
-   was never observed to be disabled by the six checks.
-2. **One documented exception does not establish a policy.** The #32 exception is recorded in the review
-   memo and in `DEBT-08`; it does not mean the six checks are optional.
-3. **The remediation is specific.** Configure the checks as required on `main`, then open one deliberately
-   failing pull request, observe it blocked, and record the run. That is the acceptance test for D7, and it
-   is the one item in the brief that this project can still close.
+1. **The pipeline is implemented, demonstrated and now enforced.** The merge button was observed disabled on a pull request whose required checks failed, and on any pull request without an approval; administrator bypass is disabled.
+2. **One documented exception does not establish a policy.** The #32 exception is recorded in the review memo and in `DEBT-08`; it does not mean the six checks are optional.
+3. **The remediation is recorded, not promised.** The branch rule, the failing demo pull request and the closed `DEBT-08` entry together are the acceptance test for D7.
 
 ### 6.3 What was actually run
 
@@ -556,10 +543,7 @@ claim can be re-run rather than trusted.
 | Guard-removal negatives | one invariant at a time, guard disabled | the corresponding test fails in each case | `docs/measurements/phase2-qa-evidence.md` §2 |
 | Atomic append | fault injection at the replace step, plus three concurrent writers | original bytes preserved on failure; both concurrent records retained | `test/offline/test_phase3_concurrency.py` |
 
-The list of things that were **not** run is equally important: no merge-time live execution against the
-protected environment, no required-check enforcement, no genuinely blocked pull request, and no committed
-latency or token measurement. `NFR-001` and `NFR-002` remain `pending` with `null` thresholds, and the
-evaluation logbook forbids substituting pytest timing for a measurement.
+The list of things that were **not** run is equally important: no merge-time live execution against the protected environment, and no committed latency or token measurement. Required-check enforcement and the blocked pull request are no longer on this list (§6.2).
 
 ### 6.4 Defect trends and the debt register
 
@@ -690,38 +674,15 @@ co-evolution stick is not good intentions but two gates that cannot be skipped: 
 
 ## 9. Limitations, risks and what we would change
 
-**Technical limits.** The budget itself is not stored: `INV-003` compares against a caller-supplied limit, so
-the system enforces a rule it does not own (`PD-003`). There is no continuous runtime monitor; log files are
-outputs, not monitors, and every trace-matrix row says so. Live semantic evaluation runs only when a change is
-classified as semantic, and it depends on a protected environment whose credentials are a single point of
-failure. The model is reached through one provider; a gateway change is a human decision, not a fallback.
+**Technical limits.** The budget itself is not stored: `INV-003` compares against a caller-supplied limit, so the system enforces a rule it does not own (`PD-003`). There is no continuous runtime monitor; log files are outputs, not monitors, and every trace-matrix row says so. Live semantic evaluation runs only when a change is classified as semantic, and it depends on a protected environment whose credentials are a single point of failure. The model is reached through one provider; a gateway change is a human decision, not a fallback.
 
-**Process limits.** Required-check enforcement on `main` is unverified (`DEBT-08`), and one merge is known to
-have bypassed a red gate (#32). A human can still merge with administrator rights, which means the gates are a
-strong convention plus a demonstration rather than a hard guarantee. The AI-use log proves that a session was
-recorded and that earlier rows were not altered; it cannot prove that the entry is a good description of what
-happened. Role B's Phase 1 work has no AI-use entry, so that part of the trace is thin. Two
-documentation-only pull requests (#37, #40) were also merged without a session row: neither
-`docs/` nor `transcripts/` is a Gate 6 trigger path, so nothing forced an entry at the time.
-They are disclosed here rather than backfilled, because the log's value is that it is written
-when the work happens; a row reconstructed days later would be weaker evidence than a stated
-gap.
+**Process limits.** Required-check enforcement on `main` was verified only at the end (`DEBT-08`), closed with the blocked pull request in §6.2), and one merge is known to have bypassed a red gate before that (#32). Administrators can no longer bypass the rule, but a maintainer can still edit it, so the gates remain a strong convention rather than an outside guarantee. The AI-use log proves that a session was recorded and that earlier rows were not altered; it cannot prove that the entry is a good description of what happened. Role B's Phase 1 work has no AI-use entry, so that part of the trace is thin. Two documentation-only pull requests (#37, #40) were also merged without a session row: neither `docs/` nor `transcripts/` is a Gate 6 trigger path, so nothing forced an entry at the time. They are disclosed here rather than backfilled, because the log's value is that it is written when the work happens; a row reconstructed days later would be weaker evidence than a stated gap.
 
-**Measurement limits.** `NFR-001` and `NFR-002` have no committed evidence. The scripts exist and the
-procedure is written, but no sample was captured, and the logbook refuses to substitute another metric for the
-missing one. That is the largest evidence gap in the project.
+**Measurement limits.** `NFR-001` and `NFR-002` have no committed evidence. The scripts exist and the procedure is written, but no sample was captured, and the logbook refuses to substitute another metric for the missing one. That is the largest evidence gap in the project.
 
-**What we would change with another sprint, in priority order.** (1) Configure the six checks as required on
-`main` and demonstrate one genuinely blocked pull request — this closes the only D7 item that is still open and
-turns the #32 exception into a dated footnote. (2) Capture and commit one latency and one token measurement
-with a written threshold, which moves two requirements out of `NOT_VERIFIED`. (3) Complete the fifth annotated
-transcript and add role B's Phase 1 sessions to the log, which closes the two remaining traceability gaps.
-(4) Backfill the two AI-use rows that the log is missing (PR #40 and #37) and add the regression
-test for a malformed prompt file, so the evidence trail has no known holes.
+**What we would change with another sprint, in priority order.** (1) Configure the six checks as required on `main` and demonstrate one genuinely blocked pull request — this closes the only D7 item that is still open and turns the #32 exception into a dated footnote. (2) Capture and commit one latency and one token measurement with a written threshold, which moves two requirements out of `NOT_VERIFIED`. (3) Complete the fifth annotated transcript and add role B's Phase 1 sessions to the log, which closes the two remaining traceability gaps. (4) Backfill the two AI-use rows that the log is missing (PR #40 and #37) and add the regression test for a malformed prompt file, so the evidence trail has no known holes.
 
-None of these is a redesign. They are the difference between a system that is *built and demonstrated* and one
-that is *enforced and measured* — which is precisely the gap the course's blocking-gate requirement is
-designed to expose.
+None of these is a redesign. They are the difference between a system that is *built and demonstrated* and one that is *enforced and measured* — which is precisely the gap the course's blocking-gate requirement is designed to expose.
 
 ---
 
@@ -847,7 +808,7 @@ the architecture and security sets. No single artefact explains a weight on its 
 | D4 Verification governance | `verification-constraints.md`, `review-memo.md`, `debt-register.md`, `bug-diary.md` | complete; the review memo covers two pull requests, the bug diary and debt register lag behind `main` on two status labels |
 | D5 Transcripts | `transcripts/**` | complete — five annotated transcripts (A, B, C, D, E), all merged |
 | D6 Report | this file | complete except §11, which is filled by each member |
-| D7 Repository and gates | `.github/workflows/**`, `.github/ci_checks.py` | six gates implemented and run; required-check enforcement and a blocked-PR proof remain unverified (`DEBT-08`) |
+| D7 Repository and gates | `.github/workflows/**`, `.github/ci_checks.py` | six gates implemented and run, and required on `main` with administrator bypass disabled; a deliberately failing pull request ([#50](https://github.com/Felix-Free/AI-Finance-Assistant/pull/50)) is kept as the blocked-merge proof |
 | D8 Source and tests | `src/**`, `test/offline/**`, `test/live/**` | complete; 164 offline test functions, five live cases |
 | D9 Static prompt | `Prompt.md`, `prompts/prompt_v1.0.yaml`, `prompts/prompt_v1.1.yaml` | complete; both versions sit at the D9 location, and Gate 4 replays only the current one because v1.0 declares `status: superseded` (PR #41) |
 
