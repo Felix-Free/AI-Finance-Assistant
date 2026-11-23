@@ -3,9 +3,9 @@
 **Project:** AI-Powered Personal Finance Assistant — one natural-language sentence in, one validated spending record out.
 **Repository:** https://github.com/Felix-Free/AI-Finance-Assistant
 **Course:** CS5351 Agentic Software Engineering · City University of Hong Kong
-**Submission date:** 22 November 2026
-**Baseline:** `main` at `20417a7` · 239 commits · 59 merge commits · development window 6–22 November 2026
-**Length:** approximately 9,100 words excluding diagrams and tables.
+**Submission date:** 23 November 2026
+**Baseline:** `main` at `20417a7` · 239 commits · 59 merge commits · development window 6–23 November 2026
+**Length:** approximately 9,200 words excluding diagrams and tables.
 
 ---
 
@@ -60,7 +60,7 @@ aggregator connections (`NG-1`), no payments (`NG-2`), no investment advice (`NG
 
 The repository delivers the nine artefacts the brief asks for. D1 is the machine-readable requirements
 registry (`docs/req/requirements.yaml`, validated against `req-schema.json`). D2 is eleven architecture
-artefacts: the blueprint, four decision records, the invariant register, the trace matrix, the memory design,
+artefacts: the blueprint, six decision records, the invariant register, the trace matrix, the memory design,
 the permission model, the runtime policy catalog, the candidate evaluation table, the evaluation logbook, the
 risk list and the option ledger. D3 is the coding governance set (`AGENTS.md`, the structural constraints,
 the MCP tool manifest, the OpenCode permission model and the always-on rules). D4 is verification governance
@@ -123,7 +123,7 @@ token and latency measurement scripts, the six-gate CI pipeline, the review memo
 bug diary, and the Phase 2 architecture set (ADR-001 and ADR-002, the risk list, the option ledger, the
 evaluation table, the trace matrix rework).
 
-**Phase 3 (19–22 November)** hardened what the earlier phases had only claimed: concurrent appends
+**Phase 3 (19–23 November)** hardened what the earlier phases had only claimed: concurrent appends
 (ADR-003), log redaction and budget re-checking under the storage lock (ADR-004), the test-approval gate's
 behaviour across upstream syncs, the requirement-approval evidence, and the reporting infrastructure itself.
 
@@ -134,7 +134,7 @@ days, of which the majority are small, reviewable changes rather than large drop
 |---|---|---|---|
 | Phase 1 | 6–13 Nov | skeleton, governance, deterministic core, requirements | `AGENTS.md`, `docs/architecture/invariants.md`, `src/policy_core.py` |
 | Phase 2 | 13–20 Nov | storage, measurement, six gates, Phase 2 architecture set | `.github/workflows/ci.yml`, ADR-001/002, `docs/review-memo.md` |
-| Phase 3 | 19–22 Nov | atomic append, log redaction, gate hardening, report | ADR-003/004, `.github/ci_checks.py`, `Report.md` |
+| Phase 3 | 19–23 Nov | atomic append, log redaction, gate hardening, report | ADR-003/004, `.github/ci_checks.py`, `Report.md` |
 
 ### 2.3 The per-task protocol
 
@@ -323,7 +323,7 @@ overridden; a guard is a branch that raises.
 
 ### 4.2 Decisions that were actually hard
 
-Four architecture decision records carry the reasoning, and each one rejected a plausible alternative.
+Six architecture decision records carry the reasoning, and each one rejected a plausible alternative.
 
 **ADR-001 — the layered context structure.** What the model receives on every turn is assembled deliberately:
 identity and standing constraints, the task, the current sentence, and — after any compaction — a
@@ -355,7 +355,21 @@ and `raw` are written as `redacted:len=<n>`, `parsed` is `None` on every path, a
 survive. The rejected alternative was a public "recompute" flag on `append_validated`; it was refused because
 a flag is a door, whereas a module-private `_PIPELINE_ORIGIN` sentinel is a key that only one caller holds.
 
-A fifth record, `adr/phase2-ci-verification.md`, documents why CI is two workflows with six independent PR
+**ADR-005 — which prompts the semantic gate replays.** Gate 4 replayed every YAML under `prompts/`,
+so the archived v1.0 prompt could not sit where D9 asks for it: v1.0 has no `not_a_record` rule, and
+replaying it fails the live non-expense case for a prompt that production no longer sends. The decision
+keeps the scope decision in the gate — a prompt is replayed unless it declares `status: superseded` — and
+rejects the tempting alternative of parking the archive where the gate cannot see it, which would have
+bought a clean tree at the cost of a gate that reports on text nobody runs.
+
+**ADR-006 — deny the agent access to the runtime ledger.** The measurement workflow needs read and edit
+access to `data/**`, and the runtime ledger lives under the same prefix. The record adds an explicit
+`data/records.jsonl*` deny on top of the broad allow, covering the lock sidecar and the temporary files
+that share the prefix, and relies on the permission model's deny-overrides-allow rule. The rejected
+alternatives are instructive: removing all `data/**` access blocks approved measurement work, and
+trusting `.gitignore` or convention does not stop an agent from reading the evidence it is judged by.
+
+A seventh record, `adr/phase2-ci-verification.md`, documents why CI is two workflows with six independent PR
 jobs and two branch jobs, and why a workflow-level `paths:` filter was rejected: such a filter skips the whole
 workflow, which would hide the approval gate entirely.
 
@@ -804,7 +818,7 @@ the architecture and security sets. No single artefact explains a weight on its 
 | Deliverable | Artefact(s) | Status |
 |---|---|---|
 | D1 Requirements | `docs/req/requirements.yaml`, `docs/req/req-schema.json` | complete; 36 formal requirements, 8 open decisions, schema validated in CI |
-| D2 Architecture | `architecture-blueprint.md`, `docs/architecture/**` (blueprint, four ADRs, CI ADR, invariants, trace matrix, memory design, permission model, runtime policy catalog, evaluation table, evaluation logbook, risk list, option ledger) | complete |
+| D2 Architecture | `architecture-blueprint.md`, `docs/architecture/**` (blueprint, six ADRs, CI ADR, invariants, trace matrix, memory design, permission model, runtime policy catalog, evaluation table, evaluation logbook, risk list, option ledger) | complete |
 | D3 Coding governance | `AGENTS.md`, `docs/code-governance/**`, `.opencode/**`, `.agent/rules.md` | complete |
 | D4 Verification governance | `verification-constraints.md`, `review-memo.md`, `debt-register.md`, `bug-diary.md` | complete; the review memo covers two pull requests, the bug diary and debt register lag behind `main` on two status labels |
 | D5 Transcripts | `transcripts/**` | complete — five annotated transcripts (A, B, C, D, E), all merged |
